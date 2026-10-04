@@ -1,4 +1,4 @@
-GitGod v0.1.0 - Third-party notices
+GitGod - Third-party notices
 
 These notices cover desktop dependencies (including build dependencies) and bundled fonts. They do not license GitGod itself. Identical license texts are included once and referenced below.
 

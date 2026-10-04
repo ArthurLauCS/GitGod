@@ -2,20 +2,20 @@
 
 面向多分支日常工作的 Git 桌面可视化客户端，使用 Svelte、Tauri 和 Rust 构建。
 
-当前版本为 **v0.1.0 预览版**，提供 Windows x64 安装包。
+当前版本为 **v0.1.1 预览版**，提供 Windows x64 安装包。
 
 ![GitGod 桌面版：提交图、独立作者样式与差异视图](docs/images/desktop.jpg)
 
-截图来自安装后的桌面程序，使用虚构作者和本地示例仓库。
+截图来自桌面程序，使用虚构作者和本地示例仓库。
 
 ## 下载与安装
 
-从 [GitHub Releases](https://github.com/ArthurLauCS/GitGod/releases) 下载 `GitGod_0.1.0_x64-setup.exe`，运行安装程序。
+从 [GitHub Releases](https://github.com/ArthurLauCS/GitGod/releases) 下载 `GitGod_0.1.1_x64-setup.exe`，运行安装程序。
 
 - 支持 Windows 10 / 11 x64；本次发布在 Windows x64 上构建和验证。
 - 需要安装 [Git for Windows](https://git-scm.com/downloads/win)，并确保 `git` 在 PATH 中可用。
 - 需要 Microsoft Edge WebView2 Runtime；缺少时安装程序会尝试联网安装。
-- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\GitGod_0.1.0_x64-setup.exe -Algorithm SHA256` 核对文件。
+- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\GitGod_0.1.1_x64-setup.exe -Algorithm SHA256` 核对文件。
 
 首次使用前，在 Git 中配置提交身份及远程认证：
 
@@ -48,6 +48,22 @@ GitGod 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败，
 
 左键作者可临时聚焦其提交；作者获得键盘焦点后，按 `Shift+F10` 也可打开样式设置。
 
+### 查看和修改提交身份
+
+“本地更改”的提交区域显示 Git 实际使用的姓名和邮箱。点击“修改身份”，可保存当前仓库的 `user.name` 和 `user.email`，不影响全局配置或已有提交；关联工作树共享仓库配置。
+
+如果环境变量或 `author.*` / `committer.*` / 工作树配置覆盖了这两个值，界面会显示实际身份并提示覆盖情况。修补上次提交会保留原作者，界面显示本次提交者。
+
+![在提交区查看和修改当前仓库的提交身份](docs/images/commit-identity.jpg)
+
+### 大仓库与大文件
+
+首屏只加载 2000 条提交，完整历史后台补齐；提交图使用紧凑骨架、每 1024 行的检查点，以及按可见窗口获取作者和标题。切换已有分支、引用重命名时，只更新标记和选中行，提交起点集合不变就复用提交图。
+
+差异读取最多保留 4 MiB + 1 字节；超限后停止读取，Git 差异进程会被终止。超过上限的文件仍可整文件暂存或提交。
+
+在本机的 148 万提交 Linux 仓库及 128 MiB 文件上进行了复测，环境、数据规模、结果和复现命令见 [性能记录](docs/PERFORMANCE.md)。
+
 ### 已提供的功能
 
 - 多仓库标签页、最近仓库与会话恢复。
@@ -62,7 +78,7 @@ GitGod 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败，
 
 - 这是桌面预览版。VS Code 扩展、行级 Blame、PR / Issue 和托管平台协作集成尚未交付。
 - 提交列表只渲染可见行，但完整历史仍会在后台读取；超大仓库的时间和内存开销需要进一步实测优化。
-- 超过 4 MiB 的补丁不显示完整差异；当前限制在读取之后判断，不能视为大文件读取的内存上限。
+- 超过 4 MiB 的补丁不显示完整差异。读取限制约束的是应用保留的数据，Git 子进程在输出补丁前仍可能消耗较多时间和内存。
 - 提交图最多显示 24 条轨道，实际数量随面板宽度变化；高度并行的复杂历史可能无法显示所有连线。
 - 尚未提供自动更新，也未发布 macOS / Linux 安装包。
 - 部分操作提供撤销入口，并非所有 Git 操作都能撤销；删除分支、丢弃变更、重置等操作前应检查提示。
