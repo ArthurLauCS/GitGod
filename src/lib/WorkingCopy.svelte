@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as api from './api'
+  import ConflictView from './ConflictView.svelte'
   import DiffView from './DiffView.svelte'
   import { t } from './zh'
 
@@ -8,10 +9,23 @@
     entries,
     reload,
     oncommitted,
-  }: { tab: number; entries: api.Entry[]; reload: () => Promise<void>; oncommitted: () => void } = $props()
+    discard,
+    discardLines,
+  }: {
+    tab: number
+    entries: api.Entry[]
+    reload: () => Promise<void>
+    oncommitted: () => void
+    /** 丢弃这些路径的改动；确认对话框和执行都由上层负责 */
+    discard: (paths: string[]) => void
+    discardLines: (path: string, hunk: number, header: string, lines: number[]) => void
+  } = $props()
 
   let sel = $state<{ path: string; staged: boolean } | null>(null)
   let diff = $state.raw<api.Diff | null>(null)
+  /** 选中的是冲突文件时显示逐处解决的视图 */
+  let conflict = $state.raw<api.Conflict | null>(null)
+  let conflicted = $state(false)
   let message = $state('')
   let amend = $state(false)
   let error = $state('')
@@ -33,10 +47,10 @@
       return
     }
     let stale = false
-    api.diffWorktree(tab, s.path, s.staged, !s.staged && entry.unstaged === '?').then(
-      (d) => stale || (diff = d),
-      (e) => stale || (error = String(e)),
-    )
+    const fail = (e: unknown) => stale || (error = String(e))
+    conflicted = entry.conflicted
+    if (entry.conflicted) api.conflictRead(tab, s.path).then((c) => stale || (conflict = c), fail)
+    else api.diffWorktree(tab, s.path, s.staged, !s.staged && entry.unstaged === '?').then((d) => stale || (diff = d), fail)
     return () => (stale = true)
   })
 
@@ -76,6 +90,9 @@
   <div class="group">
     <div class="title">
       <span>{title}<span class="count">{items.length}</span><span class="hint">{hint}</span></span>
+      {#if !isStaged}
+        <button class="danger" disabled={busy || !items.length} onclick={() => discard([])}>{t.discardAll}</button>
+      {/if}
       <button disabled={busy || !items.length} onclick={() => (isStaged ? unstage(items) : stage(items))}>
         {isStaged ? t.unstageAll : t.stageAll}
       </button>
@@ -93,6 +110,9 @@
         >
           <span class="status s{s === '?' ? 'A' : s}" title={t.status[s] ?? s}>{s}</span>
           <span class="path">{base(e.path) || e.path}<span class="dir">{dir(e.path.replace(/\/$/, ''))}</span></span>
+          {#if !isStaged && !e.conflicted}
+            <button class="danger" disabled={busy} title={t.discardFile} onclick={(ev) => (ev.stopPropagation(), discard([e.path]))}>↶</button>
+          {/if}
           <button
             disabled={busy}
             title={isStaged ? t.unstageFile : t.stageFile}
@@ -124,11 +144,20 @@
       </div>
     </div>
   </div>
-  <DiffView
-    {diff}
-    mode={sel?.staged ? 'staged' : 'unstaged'}
-    onapply={(hunk, header, lines) => sel && run(api.applyLines(tab, sel.path, sel.staged, hunk, header, lines))}
-  />
+  {#if sel && conflicted}
+    <ConflictView
+      {conflict}
+      onresolve={(choices) => sel && run(api.conflictResolve(tab, sel.path, choices))}
+      ontake={(theirs) => sel && run(api.conflictTake(tab, sel.path, theirs))}
+    />
+  {:else}
+    <DiffView
+      {diff}
+      mode={sel?.staged ? 'staged' : 'unstaged'}
+      onapply={(hunk, header, lines) => sel && run(api.applyLines(tab, sel.path, sel.staged, hunk, header, lines))}
+      ondiscard={(hunk, header, lines) => sel && discardLines(sel.path, hunk, header, lines)}
+    />
+  {/if}
 </div>
 
 <style>
@@ -148,7 +177,7 @@
   }
   .clean {
     position: absolute;
-    inset: 40% 0 auto;
+    inset: 22% 0 auto;
     margin: 0;
     text-align: center;
     color: var(--muted);
@@ -181,6 +210,25 @@
     margin-left: 10px;
     font-weight: 400;
     opacity: 0.7;
+  }
+  .title > span:first-child {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .title button {
+    flex: none;
+  }
+  .title {
+    gap: 6px;
+  }
+  .title .danger:hover:enabled,
+  .item .danger:hover:enabled {
+    border-color: var(--red);
+    background: none;
+    color: var(--red);
   }
   .title button {
     padding: 1px 8px;

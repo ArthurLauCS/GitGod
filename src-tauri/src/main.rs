@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use engine::conflict::{self, Conflict, Side};
 use engine::detail::{self, Detail};
 use engine::diff::{self, Diff};
 use engine::status::{self, Entry};
@@ -155,13 +156,33 @@ fn tracking(state: State, tab: u32) -> Result<Vec<Track>> {
     refs::tracking(&session(&state, tab)?.repo)
 }
 
+#[tauri::command(async)]
+fn discard_lines(state: State, tab: u32, path: String, hunk: usize, header: String, lines: Vec<usize>) -> Result<()> {
+    diff::discard_lines(&session(&state, tab)?.repo, &path, hunk, &header, &lines)
+}
+
+#[tauri::command(async)]
+fn conflict_read(state: State, tab: u32, path: String) -> Result<Conflict> {
+    conflict::read(&session(&state, tab)?.repo, &path)
+}
+
+#[tauri::command(async)]
+fn conflict_resolve(state: State, tab: u32, path: String, choices: Vec<Side>) -> Result<()> {
+    conflict::resolve(&session(&state, tab)?.repo, &path, &choices)
+}
+
+#[tauri::command(async)]
+fn conflict_take(state: State, tab: u32, path: String, theirs: bool) -> Result<()> {
+    conflict::take(&session(&state, tab)?.repo, &path, theirs)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Tabs::default())
         .invoke_handler(tauri::generate_handler![
             initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
-            commit, last_message, diff_worktree, diff_commit, apply_lines, op, remotes, tracking
+            commit, last_message, diff_worktree, diff_commit, apply_lines, op, remotes, tracking, discard_lines, conflict_read, conflict_resolve, conflict_take
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -66,6 +66,10 @@ fn commits(gix: &gix::Repository) -> Result<Vec<(String, ObjectId)>> {
     for r in gix.references().map_err(err)?.all().map_err(err)? {
         let Ok(r) = r else { continue };
         let name = r.name().as_bstr().to_string();
+        // 贮藏在侧栏单独列出；它内部的几个提交不进提交图
+        if name == "refs/stash" {
+            continue;
+        }
         // 标签可以指向 tree/blob（内核的 v2.6.11），这些不进提交图
         let Ok(id) = r.into_fully_peeled_id() else { continue };
         if id.header().is_ok_and(|h| h.kind() == gix::object::Kind::Commit) {

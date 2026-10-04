@@ -48,6 +48,8 @@
   let menu = $state<ContextMenu>()
   let help = $state<Help>()
   let pendingJump: string | null = null
+  /** 可撤销的操作，最近的在最后。每项是把仓库退回去要执行的操作 */
+  let undos = $state.raw<{ title: string; ops: api.Op[] }[]>([])
 
   const badges = $derived.by(() => {
     const map = new Map<string, api.Ref[]>()
@@ -121,21 +123,88 @@
     selectedRow = null
     detail = null
     await loadAll()
-    if (refs.head_id) jump(refs.head_id)
+    // 正在看本地更改或工作树时不把人拽回提交图
+    if (refs.head_id && view === 'history') jump(refs.head_id)
   }
 
-  /** 执行一个写操作，记入命令日志；失败时展开日志。返回是否成功。 */
-  async function exec(op: api.Op): Promise<boolean> {
+  /** 根据操作之前的状态，算出把它退回去要执行什么；不能撤销的返回 null */
+  function undoFor(op: api.Op, before: api.Refs): api.Op[] | null {
+    const idOf = (name: string) => before.refs.find((r) => r.name === name)?.id
+    const back: api.Op | null = before.head ? { op: 'checkout', target: short(before.head) } : before.head_id ? { op: 'checkout', target: before.head_id } : null
+    switch (op.op) {
+      case 'checkout':
+      case 'track':
+        return back && [back]
+      case 'create_branch':
+        return [...(op.checkout && back ? [back] : []), { op: 'delete_branch', name: op.name, force: true }]
+      case 'delete_branch': {
+        const id = idOf(`refs/heads/${op.name}`)
+        return id ? [{ op: 'create_branch', name: op.name, start: id, checkout: false }] : null
+      }
+      case 'create_tag':
+        return [{ op: 'delete_tag', name: op.name }]
+      case 'delete_tag': {
+        const id = idOf(`refs/tags/${op.name}`)
+        return id ? [{ op: 'create_tag', name: op.name, target: id, message: '' }] : null
+      }
+      case 'merge':
+      case 'rebase':
+      case 'cherry_pick':
+      case 'revert':
+      case 'pull':
+        return before.head_id ? [{ op: 'reset', target: before.head_id, mode: 'keep' }] : null
+      case 'reset':
+        // 软/混合重置后改动还在工作区，用同样的方式移回去正好还原；硬重置后工作区是干净的，用 keep
+        return before.head_id ? [{ op: 'reset', target: before.head_id, mode: op.mode === 'hard' ? 'keep' : op.mode }] : null
+      case 'stash_push':
+      case 'discard':
+        return [{ op: 'stash_apply', name: 'stash@{0}', pop: true }]
+      default:
+        return null
+    }
+  }
+
+  /** 执行一个写操作，记入命令日志；失败时展开日志。`record` 为 false 时不进撤销列表。返回是否成功。 */
+  async function exec(op: api.Op, record = true): Promise<boolean> {
     busy = true
     error = ''
+    const before = refs
     const log = await guard(api.op(tab, op))
     busy = false
     if (log) {
       logs = [...logs, log]
       if (!log.ok) showLog = true
     }
+    const ok = log?.ok ?? false
+    const ops = ok && record ? undoFor(op, before) : null
+    if (ops) undos = [...undos, { title: t.opNames[op.op] ?? op.op, ops }]
     await refresh()
-    return log?.ok ?? false
+    return ok
+  }
+
+  async function undo() {
+    const last = undos.at(-1)
+    if (!last || !(await ask({ title: t.undoTitle(last.title), explain: explain.undo, confirm: t.undo }))) return
+    undos = undos.slice(0, -1)
+    for (const op of last.ops) if (!(await exec(op, false))) break
+  }
+
+  /** 提交不走 exec，单独记一条撤销：软重置回去，改动回到已暂存 */
+  async function committed() {
+    const before = refs.head_id
+    await refresh()
+    if (before) undos = [...undos, { title: t.opNames.commit, ops: [{ op: 'reset', target: before, mode: 'soft' }] }]
+  }
+
+  async function discard(paths: string[]) {
+    const v = await ask({ title: t.discardTitle(paths.length), explain: explain.discard, danger: true, confirm: t.discardConfirm })
+    if (v) exec({ op: 'discard', paths })
+  }
+
+  async function discardLines(file: string, hunk: number, header: string, lines: number[]) {
+    if (!(await ask({ title: t.discardLinesTitle, explain: explain.discard, danger: true, confirm: t.discardConfirm }))) return
+    await guard(api.discardLines(tab, file, hunk, header, lines))
+    await refresh()
   }
 
   const ask = (spec: Parameters<Dialog['ask']>[0]) => dialog!.ask(spec)
@@ -279,10 +348,10 @@
     if (!v) return
     if (v.how === 'carry') exec({ op: 'checkout', target: branch })
     else if (v.how === 'worktree') addWorktree(branch, true)
-    else if (await exec({ op: 'stash_push', message: t.autoStash(branch), include_untracked: false })) {
+    else if (await exec({ op: 'stash_push', message: t.autoStash(branch), include_untracked: false }, false)) {
       // 切换失败时改动也要放回来，所以不看 checkout 的结果
       await exec({ op: 'checkout', target: branch })
-      await exec({ op: 'stash_apply', name: 'stash@{0}', pop: true })
+      await exec({ op: 'stash_apply', name: 'stash@{0}', pop: true }, false)
     }
   }
 
@@ -451,6 +520,9 @@
     {/if}
     <span class="muted">{busy ? t.working : loadingAll ? t.loadingHistory : t.commits(count)}</span>
     <span class="spacer"></span>
+    <button disabled={busy || !undos.length} title={undos.length ? t.undoTitle(undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
+      ↶ {t.undo}
+    </button>
     <button disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}>{t.fetch}</button>
     <button disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>{t.pull}</button>
     <button disabled={busy} title={explain.push.short} onclick={() => push(head)}>{t.push}</button>
@@ -503,7 +575,7 @@
         <Detail {detail} onjump={jump} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
-        <WorkingCopy {tab} {entries} reload={loadStatus} oncommitted={refresh} />
+        <WorkingCopy {tab} {entries} reload={refresh} oncommitted={committed} {discard} {discardLines} />
       </div>
       {#if view === 'worktrees'}
         <div class="pane">

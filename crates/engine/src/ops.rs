@@ -15,6 +15,8 @@ pub enum ResetMode {
     Soft,
     Mixed,
     Hard,
+    /// 像硬重置一样移动分支，但会丢失未提交改动时拒绝执行；撤销操作用它
+    Keep,
 }
 
 /// 进行到一半、可以继续或中止的操作
@@ -43,6 +45,8 @@ pub enum Op {
     Revert { id: String },
     Reset { target: String, mode: ResetMode },
     StashPush { message: String, include_untracked: bool },
+    /// 丢弃这些路径的改动（空列表表示全部）。改动进贮藏列表而不是直接删除，后悔了可以取回
+    Discard { paths: Vec<String> },
     StashApply { name: String, pop: bool },
     StashDrop { name: String },
     /// 在 `path` 新建工作树：检出已有分支，或（给了 `new_branch`）从 `start` 新建分支
@@ -86,6 +90,7 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
                 ResetMode::Soft => "--soft",
                 ResetMode::Mixed => "--mixed",
                 ResetMode::Hard => "--hard",
+                ResetMode::Keep => "--keep",
             };
             args.extend(["reset", mode, safe(target)?]);
         }
@@ -97,6 +102,10 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
             if !message.is_empty() {
                 args.extend(["-m", message]);
             }
+        }
+        Op::Discard { paths } => {
+            args.extend(["stash", "push", "--include-untracked", "-m", "丢弃的改动", "--"]);
+            args.extend(paths.iter().map(String::as_str));
         }
         Op::StashApply { name, pop } => args.extend(["stash", if *pop { "pop" } else { "apply" }, safe(name)?]),
         Op::StashDrop { name } => args.extend(["stash", "drop", safe(name)?]),
@@ -148,6 +157,10 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
             let flag = if matches!(op, Op::Abort { .. }) { "--abort" } else { "--continue" };
             args.extend(["-c", "core.editor=true", cmd, flag]);
         }
+    }
+    if matches!(op, Op::Reset { mode: ResetMode::Keep, .. }) {
+        // 文件被改过又改回原样时，索引里的时间戳是旧的，reset --keep 会误判为有改动而拒绝
+        let _ = repo.git(&["update-index", "-q", "--refresh"]);
     }
     let args: Vec<String> = args.into_iter().map(str::to_owned).collect();
     Ok(repo.git_log(&args))

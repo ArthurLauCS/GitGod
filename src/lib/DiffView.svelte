@@ -9,11 +9,14 @@
     diff,
     mode = 'readonly',
     onapply,
+    ondiscard,
   }: {
     diff: Diff | null
     /** unstaged / staged 时可以按区块、按行暂存或取消暂存 */
     mode?: 'readonly' | 'unstaged' | 'staged'
     onapply?: (hunk: number, header: string, lines: number[]) => void
+    /** 只在 unstaged 模式下出现「丢弃」按钮 */
+    ondiscard?: (hunk: number, header: string, lines: number[]) => void
   } = $props()
 
   /** 选中的行，键为「区块下标:行下标」 */
@@ -44,11 +47,11 @@
     selected = next
   }
 
-  function apply(h: number) {
+  function apply(h: number, action = onapply) {
     const hunk = diff!.hunks[h]
     const lines = picked(h)
     // 没选行就是整个区块
-    onapply?.(h, hunk.header, lines.length ? lines : hunk.lines.flatMap((l, i) => (changed(l.kind) ? [i] : [])))
+    action?.(h, hunk.header, lines.length ? lines : hunk.lines.flatMap((l, i) => (changed(l.kind) ? [i] : [])))
   }
 
   function label(h: number) {
@@ -72,6 +75,11 @@
       {#each hunks as hunk, h (h)}
         <div class="hunk">
           <span>{hunk.header}</span>
+          {#if mode === 'unstaged' && ondiscard}
+            <button class="danger" onclick={() => apply(h, ondiscard)}>
+              {picked(h).length ? t.discardLines(picked(h).length) : t.discardHunk}
+            </button>
+          {/if}
           {#if mode !== 'readonly'}<button onclick={() => apply(h)}>{label(h)}</button>{/if}
         </div>
         {#each hunk.lines as line, i (i)}
@@ -133,6 +141,7 @@
     border-block: 1px solid var(--border);
   }
   .hunk span {
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -149,6 +158,10 @@
   .hunk button:hover {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .hunk button.danger:hover {
+    border-color: var(--red);
+    color: var(--red);
   }
   .line {
     display: flex;

@@ -39,7 +39,8 @@ export type Op =
   | { op: 'rebase'; onto: string }
   | { op: 'cherry_pick'; id: string }
   | { op: 'revert'; id: string }
-  | { op: 'reset'; target: string; mode: 'soft' | 'mixed' | 'hard' }
+  | { op: 'reset'; target: string; mode: 'soft' | 'mixed' | 'hard' | 'keep' }
+  | { op: 'discard'; paths: string[] }
   | { op: 'stash_push'; message: string; include_untracked: boolean }
   | { op: 'stash_apply'; name: string; pop: boolean }
   | { op: 'stash_drop'; name: string }
@@ -67,6 +68,14 @@ export interface Worktree {
   subject: string
   time: number
 }
+export type Block =
+  | { kind: 'text'; text: string }
+  | { kind: 'conflict'; ours: string; theirs: string; ours_label: string; theirs_label: string }
+export interface Conflict {
+  binary: boolean
+  blocks: Block[]
+}
+export type Side = 'ours' | 'theirs' | 'both'
 export interface Track {
   name: string
   ahead: number
@@ -137,3 +146,8 @@ export const applyLines = (tab: number, path: string, staged: boolean, hunk: num
 export const op = (tab: number, op: Op) => invoke<Log>('op', { tab, op })
 export const remotes = (tab: number) => invoke<string[]>('remotes', { tab })
 export const tracking = (tab: number) => invoke<Track[]>('tracking', { tab })
+export const discardLines = (tab: number, path: string, hunk: number, header: string, lines: number[]) =>
+  invoke<void>('discard_lines', { tab, path, hunk, header, lines })
+export const conflictRead = (tab: number, path: string) => invoke<Conflict>('conflict_read', { tab, path })
+export const conflictResolve = (tab: number, path: string, choices: Side[]) => invoke<void>('conflict_resolve', { tab, path, choices })
+export const conflictTake = (tab: number, path: string, theirs: boolean) => invoke<void>('conflict_take', { tab, path, theirs })

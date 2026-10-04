@@ -28,6 +28,7 @@
 </script>
 
 <script lang="ts">
+  import { tick } from 'svelte'
   import Explainer from './Explainer.svelte'
   import { t } from './zh'
 
@@ -42,11 +43,16 @@
   )
 
   /** 弹出对话框；确认返回各字段的值，取消返回 null */
-  export function ask(s: Spec): Promise<Values | null> {
+  export async function ask(s: Spec): Promise<Values | null> {
     spec = s
     skip = false
     values = Object.fromEntries((s.fields ?? []).map((f) => [f.key, f.value ?? (f.type === 'checkbox' ? false : '')]))
+    // 等内容渲染出来再打开，然后把焦点放到第一个输入框；没有输入框时放到确认按钮上，回车即确认。
+    // 危险操作不抢焦点，回车落在「取消」上。
+    await tick()
     dialog.showModal()
+    const target = dialog.querySelector<HTMLElement>('input[type=text]') ?? (s.danger ? null : dialog.querySelector<HTMLElement>('button[type=submit]'))
+    target?.focus()
     return new Promise((r) => (resolve = r))
   }
 
