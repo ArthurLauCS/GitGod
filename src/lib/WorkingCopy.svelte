@@ -13,6 +13,7 @@
     identity,
     editIdentity,
     identityBusy,
+    rebasing,
     reload,
     oncommitted,
     discard,
@@ -23,6 +24,7 @@
     identity: api.Identity | null
     editIdentity: () => void
     identityBusy: boolean
+    rebasing: boolean
     reload: () => Promise<void>
     oncommitted: () => void
     /** 丢弃这些路径的改动；确认对话框和执行都由上层负责 */
@@ -171,6 +173,7 @@
   {#if sel && conflicted}
     <ConflictView
       {conflict}
+      {rebasing}
       onresolve={(choices) => sel && run(api.conflictResolve(tab, sel.path, choices))}
       ontake={(theirs) => sel && run(api.conflictTake(tab, sel.path, theirs))}
     />

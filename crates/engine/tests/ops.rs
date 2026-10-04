@@ -147,7 +147,7 @@ fn remote_fetch_push_pull_and_upstream() {
     commit_file(&origin, 4, "d.txt", "d\n");
     ok(&repo, Op::Fetch);
     assert_eq!(refs::list(&repo).unwrap().ahead_behind, Some((0, 1)));
-    ok(&repo, Op::Pull);
+    ok(&repo, Op::Pull { rebase: true });
     assert_eq!(refs::list(&repo).unwrap().ahead_behind, Some((0, 0)));
 
     // 检出远程分支：建立跟踪它的本地分支
@@ -156,6 +156,62 @@ fn remote_fetch_push_pull_and_upstream() {
     ok(&repo, Op::Track { remote_branch: "origin/remote-only".into() });
     assert_eq!(upstream_of("refs/heads/remote-only").as_deref(), Some("refs/remotes/origin/remote-only"));
 
+    std::fs::remove_dir_all(&dir).unwrap();
+    std::fs::remove_dir_all(&origin).unwrap();
+}
+
+#[test]
+fn pull_explicit_mode_and_conflict_recovery() {
+    let origin = init("pull-origin");
+    commit_file(&origin, 1, "a.txt", "base\n");
+    let dir = init("pull-local");
+    git(&dir, 0, &["remote", "add", "origin", origin.to_str().unwrap()]);
+    git(&dir, 0, &["fetch", "-q", "origin"]);
+    git(&dir, 0, &["checkout", "-B", "main", "origin/main"]);
+    let repo = Repo::open(&dir).unwrap();
+    commit_file(&dir, 2, "local.txt", "local\n");
+    let before = id_of(&repo, "refs/heads/main").unwrap();
+    git(&dir, 0, &["branch", "keep-original"]);
+    commit_file(&origin, 3, "remote.txt", "remote\n");
+    // Explicit rebase wins over merge preferences and does not move sibling branches.
+    git(&dir, 0, &["config", "pull.rebase", "false"]);
+    git(&dir, 0, &["config", "branch.main.rebase", "false"]);
+    git(&dir, 0, &["config", "rebase.updateRefs", "true"]);
+    git(&dir, 0, &["config", "pull.ff", "only"]);
+    let log = ops::run(&repo, Op::Pull { rebase: true }).unwrap();
+    assert!(log.ok, "{}", log.output);
+    assert!(log.command.contains("pull --rebase"));
+    assert_ne!(id_of(&repo, "refs/heads/main"), Some(before.clone()));
+    assert_eq!(id_of(&repo, "refs/heads/keep-original"), Some(before));
+    git(&dir, 0, &["merge-base", "--is-ancestor", "origin/main", "HEAD"]);
+    let parents = std::process::Command::new("git").current_dir(&dir)
+        .args(["rev-list", "--parents", "-1", "HEAD"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&parents.stdout).split_whitespace().count(), 2);
+
+    // Unchecking rebase must override a repository that prefers rebase.
+    git(&dir, 0, &["config", "pull.rebase", "true"]);
+    git(&dir, 0, &["config", "branch.main.rebase", "true"]);
+    git(&dir, 0, &["config", "pull.ff", "true"]);
+    commit_file(&origin, 4, "remote2.txt", "remote2\n");
+    ok(&repo, Op::Pull { rebase: false });
+    let parents = std::process::Command::new("git").current_dir(&dir)
+        .args(["rev-list", "--parents", "-1", "HEAD"]).output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&parents.stdout).split_whitespace().count(), 3);
+
+    // A conflicting pull pauses; Abort restores the local tip, Continue keeps the resolution.
+    commit_file(&dir, 5, "a.txt", "local\n");
+    let before_conflict = id_of(&repo, "refs/heads/main").unwrap();
+    commit_file(&origin, 6, "a.txt", "remote\n");
+    assert!(!ops::run(&repo, Op::Pull { rebase: true }).unwrap().ok);
+    assert_eq!(refs::list(&repo).unwrap().in_progress, Some("rebase"));
+    ok(&repo, Op::Abort { what: InProgress::Rebase });
+    assert_eq!(id_of(&repo, "refs/heads/main"), Some(before_conflict));
+    assert!(!ops::run(&repo, Op::Pull { rebase: true }).unwrap().ok);
+    std::fs::write(dir.join("a.txt"), "resolved\n").unwrap();
+    status::stage(&repo, &["a.txt".into()]).unwrap();
+    ok(&repo, Op::Continue { what: InProgress::Rebase });
+    assert_eq!(refs::list(&repo).unwrap().in_progress, None);
+    assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "resolved\n");
     std::fs::remove_dir_all(&dir).unwrap();
     std::fs::remove_dir_all(&origin).unwrap();
 }
