@@ -197,7 +197,7 @@ export const t = {
   pushMismatch: (local: string, up: string) => `本地分支 ${local} 的上游是 ${up}，名字不一致。请确认要推送到哪里。`,
   pushTarget: '推送目标',
   pushToUpstream: (up: string) => `推送到上游 ${up}`,
-  pushToSameName: (r: string) => `推送到同名分支 ${r}，并改为上游`,
+  pushToSameName: (r: string) => `推送到同名分支 ${r}，并改为上游（推荐）`,
   remote: '远程',
   forcePush: '强制推送（--force-with-lease）',
   noRemote: '这个仓库没有配置远程',

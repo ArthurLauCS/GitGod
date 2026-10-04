@@ -260,7 +260,7 @@
       })
       if (v) exec({ op: 'push', remote, branch, remote_branch: branch, force: v.force as boolean, set_upstream: false })
     } else if (remote && upBranch) {
-      // 上游与本地分支不同名：不给默认值，必须明确选一个目标
+      // 上游与本地分支不同名：先推荐同名分支，仍需明确选一个目标
       const v = await ask({
         title: t.pushTitle(branch),
         warning: t.pushMismatch(branch, `${remote}/${upBranch}`),
@@ -271,8 +271,8 @@
             label: t.pushTarget,
             type: 'radio',
             options: [
-              { value: 'upstream', label: t.pushToUpstream(`${remote}/${upBranch}`) },
               { value: 'same', label: t.pushToSameName(`${remote}/${branch}`) },
+              { value: 'upstream', label: t.pushToUpstream(`${remote}/${upBranch}`) },
             ],
           },
           force,
