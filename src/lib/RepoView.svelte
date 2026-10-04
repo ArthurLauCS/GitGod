@@ -516,31 +516,42 @@
 
 <div class="repo" class:hidden={!active}>
   <header>
-    <span class="branch">{head ?? t.detached}</span>
-    {#if refs.ahead_behind}
-      <span class="muted" title={t.aheadBehindHint}>
-        {refs.ahead_behind[0] + refs.ahead_behind[1] ? `${t.toPush(refs.ahead_behind[0])} · ${t.toPull(refs.ahead_behind[1])}` : t.wtSynced}
+    <div class="tools">
+      <button class="btn quiet" disabled={busy || !undos.length} title={undos.length ? t.undoTitle(undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
+        <Icon name="undo" /><span>{t.undo}</span>
+      </button>
+      <span class="sep"></span>
+      <button class="btn quiet" disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}>
+        <Icon name="fetch" /><span>{t.fetch}</span>
+      </button>
+      <button class="btn quiet" disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>
+        <Icon name="pull" /><span>{t.pull}</span>
+      </button>
+      <button class="btn quiet" disabled={busy} title={explain.push.short} onclick={() => push(head)}>
+        <Icon name="push" /><span>{t.push}</span>
+      </button>
+    </div>
+    <!-- 当前分支放在正中：这是整个界面里最需要随时确认的一件事 -->
+    <div class="current" class:detached={!head} title={t.currentBranch}>
+      <Icon name="branch" size={18} />
+      <strong>{head ?? t.detached}</strong>
+      <span class="state" title={t.aheadBehindHint}>
+        {#if busy}{t.working}
+        {:else if loadingAll}{t.loadingHistory}
+        {:else if refs.ahead_behind && refs.ahead_behind[0] + refs.ahead_behind[1]}{t.toPush(refs.ahead_behind[0])} · {t.toPull(refs.ahead_behind[1])}
+        {:else if refs.ahead_behind}{t.wtSynced}
+        {:else}{t.commits(count)}{/if}
       </span>
-    {/if}
-    <span class="muted">{busy ? t.working : loadingAll ? t.loadingHistory : t.commits(count)}</span>
-    <span class="spacer"></span>
-    <button class="btn quiet" disabled={busy || !undos.length} title={undos.length ? t.undoTitle(undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
-      <Icon name="undo" />{t.undo}
-    </button>
-    <span class="sep"></span>
-    <button class="btn quiet" disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}><Icon name="fetch" />{t.fetch}</button>
-    <button class="btn quiet" disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>
-      <Icon name="pull" />{t.pull}
-    </button>
-    <button class="btn quiet" disabled={busy} title={explain.push.short} onclick={() => push(head)}><Icon name="push" />{t.push}</button>
-    <span class="sep"></span>
-    <button class="btn quiet" disabled={busy} title={explain.stash.short} onclick={stash}><Icon name="stash" />{t.stash}</button>
-    <button class="btn quiet" disabled={busy} title={explain.create_branch.short} onclick={() => newBranch('HEAD')}>
-      <Icon name="branch" />{t.newBranch}
-    </button>
-    <span class="sep"></span>
-    <button class="btn quiet" class:on={showLog} title={t.logHint} onclick={() => (showLog = !showLog)}><Icon name="log" />{t.log}</button>
-    <button class="btn quiet" onclick={() => help!.open()}><Icon name="help" />{t.help}</button>
+    </div>
+    <div class="tools end">
+      <button class="btn quiet" disabled={busy} title={explain.stash.short} onclick={stash}><Icon name="stash" /><span>{t.stash}</span></button>
+      <button class="btn quiet" disabled={busy} title={explain.create_branch.short} onclick={() => newBranch('HEAD')}>
+        <Icon name="branch" /><span>{t.newBranch}</span>
+      </button>
+      <span class="sep"></span>
+      <button class="btn quiet" class:on={showLog} title={t.logHint} onclick={() => (showLog = !showLog)}><Icon name="log" /><span>{t.log}</span></button>
+      <button class="btn quiet" title={t.help} onclick={() => help!.open()}><Icon name="help" /><span>{t.help}</span></button>
+    </div>
   </header>
   {#if error}<p class="error">{error}</p>{/if}
   {#if refs.in_progress}
@@ -628,33 +639,69 @@
     inset: 0;
     visibility: hidden;
   }
+  /* 左右两组工具等宽，当前分支才能落在正中 */
   header {
     flex: none;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    padding: 0 8px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    container-type: inline-size;
+  }
+  .tools {
     display: flex;
     align-items: center;
     gap: 4px;
-    height: 44px;
-    padding: 0 8px 0 16px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
+    min-width: 0;
   }
-  .branch {
-    margin-right: 8px;
-    padding: 2px 8px;
-    border-radius: var(--r-sm);
-    color: var(--accent);
+  .tools.end {
+    justify-content: flex-end;
+  }
+  /* 窗口窄时工具栏只留图标 */
+  @container (max-width: 1100px) {
+    .tools .btn span {
+      display: none;
+    }
+  }
+  .current {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    max-width: 44cqw;
+    padding: 0 16px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    border-radius: var(--r-lg);
     background: var(--accent-soft);
-    font-family: var(--display);
-    font-weight: 600;
+    color: var(--accent);
   }
-  .muted {
-    margin-right: 8px;
+  .current strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--display);
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .current .state {
+    flex: none;
+    padding-left: 8px;
+    border-left: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     color: var(--muted);
     font-size: var(--fs-sm);
     white-space: nowrap;
   }
-  .spacer {
-    flex: 1;
+  /* 游离状态不属于任何分支，换成警示色 */
+  .current.detached {
+    border-color: color-mix(in srgb, var(--yellow) 45%, transparent);
+    background: color-mix(in srgb, var(--yellow) 14%, transparent);
+    color: var(--yellow);
   }
   .sep {
     width: 1px;
@@ -680,6 +727,8 @@
     flex-direction: column;
   }
   .none {
+    font-family: var(--prose);
+    font-size: var(--fs-lg);
     flex: 1;
     display: grid;
     place-items: center;
@@ -709,6 +758,8 @@
   }
   .progress span {
     flex: 1;
+    font-family: var(--prose);
+    font-size: var(--fs-md);
   }
   .log {
     flex: none;

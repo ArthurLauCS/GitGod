@@ -110,6 +110,7 @@
   {#if active === null}
     <div class="welcome">
       <h1>{t.appName}</h1>
+      <p class="lead">{t.welcomeLead}</p>
       <p class="muted">{t.openRepoHint}</p>
       <button class="btn primary" onclick={pick}>{t.openRepo}</button>
       {#if error}<p class="error">{error}</p>{/if}
@@ -175,7 +176,7 @@
     background: var(--panel);
     border-color: var(--border);
     color: var(--text);
-    font-weight: 600;
+    font-weight: 700;
   }
   .tab span {
     overflow: hidden;
@@ -206,7 +207,7 @@
   }
   .welcome {
     margin: auto;
-    width: 480px;
+    width: 520px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -214,9 +215,20 @@
   }
   h1 {
     margin: 0;
-    font-size: var(--fs-2xl);
-    font-weight: 600;
+    color: var(--accent);
+    font-size: 48px;
+    font-weight: 800;
     letter-spacing: -0.02em;
+  }
+  .lead {
+    margin: 0 0 16px;
+    font-family: var(--prose);
+    font-size: var(--fs-xl);
+  }
+  .welcome .btn.primary {
+    height: 40px;
+    padding: 0 24px;
+    font-size: var(--fs-md);
   }
   h2 {
     margin: 32px 0 4px;

@@ -186,6 +186,8 @@
     margin: 0;
     text-align: center;
     color: var(--muted);
+    font-family: var(--prose);
+    font-size: var(--fs-lg);
     pointer-events: none;
   }
   .group {
@@ -292,7 +294,8 @@
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
-    font-family: var(--display);
+    font-family: var(--prose);
+    font-size: var(--fs-md);
     line-height: var(--lh-body);
     outline: none;
     user-select: text;

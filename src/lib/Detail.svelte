@@ -110,7 +110,7 @@
   .message {
     max-width: 72ch;
     margin: 0 0 16px;
-    font-family: var(--font);
+    font-family: var(--prose);
     font-size: var(--fs-md);
     line-height: var(--lh-body);
     white-space: pre-wrap;
@@ -205,5 +205,7 @@
   .empty {
     margin: auto;
     color: var(--muted);
+    font-family: var(--prose);
+    font-size: var(--fs-lg);
   }
 </style>

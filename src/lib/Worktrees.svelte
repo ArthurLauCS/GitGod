@@ -70,14 +70,16 @@
   }
   h2 {
     margin: 0 0 8px;
-    font-size: var(--fs-xl);
-    font-weight: 600;
+    font-size: var(--fs-2xl);
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
   p {
     margin: 0;
     max-width: 38em;
     color: var(--muted);
+    font-family: var(--prose);
+    font-size: var(--fs-lg);
     line-height: var(--lh-body);
   }
   .table {

@@ -96,7 +96,8 @@
   header span {
     flex: 1;
     color: var(--yellow);
-    font-size: var(--fs-sm);
+    font-family: var(--prose);
+    font-size: var(--fs-md);
   }
   .body {
     flex: 1;

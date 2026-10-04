@@ -18,11 +18,17 @@
 </div>
 
 <style>
+  /* 说明文字是写给人慢慢读的，用文楷和控件区分开 */
   .explain {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    font-family: var(--prose);
+    font-size: var(--fs-md);
     line-height: var(--lh-body);
+  }
+  p:first-child {
+    font-size: var(--fs-lg);
   }
   p,
   ul {
@@ -40,9 +46,9 @@
     padding: 8px 12px;
     border-left: 2px solid var(--border-strong);
     color: var(--muted);
-    font-size: var(--fs-sm);
   }
   strong {
+    font-family: var(--display);
     color: var(--text);
     font-weight: 600;
   }

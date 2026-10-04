@@ -1,56 +1,65 @@
 /*
  * 设计令牌。组件里的颜色、字号、间距、圆角、动效都从这里取，不写裸值。
  * 间距 scale：2 4 8 12 16 24 32 48；字号音阶 1.2：10 12 14 17 21 25。
+ *
+ * 配色和气质参照 Claude 的公开界面：暖调的象牙白与炭黑、陶土色强调、衬线标题。
+ * Claude 自用的字体不公开授权，这里用开源字体替代（思源宋体、霞鹜文楷）。
  */
 :root {
   color-scheme: dark;
 
-  /* 底色由深到浅三层：窗口底、面板、浮起的控件 */
-  --bg: #121316;
-  --panel: #1a1c21;
-  --raised: #24272e;
-  --border: #2d3139;
-  --border-strong: #454b57;
-  --text: #e4e6eb;
-  --muted: #959ca9;
-  --hover: rgba(255, 255, 255, 0.05);
+  /* 底色由深到浅三层：内容区、面板、浮起的控件。全部带一点暖调 */
+  --bg: #1f1e1d;
+  --panel: #262624;
+  --raised: #30302e;
+  --border: #3a3936;
+  --border-strong: #5a5852;
+  --text: #f0eee6;
+  --muted: #a9a69c;
+  --hover: rgba(240, 238, 230, 0.06);
 
-  --accent: #6aa6ff;
-  --accent-soft: rgba(106, 166, 255, 0.16);
-  --on-accent: #0c1424;
-  --green: #62c684;
-  --yellow: #e2b65a;
-  --red: #f0747c;
-  --on-danger: #1f0b0d;
+  /* 陶土色：全应用唯一的强调色 */
+  --accent: #e08363;
+  --accent-soft: rgba(224, 131, 99, 0.16);
+  --on-accent: #1f1e1d;
+  --green: #91b876;
+  --yellow: #e0b35a;
+  --red: #ef7b88;
+  --on-danger: #1f1e1d;
 
   /* 提交图泳道 */
-  --lane-0: #6aa6ff;
-  --lane-1: #62c684;
-  --lane-2: #e2b65a;
-  --lane-3: #c792f5;
-  --lane-4: #f0747c;
-  --lane-5: #56c8d2;
-  --lane-6: #f2955a;
-  --lane-7: #a3adbf;
+  --lane-0: #e08363;
+  --lane-1: #91b876;
+  --lane-2: #e0b35a;
+  --lane-3: #b79ad9;
+  --lane-4: #6a9bcc;
+  --lane-5: #5fb8a8;
+  --lane-6: #e08fb0;
+  --lane-7: #a9a69c;
 
   /* 作者色：按名字哈希取一个，同一个人在任何仓库里颜色都一样 */
-  --author-0: #7fb2ff;
-  --author-1: #6fd08f;
-  --author-2: #e6bd68;
-  --author-3: #cf9ff7;
-  --author-4: #f38a90;
-  --author-5: #62d0d9;
-  --author-6: #f5a26b;
-  --author-7: #b4c96a;
-  --author-8: #f092c8;
-  --author-9: #9aa7ff;
+  --author-0: #e59a7f;
+  --author-1: #9cc281;
+  --author-2: #e3bd6e;
+  --author-3: #c1a6e3;
+  --author-4: #84b1dc;
+  --author-5: #6fc4b5;
+  --author-6: #e79abb;
+  --author-7: #c9b98a;
+  --author-8: #9fb0e8;
+  --author-9: #d6a36a;
 
-  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.45);
-  --backdrop: rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(20, 19, 18, 0.55);
 
-  /* 界面文字、标题、等宽三个字族，各管一个区域 */
+  /* 四个字族各管一个区域：
+     --font    界面控件：无衬线，小字号下最清楚
+     --display 标题和名字：思源宋体，衬线带来书卷气
+     --prose   给人读的整段话（操作说明、提交说明、空状态）：霞鹜文楷，手写感，和控件区分开
+     --mono    代码、哈希、路径 */
   --font: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
-  --display: 'Segoe UI Variable Display', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+  --display: 'Noto Serif SC Variable', Georgia, 'Songti SC', serif;
+  --prose: 'LXGW WenKai', 'KaiTi', 'Noto Serif SC Variable', serif;
   --mono: 'Cascadia Code', 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
 
   --fs-xs: 10px;
@@ -59,60 +68,60 @@
   --fs-lg: 17px;
   --fs-xl: 21px;
   --fs-2xl: 25px;
-  --lh-tight: 1.25;
-  --lh-body: 1.65;
+  --lh-tight: 1.3;
+  --lh-body: 1.7;
 
-  --r-sm: 4px;
-  --r-md: 6px;
-  --r-lg: 10px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 14px;
 
   --row: 28px;
 
   --t-press: 80ms ease-out;
-  --t-pop: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-pop: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #f1f2f5;
-  --panel: #fafafb;
-  --raised: #e9ebef;
-  --border: #dadde3;
-  --border-strong: #b3b9c4;
-  --text: #1b1e25;
-  --muted: #5a616e;
-  --hover: rgba(15, 20, 30, 0.05);
+  --bg: #faf9f5;
+  --panel: #f0eee6;
+  --raised: #e6e3d8;
+  --border: #dbd8cc;
+  --border-strong: #b4b0a2;
+  --text: #141413;
+  --muted: #5e5d57;
+  --hover: rgba(20, 20, 19, 0.05);
 
-  --accent: #2460d6;
-  --accent-soft: rgba(36, 96, 214, 0.12);
-  --on-accent: #f7f9fc;
-  --green: #1c7a3e;
-  --yellow: #8a5f00;
-  --red: #c12f3a;
-  --on-danger: #fbf5f5;
+  --accent: #a04423;
+  --accent-soft: rgba(160, 68, 35, 0.12);
+  --on-accent: #faf9f5;
+  --green: #3f6b2f;
+  --yellow: #7a5607;
+  --red: #a82835;
+  --on-danger: #faf9f5;
 
-  --lane-0: #2460d6;
-  --lane-1: #1c8a47;
-  --lane-2: #a87400;
-  --lane-3: #8a45d1;
-  --lane-4: #c12f3a;
-  --lane-5: #0f8791;
-  --lane-6: #c25a14;
-  --lane-7: #667085;
+  --lane-0: #b5532d;
+  --lane-1: #5a8548;
+  --lane-2: #a87a1c;
+  --lane-3: #7b5bb0;
+  --lane-4: #3f79b5;
+  --lane-5: #2f8a7c;
+  --lane-6: #b8527f;
+  --lane-7: #76746c;
 
-  --author-0: #1f58c7;
-  --author-1: #187a3d;
-  --author-2: #8a5f00;
-  --author-3: #7a3cc0;
-  --author-4: #b82a35;
-  --author-5: #0a6b74;
-  --author-6: #ad4f10;
-  --author-7: #526610;
-  --author-8: #b0307c;
-  --author-9: #4a55c9;
+  --author-0: #9a4522;
+  --author-1: #40682f;
+  --author-2: #77540a;
+  --author-3: #63469a;
+  --author-4: #2b5e93;
+  --author-5: #1c6c60;
+  --author-6: #973a66;
+  --author-7: #63552a;
+  --author-8: #4250a3;
+  --author-9: #84511a;
 
-  --shadow-pop: 0 12px 32px rgba(20, 28, 45, 0.18);
-  --backdrop: rgba(20, 28, 45, 0.3);
+  --shadow-pop: 0 16px 40px rgba(60, 50, 30, 0.18);
+  --backdrop: rgba(40, 36, 28, 0.32);
 }
 
 * {
@@ -139,6 +148,7 @@ h1,
 h2,
 h3 {
   font-family: var(--display);
+  font-weight: 600;
   line-height: var(--lh-tight);
   text-wrap: balance;
 }

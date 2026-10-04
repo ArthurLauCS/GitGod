@@ -127,8 +127,8 @@
   }
   h2 {
     margin: 0;
-    font-size: var(--fs-lg);
-    font-weight: 600;
+    font-size: var(--fs-xl);
+    font-weight: 700;
   }
   p {
     margin: 0;

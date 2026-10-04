@@ -123,8 +123,8 @@
     padding: 48px 24px;
     text-align: center;
     color: var(--muted);
-    font-family: var(--font);
-    font-size: var(--fs-md);
+    font-family: var(--prose);
+    font-size: var(--fs-lg);
   }
   .hunk {
     position: sticky;

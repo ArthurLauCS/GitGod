@@ -67,8 +67,8 @@
   h2 {
     flex: 1;
     margin: 0;
-    font-size: var(--fs-xl);
-    font-weight: 600;
+    font-size: var(--fs-2xl);
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
   .legend {
@@ -76,7 +76,8 @@
     margin: 0;
     padding: 0 24px 16px;
     color: var(--muted);
-    font-size: var(--fs-sm);
+    font-family: var(--prose);
+    font-size: var(--fs-md);
     line-height: var(--lh-body);
     border-bottom: 1px solid var(--border);
   }
@@ -94,7 +95,8 @@
   }
   h3 {
     margin: 0 0 12px;
-    font-size: var(--fs-lg);
-    font-weight: 600;
+    color: var(--accent);
+    font-size: var(--fs-xl);
+    font-weight: 700;
   }
 </style>

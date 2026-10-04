@@ -2,6 +2,7 @@
   import type { Ref, Row } from './api'
   import { authorColor } from './author'
   import { layout } from './layout.svelte'
+  import { prefs, savePrefs } from './prefs.svelte'
   import Splitter from './Splitter.svelte'
   import { theme } from './theme.svelte'
   import { fmtTime, t } from './zh'
@@ -41,6 +42,8 @@
   let canvas = $state<HTMLCanvasElement>()
   /** 只高亮这个作者的提交，其余变淡 */
   let focusAuthor = $state<string | null>(null)
+  /** 作者列的显示方式菜单是否展开 */
+  let authorMenu = $state(false)
   const cols = $derived(`minmax(0, 1fr) min(${layout.author}px, 18vw) min(${layout.date}px, 13vw) 72px`)
   let scrollTop = $state(0)
   let height = $state(0)
@@ -161,6 +164,8 @@
   const short = (name: string) => name.replace(/^refs\/(heads|tags|remotes)\//, '')
 </script>
 
+<svelte:window onmousedown={() => (authorMenu = false)} />
+
 <div class="head" style:padding-left="{graphW}px" style:grid-template-columns={cols}>
   <span>
     {t.colSubject}
@@ -168,7 +173,17 @@
       <button class="chip" style:color={authorColor(focusAuthor)} onclick={() => (focusAuthor = null)}>{t.onlyAuthor(focusAuthor)} ×</button>
     {/if}
   </span>
-  <span class="cell"><span class="grip" title={t.dragHint}><Splitter key="author" min={80} max={360} invert /></span>{t.colAuthor}</span>
+  <span class="cell">
+    <span class="grip" title={t.dragHint}><Splitter key="author" min={80} max={360} invert /></span>
+    <button class="colbtn" title={t.authorStyle} onclick={() => (authorMenu = !authorMenu)}>{t.colAuthor} ▾</button>
+    {#if authorMenu}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="popover" onmousedown={(e) => e.stopPropagation()}>
+        <label><input type="checkbox" bind:checked={prefs.authorBorder} onchange={savePrefs} />{t.authorBorder}</label>
+        <label><input type="checkbox" bind:checked={prefs.authorFill} onchange={savePrefs} />{t.authorFill}</label>
+      </div>
+    {/if}
+  </span>
   <span class="cell"><span class="grip" title={t.dragHint}><Splitter key="date" min={96} max={220} invert /></span>{t.colDate}</span>
   <span>{t.colCommit}</span>
 </div>
@@ -203,6 +218,8 @@
             </span>
             <button
               class="author"
+              class:boxed={prefs.authorBorder}
+              class:filled={prefs.authorFill}
               style:color={authorColor(row.author)}
               title={t.authorHint}
               onclick={(e) => (e.stopPropagation(), (focusAuthor = focusAuthor === row.author ? null : row.author))}
@@ -227,6 +244,8 @@
     padding-right: 12px;
   }
   .head {
+    position: relative;
+    z-index: 3;
     flex: none;
     height: var(--row);
     color: var(--muted);
@@ -301,6 +320,55 @@
   }
   .author:hover {
     text-decoration: underline;
+  }
+  /* 可选：给作者名加边框和（或）底色，颜色都跟着作者色走 */
+  .author.boxed,
+  .author.filled {
+    justify-self: start;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--r-lg);
+    line-height: 20px;
+  }
+  .author.boxed {
+    border-color: currentColor;
+  }
+  .author.filled {
+    background: color-mix(in srgb, currentColor 18%, transparent);
+  }
+  .colbtn {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    cursor: pointer;
+  }
+  .colbtn:hover {
+    color: var(--text);
+  }
+  .popover {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    background: var(--raised);
+    box-shadow: var(--shadow-pop);
+    color: var(--text);
+    animation: pop var(--t-pop);
+  }
+  .popover label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
   }
   .muted {
     color: var(--muted);
