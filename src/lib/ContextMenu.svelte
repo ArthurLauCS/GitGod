@@ -1,6 +1,6 @@
 <script lang="ts" module>
   /** null 表示分隔线 */
-  export type Item = { label: string; action: () => void; danger?: boolean } | null
+  export type Item = { label: string; hint?: string; action: () => void; danger?: boolean } | null
 </script>
 
 <script lang="ts">
@@ -33,7 +33,10 @@
   <div class="menu" bind:this={menu} style:left="{x}px" style:top="{y}px" role="menu">
     {#each items as item, i (i)}
       {#if item}
-        <button role="menuitem" class:danger={item.danger} onclick={() => (close(), item.action())}>{item.label}</button>
+        <button role="menuitem" class:danger={item.danger} onclick={() => (close(), item.action())}>
+          {item.label}
+          {#if item.hint}<small>{item.hint}</small>{/if}
+        </button>
       {:else}
         <hr />
       {/if}
@@ -45,7 +48,7 @@
   .menu {
     position: fixed;
     z-index: 10;
-    min-width: 200px;
+    min-width: 260px;
     padding: 5px;
     border: 1px solid var(--border);
     border-radius: 7px;
@@ -65,6 +68,11 @@
   button:hover {
     background: var(--accent);
     color: #fff;
+  }
+  small {
+    display: block;
+    font-size: 11px;
+    opacity: 0.65;
   }
   .danger {
     color: var(--red);

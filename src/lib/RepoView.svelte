@@ -4,7 +4,9 @@
   import ContextMenu, { type Item } from './ContextMenu.svelte'
   import Detail from './Detail.svelte'
   import Dialog from './Dialog.svelte'
+  import { explain, type ExplainKey } from './explain'
   import Graph from './Graph.svelte'
+  import Help from './Help.svelte'
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
   import { t } from './zh'
@@ -28,6 +30,7 @@
   let graph = $state<Graph>()
   let dialog = $state<Dialog>()
   let menu = $state<ContextMenu>()
+  let help = $state<Help>()
   let pendingJump: string | null = null
 
   const badges = $derived.by(() => {
@@ -116,9 +119,15 @@
 
   const ask = (spec: Parameters<Dialog['ask']>[0]) => dialog!.ask(spec)
 
+  /** 先用白话和示意图说明这个操作会发生什么，确认后再执行；勾过「不再显示」的直接执行 */
+  async function explained(key: ExplainKey, title: string, op: api.Op) {
+    if (localStorage.getItem(`skip:${key}`) || (await ask({ title, explain: explain[key], skipKey: key }))) exec(op)
+  }
+
   async function newBranch(start: string) {
     const v = await ask({
       title: t.newBranch,
+      explain: explain.create_branch,
       fields: [
         { key: 'name', label: t.branchName, type: 'text' },
         { key: 'checkout', label: t.checkoutAfterCreate, type: 'checkbox', value: true },
@@ -130,6 +139,7 @@
   async function stash() {
     const v = await ask({
       title: t.stashTitle,
+      explain: explain.stash,
       fields: [
         { key: 'message', label: t.stashMessage, type: 'text', optional: true },
         { key: 'untracked', label: t.includeUntracked, type: 'checkbox', value: true },
@@ -149,7 +159,13 @@
     const force = { key: 'force', label: t.forcePush, type: 'checkbox' as const }
 
     if (remote && upBranch === branch) {
-      const v = await ask({ title: t.pushTitle(branch), message: t.pushTo(`${remote}/${branch}`), confirm: t.push, fields: [force] })
+      const v = await ask({
+        title: t.pushTitle(branch),
+        explain: explain.push,
+        message: t.pushTo(`${remote}/${branch}`),
+        confirm: t.push,
+        fields: [force],
+      })
       if (v) exec({ op: 'push', remote, branch, remote_branch: branch, force: v.force as boolean, set_upstream: false })
     } else if (remote && upBranch) {
       // 上游与本地分支不同名：不给默认值，必须明确选一个目标
@@ -176,6 +192,7 @@
     } else {
       const v = await ask({
         title: t.pushTitle(branch),
+        explain: explain.push,
         message: t.pushNew(`${remotes.length === 1 ? remotes[0] : '<' + t.remote + '>'}/${branch}`),
         confirm: t.push,
         fields: [
@@ -192,7 +209,7 @@
   async function reset(target: string) {
     const v = await ask({
       title: t.resetTitle(head ?? 'HEAD'),
-      warning: t.resetHardWarning,
+      explain: explain.reset,
       danger: true,
       fields: [
         {
@@ -214,8 +231,9 @@
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
 
   function activate(kind: Kind, name: string) {
-    if (kind === 'branch' || kind === 'tag') exec({ op: 'checkout', target: short(name) })
-    else if (kind === 'remote') exec({ op: 'track', remote_branch: short(name) })
+    if (kind === 'branch') exec({ op: 'checkout', target: short(name) })
+    else if (kind === 'tag') explained('checkout_commit', short(name), { op: 'checkout', target: short(name) })
+    else if (kind === 'remote') explained('track', short(name), { op: 'track', remote_branch: short(name) })
     else exec({ op: 'stash_apply', name, pop: false })
   }
 
@@ -226,11 +244,12 @@
     const items: Item[] = []
     if (kind === 'stash') {
       items.push(
-        { label: t.stashApply, action: () => exec({ op: 'stash_apply', name, pop: false }) },
-        { label: t.stashPop, action: () => exec({ op: 'stash_apply', name, pop: true }) },
+        { label: t.stashApply, hint: '把收起来的改动放回工作区，贮藏保留', action: () => exec({ op: 'stash_apply', name, pop: false }) },
+        { label: t.stashPop, hint: '放回工作区，并从贮藏列表里移除', action: () => exec({ op: 'stash_apply', name, pop: true }) },
         null,
         {
           label: t.stashDrop,
+          hint: explain.stash_drop.short,
           danger: true,
           action: async () => {
             if (await ask({ title: t.dropStashTitle, warning: t.dropStashWarning, danger: true })) exec({ op: 'stash_drop', name })
@@ -240,17 +259,22 @@
     } else {
       if (!current) {
         items.push(
-          { label: kind === 'remote' ? t.checkoutRemote : t.checkout, action: () => activate(kind, name) },
-          { label: t.mergeInto(onto), action: () => exec({ op: 'merge', target: s }) },
-          { label: t.rebaseOnto(onto), action: () => exec({ op: 'rebase', onto: s }) },
+          {
+            label: kind === 'remote' ? t.checkoutRemote : kind === 'tag' ? t.checkoutCommit : t.checkout,
+            hint: explain[kind === 'remote' ? 'track' : kind === 'tag' ? 'checkout_commit' : 'checkout'].short,
+            action: () => activate(kind, name),
+          },
+          { label: t.mergeInto(onto), hint: explain.merge.short, action: () => explained('merge', t.mergeInto(onto), { op: 'merge', target: s }) },
+          { label: t.rebaseOnto(onto), hint: explain.rebase.short, action: () => explained('rebase', t.rebaseOnto(onto), { op: 'rebase', onto: s }) },
           null,
         )
       }
       if (kind === 'branch') {
         items.push(
-          { label: t.pushBranch, action: () => push(s) },
+          { label: t.pushBranch, hint: explain.push.short, action: () => push(s) },
           {
             label: t.rename,
+            hint: '只改本地分支的名字',
             action: async () => {
               const v = await ask({ title: t.rename, fields: [{ key: 'name', label: t.newName, type: 'text', value: s }] })
               if (v) exec({ op: 'rename_branch', old: s, new: v.name as string })
@@ -260,9 +284,10 @@
         if (!current) {
           items.push(null, {
             label: t.delete,
+            hint: explain.delete_branch.short,
             danger: true,
             action: async () => {
-              const v = await ask({ title: t.deleteBranchTitle(s), danger: true, fields: [{ key: 'force', label: t.forceDelete, type: 'checkbox' }] })
+              const v = await ask({ title: t.deleteBranchTitle(s), explain: explain.delete_branch, danger: true, fields: [{ key: 'force', label: t.forceDelete, type: 'checkbox' }] })
               if (v) exec({ op: 'delete_branch', name: s, force: v.force as boolean })
             },
           })
@@ -285,13 +310,19 @@
   function commitMenu(e: MouseEvent, id: string) {
     const onto = head ?? 'HEAD'
     menu!.show(e, [
-      { label: t.checkoutCommit, action: () => exec({ op: 'checkout', target: id }) },
-      { label: t.newBranchHere, action: () => newBranch(id) },
+      {
+        label: t.checkoutCommit,
+        hint: explain.checkout_commit.short,
+        action: () => explained('checkout_commit', t.checkoutCommit, { op: 'checkout', target: id }),
+      },
+      { label: t.newBranchHere, hint: explain.create_branch.short, action: () => newBranch(id) },
       {
         label: t.newTagHere,
+        hint: explain.create_tag.short,
         action: async () => {
           const v = await ask({
             title: t.newTagHere,
+            explain: explain.create_tag,
             fields: [
               { key: 'name', label: t.tagName, type: 'text' },
               { key: 'message', label: t.tagMessage, type: 'text', optional: true },
@@ -301,9 +332,9 @@
         },
       },
       null,
-      { label: t.cherryPick, action: () => exec({ op: 'cherry_pick', id }) },
-      { label: t.revertCommit, action: () => exec({ op: 'revert', id }) },
-      { label: t.resetTo(onto), danger: true, action: () => reset(id) },
+      { label: t.cherryPick, hint: explain.cherry_pick.short, action: () => explained('cherry_pick', t.cherryPick, { op: 'cherry_pick', id }) },
+      { label: t.revertCommit, hint: explain.revert.short, action: () => explained('revert', t.revertCommit, { op: 'revert', id }) },
+      { label: t.resetTo(onto), hint: explain.reset.short, danger: true, action: () => reset(id) },
       null,
       { label: t.copyId, action: () => navigator.clipboard.writeText(id) },
     ])
@@ -332,16 +363,17 @@
   <header>
     <span class="branch">{head ?? t.detached}</span>
     {#if refs.ahead_behind}
-      <span class="muted">↑{refs.ahead_behind[0]} ↓{refs.ahead_behind[1]}</span>
+      <span class="muted" title={t.aheadBehindHint}>{t.toPush(refs.ahead_behind[0])} · {t.toPull(refs.ahead_behind[1])}</span>
     {/if}
     <span class="muted">{busy ? t.working : loadingAll ? t.loadingHistory : t.commits(count)}</span>
     <span class="spacer"></span>
-    <button disabled={busy} onclick={() => exec({ op: 'fetch' })}>{t.fetch}</button>
-    <button disabled={busy} onclick={() => exec({ op: 'pull' })}>{t.pull}</button>
-    <button disabled={busy} onclick={() => push(head)}>{t.push}</button>
-    <button disabled={busy} onclick={stash}>{t.stash}</button>
-    <button disabled={busy} onclick={() => newBranch('HEAD')}>{t.newBranch}</button>
-    <button class:on={showLog} onclick={() => (showLog = !showLog)}>{t.log}</button>
+    <button disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}>{t.fetch}</button>
+    <button disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>{t.pull}</button>
+    <button disabled={busy} title={explain.push.short} onclick={() => push(head)}>{t.push}</button>
+    <button disabled={busy} title={explain.stash.short} onclick={stash}>{t.stash}</button>
+    <button disabled={busy} title={explain.create_branch.short} onclick={() => newBranch('HEAD')}>{t.newBranch}</button>
+    <button class:on={showLog} title={t.logHint} onclick={() => (showLog = !showLog)}>{t.log}</button>
+    <button class="help" onclick={() => help!.open()}>? {t.help}</button>
   </header>
   {#if error}<p class="error">{error}</p>{/if}
   {#if refs.in_progress}
@@ -405,6 +437,7 @@
 
 <Dialog bind:this={dialog} />
 <ContextMenu bind:this={menu} />
+<Help bind:this={help} />
 
 <style>
   .repo {
@@ -455,7 +488,8 @@
   .progress button:hover:enabled {
     border-color: var(--muted);
   }
-  header button.on {
+  header button.on,
+  header button.help {
     border-color: var(--accent);
     color: var(--accent);
   }
@@ -505,7 +539,10 @@
   }
   .progress span {
     flex: 1;
-    color: var(--muted);
+    color: var(--text);
+  }
+  .progress strong {
+    flex: none;
   }
   .log {
     flex: none;

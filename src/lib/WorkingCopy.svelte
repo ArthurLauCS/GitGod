@@ -72,10 +72,10 @@
   const base = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 </script>
 
-{#snippet list(title: string, items: api.Entry[], isStaged: boolean)}
+{#snippet list(title: string, hint: string, items: api.Entry[], isStaged: boolean)}
   <div class="group">
     <div class="title">
-      <span>{title}<span class="count">{items.length}</span></span>
+      <span>{title}<span class="count">{items.length}</span><span class="hint">{hint}</span></span>
       <button disabled={busy || !items.length} onclick={() => (isStaged ? unstage(items) : stage(items))}>
         {isStaged ? t.unstageAll : t.stageAll}
       </button>
@@ -109,8 +109,8 @@
 <div class="working">
   <div class="left">
     {#if !entries.length}<p class="clean">{t.clean}</p>{/if}
-    {@render list(t.unstaged, unstaged, false)}
-    {@render list(t.staged, staged, true)}
+    {@render list(t.unstaged, t.unstagedHint, unstaged, false)}
+    {@render list(t.staged, t.stagedHint, staged, true)}
     <div class="commit">
       {#if error}<p class="error">{error}</p>{/if}
       <textarea
@@ -139,7 +139,7 @@
   }
   .left {
     position: relative;
-    width: 360px;
+    width: 400px;
     flex: none;
     display: flex;
     flex-direction: column;
@@ -174,6 +174,11 @@
   }
   .count {
     margin-left: 6px;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+  .hint {
+    margin-left: 10px;
     font-weight: 400;
     opacity: 0.7;
   }

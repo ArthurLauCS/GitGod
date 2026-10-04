@@ -1,4 +1,6 @@
 <script lang="ts" module>
+  import type { Explain } from './explain'
+
   export interface Field {
     key: string
     label: string
@@ -11,6 +13,10 @@
   }
   export interface Spec {
     title: string
+    /** 白话说明和操作前后的示意图 */
+    explain?: Explain
+    /** 给了这个键，对话框会多一个「下次不再显示」的勾选框，勾选后记在 localStorage 的 skip:<键> */
+    skipKey?: string
     message?: string
     /** 醒目的警告，显示为红色 */
     warning?: string
@@ -22,9 +28,11 @@
 </script>
 
 <script lang="ts">
+  import Explainer from './Explainer.svelte'
   import { t } from './zh'
 
   let dialog: HTMLDialogElement
+  let skip = $state(false)
   let spec = $state<Spec | null>(null)
   let values = $state<Values>({})
   let resolve: (v: Values | null) => void = () => {}
@@ -36,6 +44,7 @@
   /** 弹出对话框；确认返回各字段的值，取消返回 null */
   export function ask(s: Spec): Promise<Values | null> {
     spec = s
+    skip = false
     values = Object.fromEntries((s.fields ?? []).map((f) => [f.key, f.value ?? (f.type === 'checkbox' ? false : '')]))
     dialog.showModal()
     return new Promise((r) => (resolve = r))
@@ -43,6 +52,7 @@
 
   function close(ok: boolean) {
     dialog.close()
+    if (ok && skip && spec?.skipKey) localStorage.setItem(`skip:${spec.skipKey}`, '1')
     resolve(ok ? $state.snapshot(values) : null)
   }
 </script>
@@ -56,6 +66,7 @@
       }}
     >
       <h2>{spec.title}</h2>
+      {#if spec.explain}<Explainer explain={spec.explain} />{/if}
       {#if spec.message}<p>{spec.message}</p>{/if}
       {#if spec.warning}<p class="warning">{spec.warning}</p>{/if}
       {#each spec.fields ?? [] as f (f.key)}
@@ -73,6 +84,9 @@
           </fieldset>
         {/if}
       {/each}
+      {#if spec.skipKey}
+        <label class="check skip"><input type="checkbox" bind:checked={skip} />{t.dontShowAgain}</label>
+      {/if}
       <div class="buttons">
         <button type="button" onclick={() => close(false)}>{t.cancel}</button>
         <button type="submit" class="primary" class:danger={spec.danger} disabled={!ready}>{spec.confirm ?? t.ok}</button>
@@ -83,7 +97,8 @@
 
 <style>
   dialog {
-    width: 440px;
+    width: 560px;
+    max-height: 90vh;
     padding: 0;
     border: 1px solid var(--border);
     border-radius: 9px;
@@ -133,6 +148,10 @@
   }
   .text input:focus {
     border-color: var(--accent);
+  }
+  .skip {
+    color: var(--muted);
+    font-size: 12px;
   }
   .check {
     display: flex;
