@@ -33,10 +33,10 @@
   {:else}
     <header>
       <span>{conflict.binary ? t.conflictBinary : t.conflictHint(choices.length)}</span>
-      <button onclick={() => ontake(false)}>{t.takeOurs}</button>
-      <button onclick={() => ontake(true)}>{t.takeTheirs}</button>
+      <button class="btn small" onclick={() => ontake(false)}>{t.takeOurs}</button>
+      <button class="btn small" onclick={() => ontake(true)}>{t.takeTheirs}</button>
       {#if !conflict.binary}
-        <button class="primary" disabled={!done} onclick={() => onresolve(choices as Side[])}>{t.resolve}</button>
+        <button class="btn small primary" disabled={!done} onclick={() => onresolve(choices as Side[])}>{t.resolve}</button>
       {/if}
     </header>
     <div class="body">
@@ -49,15 +49,15 @@
             <div class="side" class:picked={choice === 'ours' || choice === 'both'} class:dropped={choice === 'theirs'}>
               <div class="bar">
                 <span>{t.ours}<small>{block.ours_label}</small></span>
-                <button onclick={() => (choices[index] = 'ours')}>{t.useThis}</button>
+                <button class="btn small" class:on={choice === 'ours'} onclick={() => (choices[index] = 'ours')}>{t.useThis}</button>
               </div>
               <pre>{block.ours || t.emptySide}</pre>
             </div>
             <div class="side theirs" class:picked={choice === 'theirs' || choice === 'both'} class:dropped={choice === 'ours'}>
               <div class="bar">
                 <span>{t.theirs}<small>{block.theirs_label}</small></span>
-                <button onclick={() => (choices[index] = 'theirs')}>{t.useThis}</button>
-                <button onclick={() => (choices[index] = 'both')}>{t.useBoth}</button>
+                <button class="btn small" class:on={choice === 'theirs'} onclick={() => (choices[index] = 'theirs')}>{t.useThis}</button>
+                <button class="btn small" class:on={choice === 'both'} onclick={() => (choices[index] = 'both')}>{t.useBoth}</button>
               </div>
               <pre>{block.theirs || t.emptySide}</pre>
             </div>
@@ -79,7 +79,7 @@
   }
   .note {
     margin: 0;
-    padding: 24px;
+    padding: 48px 24px;
     text-align: center;
     color: var(--muted);
   }
@@ -88,6 +88,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-height: 44px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--panel);
@@ -95,6 +96,7 @@
   header span {
     flex: 1;
     color: var(--yellow);
+    font-size: var(--fs-sm);
   }
   .body {
     flex: 1;
@@ -103,8 +105,8 @@
   }
   pre {
     margin: 0;
-    padding: 4px 14px;
-    font: 12px/20px var(--mono);
+    padding: 4px 16px;
+    font: var(--fs-sm) / 20px var(--mono);
     white-space: pre;
     tab-size: 4;
   }
@@ -112,7 +114,7 @@
     color: var(--muted);
   }
   section {
-    margin: 6px 0;
+    margin: 8px 0;
     border-block: 1px solid var(--border);
   }
   .side {
@@ -122,9 +124,6 @@
   .side.theirs {
     border-left-color: var(--green);
     background: color-mix(in srgb, var(--green) 8%, transparent);
-  }
-  .side.picked {
-    box-shadow: inset 0 0 0 1px currentColor;
   }
   .side.dropped {
     opacity: 0.35;
@@ -136,8 +135,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 10px;
-    font-size: 12px;
+    padding: 4px 12px;
+    font-size: var(--fs-sm);
   }
   .bar span {
     flex: 1;
@@ -145,32 +144,8 @@
   }
   small {
     margin-left: 8px;
+    font-family: var(--mono);
     font-weight: 400;
     color: var(--muted);
-  }
-  button {
-    padding: 2px 10px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--panel);
-    font-size: 12px;
-    cursor: pointer;
-  }
-  button:hover:enabled {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: #fff;
-  }
-  .primary:hover:enabled {
-    color: #fff;
-    filter: brightness(1.1);
-  }
-  button:disabled {
-    opacity: 0.45;
-    cursor: default;
   }
 </style>

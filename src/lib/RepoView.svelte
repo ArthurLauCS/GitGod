@@ -7,6 +7,8 @@
   import { explain, type ExplainKey } from './explain'
   import Graph from './Graph.svelte'
   import Help from './Help.svelte'
+  import Icon from './Icon.svelte'
+  import Splitter from './Splitter.svelte'
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
   import Worktrees from './Worktrees.svelte'
@@ -516,20 +518,29 @@
   <header>
     <span class="branch">{head ?? t.detached}</span>
     {#if refs.ahead_behind}
-      <span class="muted" title={t.aheadBehindHint}>{t.toPush(refs.ahead_behind[0])} · {t.toPull(refs.ahead_behind[1])}</span>
+      <span class="muted" title={t.aheadBehindHint}>
+        {refs.ahead_behind[0] + refs.ahead_behind[1] ? `${t.toPush(refs.ahead_behind[0])} · ${t.toPull(refs.ahead_behind[1])}` : t.wtSynced}
+      </span>
     {/if}
     <span class="muted">{busy ? t.working : loadingAll ? t.loadingHistory : t.commits(count)}</span>
     <span class="spacer"></span>
-    <button disabled={busy || !undos.length} title={undos.length ? t.undoTitle(undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
-      ↶ {t.undo}
+    <button class="btn quiet" disabled={busy || !undos.length} title={undos.length ? t.undoTitle(undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
+      <Icon name="undo" />{t.undo}
     </button>
-    <button disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}>{t.fetch}</button>
-    <button disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>{t.pull}</button>
-    <button disabled={busy} title={explain.push.short} onclick={() => push(head)}>{t.push}</button>
-    <button disabled={busy} title={explain.stash.short} onclick={stash}>{t.stash}</button>
-    <button disabled={busy} title={explain.create_branch.short} onclick={() => newBranch('HEAD')}>{t.newBranch}</button>
-    <button class:on={showLog} title={t.logHint} onclick={() => (showLog = !showLog)}>{t.log}</button>
-    <button class="help" onclick={() => help!.open()}>? {t.help}</button>
+    <span class="sep"></span>
+    <button class="btn quiet" disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}><Icon name="fetch" />{t.fetch}</button>
+    <button class="btn quiet" disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>
+      <Icon name="pull" />{t.pull}
+    </button>
+    <button class="btn quiet" disabled={busy} title={explain.push.short} onclick={() => push(head)}><Icon name="push" />{t.push}</button>
+    <span class="sep"></span>
+    <button class="btn quiet" disabled={busy} title={explain.stash.short} onclick={stash}><Icon name="stash" />{t.stash}</button>
+    <button class="btn quiet" disabled={busy} title={explain.create_branch.short} onclick={() => newBranch('HEAD')}>
+      <Icon name="branch" />{t.newBranch}
+    </button>
+    <span class="sep"></span>
+    <button class="btn quiet" class:on={showLog} title={t.logHint} onclick={() => (showLog = !showLog)}><Icon name="log" />{t.log}</button>
+    <button class="btn quiet" onclick={() => help!.open()}><Icon name="help" />{t.help}</button>
   </header>
   {#if error}<p class="error">{error}</p>{/if}
   {#if refs.in_progress}
@@ -537,8 +548,8 @@
     <p class="progress">
       <strong>{t.inProgress[what]}</strong>
       <span>{t.inProgressHint}</span>
-      <button disabled={busy} onclick={() => exec({ op: 'continue', what })}>{t.continue}</button>
-      <button disabled={busy} onclick={() => exec({ op: 'abort', what })}>{t.abort}</button>
+      <button class="btn small primary" disabled={busy} onclick={() => exec({ op: 'continue', what })}>{t.continue}</button>
+      <button class="btn small" disabled={busy} onclick={() => exec({ op: 'abort', what })}>{t.abort}</button>
     </p>
   {/if}
   <main>
@@ -555,6 +566,7 @@
       onmenu={(e, kind, name) => refMenu(e, kind, name)}
       onworktree={onopen}
     />
+    <Splitter key="sidebar" min={180} max={520} />
     <div class="content">
       <div class="pane" class:hidden={view !== 'history'}>
         {#if count}
@@ -572,6 +584,7 @@
         {:else}
           <p class="none">{t.noCommits}</p>
         {/if}
+        <Splitter key="detail" dir="y" min={120} max={640} invert />
         <Detail {detail} onjump={jump} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
@@ -619,46 +632,35 @@
     flex: none;
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 40px;
-    padding: 0 10px 0 14px;
+    gap: 4px;
+    height: 44px;
+    padding: 0 8px 0 16px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
   }
   .branch {
-    padding: 1px 8px;
-    border-radius: 4px;
+    margin-right: 8px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
     color: var(--accent);
     background: var(--accent-soft);
-    font-size: 12px;
+    font-family: var(--display);
+    font-weight: 600;
   }
   .muted {
+    margin-right: 8px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
+    white-space: nowrap;
   }
   .spacer {
     flex: 1;
   }
-  header button,
-  .progress button {
-    padding: 3px 12px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--raised);
-    cursor: pointer;
-  }
-  header button:hover:enabled,
-  .progress button:hover:enabled {
-    border-color: var(--muted);
-  }
-  header button.on,
-  header button.help {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  button:disabled {
-    opacity: 0.45;
-    cursor: default;
+  .sep {
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: var(--border);
   }
   main {
     flex: 1;
@@ -686,35 +688,36 @@
   }
   .error {
     margin: 0;
-    padding: 6px 14px;
+    padding: 8px 16px;
     color: var(--red);
     background: color-mix(in srgb, var(--red) 12%, transparent);
+    font-size: var(--fs-sm);
     user-select: text;
   }
   .progress {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     margin: 0;
-    padding: 6px 14px;
-    color: var(--yellow);
+    padding: 8px 16px;
     background: color-mix(in srgb, var(--yellow) 12%, transparent);
-  }
-  .progress span {
-    flex: 1;
-    color: var(--text);
+    font-size: var(--fs-sm);
   }
   .progress strong {
     flex: none;
+    color: var(--yellow);
+  }
+  .progress span {
+    flex: 1;
   }
   .log {
     flex: none;
     height: 180px;
     overflow: auto;
-    padding: 8px 14px;
+    padding: 8px 16px;
     border-top: 1px solid var(--border);
     background: var(--bg);
-    font: 12px/1.6 var(--mono);
+    font: var(--fs-sm) / 1.6 var(--mono);
     user-select: text;
   }
   .log div {

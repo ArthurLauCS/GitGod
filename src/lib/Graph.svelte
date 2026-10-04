@@ -1,16 +1,20 @@
 <script lang="ts">
   import type { Ref, Row } from './api'
+  import { authorColor } from './author'
+  import { layout } from './layout.svelte'
+  import Splitter from './Splitter.svelte'
+  import { theme } from './theme.svelte'
   import { fmtTime, t } from './zh'
 
-  const ROW_H = 26
+  const ROW_H = 28
   const LANE_W = 14
   const PAD = 12
   const CHUNK = 128
   // ponytail: 超过 MAX_LANES 的泳道不画（内核图宽 572）；需要时给图列加横向滚动
-  const MAX_LANES = 24
+  const LANE_CAP = 24
   // 浏览器单个元素的高度上限约 3300 万像素，超出后把滚动位置按比例映射到行号
   const MAX_H = 16_000_000
-  const COLORS = ['#5c9dff', '#5fc27e', '#e0b252', '#c58af9', '#ef6b73', '#4fc4cf', '#f08d49', '#9aa5b8']
+  const LANES = 8
 
   let {
     fetchRows,
@@ -35,8 +39,14 @@
 
   let viewport: HTMLDivElement
   let canvas = $state<HTMLCanvasElement>()
+  /** 只高亮这个作者的提交，其余变淡 */
+  let focusAuthor = $state<string | null>(null)
+  const cols = $derived(`minmax(0, 1fr) min(${layout.author}px, 18vw) min(${layout.date}px, 13vw) 72px`)
   let scrollTop = $state(0)
   let height = $state(0)
+  let width = $state(0)
+  /** 泳道列最多占提交图宽度的 28%，窄窗口下给说明列留地方 */
+  const MAX_LANES = $derived(Math.max(4, Math.min(LANE_CAP, Math.floor((width * 0.28 - PAD * 2) / LANE_W))))
   let loaded = $state(0)
 
   const chunks = new Map<number, Row[]>()
@@ -88,6 +98,10 @@
 
   $effect(() => {
     if (!canvas) return
+    // 泳道色跟主题走，切主题时重画
+    theme.current
+    const css = getComputedStyle(canvas)
+    const COLORS = Array.from({ length: LANES }, (_, i) => css.getPropertyValue(`--lane-${i}`).trim())
     const dpr = window.devicePixelRatio || 1
     const h = windowRows.length * ROW_H
     canvas.width = graphW * dpr
@@ -116,7 +130,7 @@
       const color = COLORS[row.lane % COLORS.length]
       ctx.beginPath()
       ctx.arc(cx, cy, 4, 0, Math.PI * 2)
-      ctx.fillStyle = row.id === headId ? getComputedStyle(canvas!).getPropertyValue('--panel') : color
+      ctx.fillStyle = row.id === headId ? css.getPropertyValue('--bg') : color
       ctx.fill()
       ctx.strokeStyle = color
       ctx.lineWidth = 2
@@ -147,11 +161,19 @@
   const short = (name: string) => name.replace(/^refs\/(heads|tags|remotes)\//, '')
 </script>
 
-<div class="head" style:padding-left="{graphW}px">
-  <span>{t.colSubject}</span><span>{t.colAuthor}</span><span>{t.colDate}</span><span>{t.colCommit}</span>
+<div class="head" style:padding-left="{graphW}px" style:grid-template-columns={cols}>
+  <span>
+    {t.colSubject}
+    {#if focusAuthor}
+      <button class="chip" style:color={authorColor(focusAuthor)} onclick={() => (focusAuthor = null)}>{t.onlyAuthor(focusAuthor)} ×</button>
+    {/if}
+  </span>
+  <span class="cell"><span class="grip" title={t.dragHint}><Splitter key="author" min={80} max={360} invert /></span>{t.colAuthor}</span>
+  <span class="cell"><span class="grip" title={t.dragHint}><Splitter key="date" min={96} max={220} invert /></span>{t.colDate}</span>
+  <span>{t.colCommit}</span>
 </div>
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="viewport" bind:this={viewport} bind:clientHeight={height} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role="grid">
+<div class="viewport" bind:this={viewport} bind:clientHeight={height} bind:clientWidth={width} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role="grid">
   <div style:height="{virt}px">
     <div class="window" style:transform="translateY({scrollTop - (top % ROW_H)}px)">
       <canvas bind:this={canvas} style:width="{graphW}px" style:height="{windowRows.length * ROW_H}px"></canvas>
@@ -160,7 +182,9 @@
         <div
           class="row"
           class:selected={first + i === selectedRow}
+          class:dim={focusAuthor !== null && row?.author !== focusAuthor}
           style:padding-left="{graphW}px"
+          style:grid-template-columns={cols}
           role="row"
           tabindex="-1"
           onclick={() => row && onselect(first + i, row.id)}
@@ -168,14 +192,25 @@
         >
           {#if row}
             <span class="subject">
-              {#each badges.get(row.id) ?? [] as ref (ref.name)}
-                <span class="badge {kind(ref.name)}">{short(ref.name)}</span>
-              {/each}
-              {row.subject}
+              {#if badges.has(row.id)}
+                <span class="badges">
+                  {#each badges.get(row.id) ?? [] as ref (ref.name)}
+                    <span class="badge {kind(ref.name)}">{short(ref.name)}</span>
+                  {/each}
+                </span>
+              {/if}
+              <span>{row.subject}</span>
             </span>
-            <span class="muted">{row.author}</span>
+            <button
+              class="author"
+              style:color={authorColor(row.author)}
+              title={t.authorHint}
+              onclick={(e) => (e.stopPropagation(), (focusAuthor = focusAuthor === row.author ? null : row.author))}
+            >
+              {row.author}
+            </button>
             <span class="muted">{fmtTime(row.time)}</span>
-            <span class="muted mono">{row.id.slice(0, 8)}</span>
+            <span class="muted mono">{row.id.slice(0, 7)}</span>
           {/if}
         </div>
       {/each}
@@ -187,20 +222,40 @@
   .head,
   .row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 150px 128px 76px;
     gap: 12px;
     align-items: center;
     padding-right: 12px;
   }
   .head {
-    height: 28px;
-    color: var(--muted);
-    font-size: 12px;
-    border-bottom: 1px solid var(--border);
     flex: none;
+    height: var(--row);
+    color: var(--muted);
+    font-size: var(--fs-sm);
+    border-bottom: 1px solid var(--border);
+  }
+  .cell {
+    position: relative;
+  }
+  /* 列分隔条贴在列的左边缘 */
+  .grip {
+    position: absolute;
+    left: -6px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+  }
+  .chip {
+    margin-left: 8px;
+    padding: 0 8px;
+    border: 1px solid currentColor;
+    border-radius: var(--r-lg);
+    background: none;
+    font-size: var(--fs-sm);
+    cursor: pointer;
   }
   .viewport {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     outline: none;
@@ -216,7 +271,7 @@
     pointer-events: none;
   }
   .row {
-    height: 26px;
+    height: var(--row);
     cursor: default;
   }
   .row:hover {
@@ -224,24 +279,55 @@
   }
   .row.selected {
     background: var(--accent-soft);
+    box-shadow: inset 2px 0 var(--accent);
   }
-  .row span {
+  /* 高亮某个作者时，其他人的提交退后 */
+  .row.dim > :global(*) {
+    opacity: 0.3;
+  }
+  .row span,
+  .author {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .author {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: var(--fs-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  .author:hover {
+    text-decoration: underline;
+  }
   .muted {
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
   .mono {
     font-family: var(--mono);
   }
+  /* 引用标签最多占说明列的一半，剩下的留给提交标题 */
+  .subject {
+    display: flex;
+    align-items: center;
+  }
+  .badges {
+    flex: 0 1 auto;
+    max-width: 50%;
+  }
+  .subject > span:last-child {
+    flex: 1;
+    min-width: 0;
+  }
   .badge {
-    margin-right: 6px;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 11px;
+    margin-right: 8px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+    font-size: var(--fs-sm);
+    font-weight: 600;
     border: 1px solid;
   }
   .badge.branch {
@@ -251,10 +337,11 @@
   }
   .badge.remote {
     color: var(--muted);
-    border-color: var(--border);
+    border-color: var(--border-strong);
+    font-weight: 400;
   }
   .badge.tag {
     color: var(--yellow);
-    border-color: color-mix(in srgb, var(--yellow) 40%, transparent);
+    border-color: color-mix(in srgb, var(--yellow) 45%, transparent);
   }
 </style>

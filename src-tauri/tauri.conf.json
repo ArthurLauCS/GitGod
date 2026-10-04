@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "GitGod",
-        "width": 1360,
+        "width": 1440, "minWidth": 1024, "minHeight": 640,
         "height": 860,
         "resizable": true,
         "fullscreen": false

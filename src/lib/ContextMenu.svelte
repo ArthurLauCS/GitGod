@@ -48,37 +48,45 @@
   .menu {
     position: fixed;
     z-index: 10;
-    min-width: 260px;
-    padding: 5px;
-    border: 1px solid var(--border);
-    border-radius: 7px;
+    min-width: 264px;
+    padding: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
     background: var(--raised);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-pop);
+    animation: pop var(--t-pop);
   }
   button {
     display: block;
     width: 100%;
-    padding: 5px 12px;
+    padding: 4px 12px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: none;
     text-align: left;
     white-space: nowrap;
   }
   button:hover {
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
+  }
+  button:active:enabled {
+    transform: none;
   }
   small {
     display: block;
-    font-size: 11px;
-    opacity: 0.65;
+    font-size: var(--fs-sm);
+    opacity: 0.7;
   }
   .danger {
     color: var(--red);
   }
+  .danger:hover {
+    background: var(--red);
+    color: var(--on-danger);
+  }
   hr {
-    margin: 5px 0;
+    margin: 4px 0;
     border: 0;
     border-top: 1px solid var(--border);
   }

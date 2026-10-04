@@ -2,6 +2,9 @@
   import * as api from './api'
   import ConflictView from './ConflictView.svelte'
   import DiffView from './DiffView.svelte'
+  import Icon from './Icon.svelte'
+  import { layout } from './layout.svelte'
+  import Splitter from './Splitter.svelte'
   import { t } from './zh'
 
   let {
@@ -91,9 +94,9 @@
     <div class="title">
       <span>{title}<span class="count">{items.length}</span><span class="hint">{hint}</span></span>
       {#if !isStaged}
-        <button class="danger" disabled={busy || !items.length} onclick={() => discard([])}>{t.discardAll}</button>
+        <button class="btn small quiet danger" disabled={busy || !items.length} onclick={() => discard([])}>{t.discardAll}</button>
       {/if}
-      <button disabled={busy || !items.length} onclick={() => (isStaged ? unstage(items) : stage(items))}>
+      <button class="btn small" disabled={busy || !items.length} onclick={() => (isStaged ? unstage(items) : stage(items))}>
         {isStaged ? t.unstageAll : t.stageAll}
       </button>
     </div>
@@ -111,14 +114,17 @@
           <span class="status s{s === '?' ? 'A' : s}" title={t.status[s] ?? s}>{s}</span>
           <span class="path">{base(e.path) || e.path}<span class="dir">{dir(e.path.replace(/\/$/, ''))}</span></span>
           {#if !isStaged && !e.conflicted}
-            <button class="danger" disabled={busy} title={t.discardFile} onclick={(ev) => (ev.stopPropagation(), discard([e.path]))}>↶</button>
+            <button class="btn small quiet icon danger" disabled={busy} title={t.discardFile} onclick={(ev) => (ev.stopPropagation(), discard([e.path]))}>
+              <Icon name="undo" size={14} />
+            </button>
           {/if}
           <button
+            class="btn small quiet icon"
             disabled={busy}
             title={isStaged ? t.unstageFile : t.stageFile}
             onclick={(ev) => (ev.stopPropagation(), isStaged ? unstage([e]) : stage([e]))}
           >
-            {isStaged ? '−' : '+'}
+            <Icon name={isStaged ? 'minus' : 'plus'} size={14} />
           </button>
         </div>
       {/each}
@@ -127,7 +133,7 @@
 {/snippet}
 
 <div class="working">
-  <div class="left">
+  <div class="left" style:width="min({layout.changes}px, 50%)">
     {#if !entries.length}<p class="clean">{t.clean}</p>{/if}
     {@render list(t.unstaged, t.unstagedHint, unstaged, false)}
     {@render list(t.staged, t.stagedHint, staged, true)}
@@ -140,10 +146,11 @@
       ></textarea>
       <div class="actions">
         <label><input type="checkbox" bind:checked={amend} onchange={toggleAmend} />{t.amend}</label>
-        <button class="primary" disabled={!canCommit} onclick={commit}>{t.commit}</button>
+        <button class="btn primary" disabled={!canCommit} onclick={commit}>{t.commit}</button>
       </div>
     </div>
   </div>
+  <Splitter key="changes" min={260} max={720} />
   {#if sel && conflicted}
     <ConflictView
       {conflict}
@@ -168,11 +175,9 @@
   }
   .left {
     position: relative;
-    width: 400px;
     flex: none;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--border);
     background: var(--panel);
   }
   .clean {
@@ -194,22 +199,11 @@
     flex: none;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 32px;
+    gap: 4px;
+    height: 36px;
     padding: 0 8px 0 12px;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--fs-sm);
     color: var(--muted);
-  }
-  .count {
-    margin-left: 6px;
-    font-weight: 400;
-    opacity: 0.7;
-  }
-  .hint {
-    margin-left: 10px;
-    font-weight: 400;
-    opacity: 0.7;
   }
   .title > span:first-child {
     flex: 1;
@@ -217,34 +211,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--text);
+    font-weight: 600;
   }
-  .title button {
-    flex: none;
-  }
-  .title {
-    gap: 6px;
-  }
-  .title .danger:hover:enabled,
-  .item .danger:hover:enabled {
-    border-color: var(--red);
-    background: none;
-    color: var(--red);
-  }
-  .title button {
-    padding: 1px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: none;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .title button:hover:enabled {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  button:disabled {
-    opacity: 0.45;
-    cursor: default;
+  .count,
+  .hint {
+    margin-left: 8px;
+    color: var(--muted);
+    font-weight: 400;
   }
   .items {
     flex: 1;
@@ -254,8 +228,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 24px;
-    padding: 0 6px 0 12px;
+    height: var(--row);
+    padding: 0 8px 0 12px;
     cursor: default;
   }
   .item:hover {
@@ -263,6 +237,7 @@
   }
   .item.selected {
     background: var(--accent-soft);
+    box-shadow: inset 2px 0 var(--accent);
   }
   .path {
     flex: 1;
@@ -273,33 +248,23 @@
   .dir {
     margin-left: 8px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
-  .item button {
-    flex: none;
-    visibility: hidden;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: var(--raised);
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
+  /* 行内操作按钮只在悬停或选中时出现。用 opacity 而不是 visibility：
+     visibility: visible 会穿透上层隐藏的面板显示出来 */
+  .item .btn {
+    opacity: 0;
   }
-  .item:hover button {
-    visibility: visible;
-  }
-  .item button:hover:enabled {
-    background: var(--accent);
-    color: #fff;
+  .item:hover .btn:enabled,
+  .item.selected .btn:enabled,
+  .item .btn:focus-visible {
+    opacity: 1;
   }
   .status {
     flex: none;
-    width: 14px;
+    width: 16px;
     text-align: center;
-    font: 600 12px var(--mono);
+    font: 600 var(--fs-sm) var(--mono);
     color: var(--yellow);
   }
   .sA {
@@ -318,17 +283,17 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 10px;
+    padding: 12px;
   }
   textarea {
-    height: 92px;
-    padding: 7px 9px;
+    height: 96px;
+    padding: 8px;
     resize: none;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 5px;
-    color: inherit;
-    font: inherit;
+    border-radius: var(--r-md);
+    font-family: var(--display);
+    line-height: var(--lh-body);
     outline: none;
     user-select: text;
   }
@@ -343,27 +308,16 @@
   label {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     color: var(--muted);
-    font-size: 12px;
-  }
-  .primary {
-    padding: 5px 22px;
-    border: 0;
-    border-radius: 5px;
-    background: var(--accent);
-    color: #fff;
-    cursor: pointer;
-  }
-  .primary:hover:enabled {
-    filter: brightness(1.1);
+    font-size: var(--fs-sm);
   }
   .error {
     margin: 0;
     max-height: 96px;
     overflow: auto;
     color: var(--red);
-    font-size: 12px;
+    font-size: var(--fs-sm);
     white-space: pre-wrap;
     user-select: text;
   }

@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Refs, Stash, Track, Worktree } from './api'
+  import Icon from './Icon.svelte'
+  import { layout } from './layout.svelte'
   import { t } from './zh'
 
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
@@ -52,17 +54,17 @@
   const basename = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 </script>
 
-<aside>
+<aside style:width="min({layout.sidebar}px, 36vw)">
   <nav>
     <button class:on={view === 'changes'} onclick={() => onview('changes')}>
-      {t.changes}{#if changes}<span class="pill">{changes}</span>{/if}
+      <Icon name="changes" /><span>{t.changes}</span>{#if changes}<span class="pill">{changes}</span>{/if}
     </button>
-    <button class:on={view === 'history'} onclick={() => onview('history')}>{t.history}</button>
+    <button class:on={view === 'history'} onclick={() => onview('history')}><Icon name="history" /><span>{t.history}</span></button>
     <button class:on={view === 'worktrees'} onclick={() => onview('worktrees')}>
-      {t.worktreesNav}{#if worktrees.length > 1}<span class="pill quiet">{worktrees.length}</span>{/if}
+      <Icon name="folders" /><span>{t.worktreesNav}</span>{#if worktrees.length > 1}<span class="pill quiet">{worktrees.length}</span>{/if}
     </button>
   </nav>
-  <input type="search" placeholder={t.filter} bind:value={filter} />
+  <label class="search"><Icon name="search" size={14} /><input type="search" placeholder={t.filter} bind:value={filter} /></label>
   <div class="scroll">
     {#snippet section(kind: Kind, title: string, items: { name: string; id: string; label: string }[], open: boolean)}
       <details {open}>
@@ -75,8 +77,8 @@
             ondblclick={() => onactivate(kind, r.name)}
             oncontextmenu={(e) => onmenu(e, kind, r.name, r.id)}
           >
-            {r.label}
-            {#if elsewhere.has(r.name)}<span class="sub" title={t.inOtherWorktreeMark}>⧉</span>{/if}
+            <span class="name">{r.label}</span>
+            {#if elsewhere.has(r.name)}<span class="sub" title={t.inOtherWorktreeMark}><Icon name="windows" size={12} /></span>{/if}
             {#if tracks.get(r.name)}
               {@const tr = tracks.get(r.name)!}
               <span class="sub" title={tr.gone ? t.gone : `${t.toPush(tr.ahead)} · ${t.toPull(tr.behind)}`}>
@@ -93,8 +95,8 @@
     <details>
       <summary>{t.stashes}<span class="count">{stashes.length}</span></summary>
       {#each stashes as s (s.name)}
-        <button title={s.subject} onclick={() => onjump(s.id)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
-          {s.subject}
+        <button title={s.subject} ondblclick={() => onactivate('stash', s.name)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
+          <span class="name">{s.subject}</span>
         </button>
       {/each}
     </details>
@@ -102,7 +104,7 @@
       <summary>{t.worktrees}<span class="count">{worktrees.length}</span></summary>
       {#each worktrees as w (w.path)}
         <button class:head={w.current} title={w.path} onclick={() => onjump(w.head)} ondblclick={() => w.current || onworktree(w.path)}>
-          {basename(w.path)}
+          <span class="name">{basename(w.path)}</span>
           <span class="sub">{w.branch ? w.branch.replace('refs/heads/', '') : t.detached}{w.changes ? ` · ${t.wtDirty(w.changes)}` : ''}</span>
         </button>
       {/each}
@@ -112,92 +114,132 @@
 
 <style>
   aside {
-    width: 260px;
     flex: none;
     display: flex;
     flex-direction: column;
     background: var(--panel);
-    border-right: 1px solid var(--border);
   }
   nav {
-    padding: 8px 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
   }
   nav button {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-weight: 600;
+    gap: 8px;
+    height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    cursor: pointer;
+  }
+  nav button span:first-of-type {
+    flex: 1;
+    text-align: left;
+  }
+  nav button:hover {
+    background: var(--hover);
   }
   nav button.on {
     background: var(--accent-soft);
     color: var(--accent);
+    font-weight: 600;
+  }
+  .pill {
+    min-width: 20px;
+    padding: 0 4px;
+    border-radius: var(--r-lg);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    line-height: 20px;
+    text-align: center;
   }
   .pill.quiet {
     background: var(--raised);
     color: var(--muted);
   }
-  .pill {
-    padding: 0 7px;
-    border-radius: 9px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-  }
-  input {
-    margin: 10px;
-    padding: 5px 9px;
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    margin: 0 8px 8px;
+    padding: 0 8px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 5px;
-    outline: none;
+    border-radius: var(--r-md);
+    color: var(--muted);
   }
-  input:focus {
+  .search:focus-within {
     border-color: var(--accent);
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-sm);
+    outline: none;
   }
   .scroll {
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 10px;
+    padding-bottom: 12px;
   }
   summary {
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
+    padding: 8px 12px 4px;
+    font-size: var(--fs-sm);
     color: var(--muted);
+    letter-spacing: 0.04em;
     cursor: default;
   }
   summary:hover {
     color: var(--text);
   }
   .count {
-    margin-left: 6px;
-    font-weight: 400;
+    margin-left: 8px;
     opacity: 0.7;
   }
-  button {
-    display: block;
+  details button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
-    padding: 3px 12px 3px 26px;
+    height: 26px;
+    padding: 0 12px 0 24px;
     border: 0;
     background: none;
     text-align: left;
-    white-space: nowrap;
+    cursor: default;
+  }
+  details button:hover {
+    background: var(--hover);
+  }
+  details button:active:enabled {
+    transform: none;
+  }
+  .name {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  button:hover {
-    background: var(--hover);
+    white-space: nowrap;
   }
   button.head {
     color: var(--accent);
     font-weight: 600;
   }
   .sub {
-    margin-left: 6px;
+    flex: none;
+    display: inline-flex;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
+    white-space: nowrap;
   }
 </style>

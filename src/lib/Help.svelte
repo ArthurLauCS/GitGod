@@ -22,8 +22,8 @@
 <dialog bind:this={dialog} onclick={(e) => e.target === dialog && dialog.close()}>
   <header>
     <h2>{t.help}</h2>
-    <button disabled={reset} onclick={showAgain}>{reset ? t.helpResetDone : t.helpReset}</button>
-    <button onclick={() => dialog.close()}>{t.close}</button>
+    <button class="btn small" disabled={reset} onclick={showAgain}>{reset ? t.helpResetDone : t.helpReset}</button>
+    <button class="btn small" onclick={() => dialog.close()}>{t.close}</button>
   </header>
   <p class="legend">{t.helpLegend}</p>
   <div class="list">
@@ -38,73 +38,63 @@
 
 <style>
   dialog {
-    width: 640px;
-    max-height: 84vh;
     padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg);
     background: var(--panel);
     color: var(--text);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--shadow-pop);
+  }
+  dialog::backdrop {
+    background: var(--backdrop);
+  }
+
+  dialog {
+    width: 680px;
+    max-height: 86vh;
   }
   dialog[open] {
     display: flex;
     flex-direction: column;
-  }
-  dialog::backdrop {
-    background: rgba(0, 0, 0, 0.4);
   }
   header {
     flex: none;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 14px 20px 8px;
+    padding: 24px 24px 8px;
   }
   h2 {
     flex: 1;
     margin: 0;
-    font-size: 15px;
+    font-size: var(--fs-xl);
     font-weight: 600;
+    letter-spacing: -0.01em;
   }
   .legend {
     flex: none;
     margin: 0;
-    padding: 0 20px 12px;
+    padding: 0 24px 16px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
+    line-height: var(--lh-body);
     border-bottom: 1px solid var(--border);
   }
   .list {
     overflow-y: auto;
-    padding: 4px 20px 20px;
+    padding: 0 24px 24px;
     user-select: text;
   }
   section {
-    padding: 16px 0;
+    padding: 24px 0;
     border-bottom: 1px solid var(--border);
   }
   section:last-child {
     border-bottom: 0;
   }
   h3 {
-    margin: 0 0 8px;
-    font-size: 14px;
+    margin: 0 0 12px;
+    font-size: var(--fs-lg);
     font-weight: 600;
-    color: var(--accent);
-  }
-  button {
-    padding: 4px 12px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--raised);
-    cursor: pointer;
-  }
-  button:hover:enabled {
-    border-color: var(--muted);
-  }
-  button:disabled {
-    opacity: 0.6;
-    cursor: default;
   }
 </style>

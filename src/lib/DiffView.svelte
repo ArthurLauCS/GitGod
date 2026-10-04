@@ -76,11 +76,11 @@
         <div class="hunk">
           <span>{hunk.header}</span>
           {#if mode === 'unstaged' && ondiscard}
-            <button class="danger" onclick={() => apply(h, ondiscard)}>
+            <button class="btn small danger" onclick={() => apply(h, ondiscard)}>
               {picked(h).length ? t.discardLines(picked(h).length) : t.discardHunk}
             </button>
           {/if}
-          {#if mode !== 'readonly'}<button onclick={() => apply(h)}>{label(h)}</button>{/if}
+          {#if mode !== 'readonly'}<button class="btn small" onclick={() => apply(h)}>{label(h)}</button>{/if}
         </div>
         {#each hunk.lines as line, i (i)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -111,7 +111,7 @@
     /* 区块标题用 100cqw 取本容器宽度，横向滚动时保持不动 */
     container-type: inline-size;
     background: var(--bg);
-    font: 12px/20px var(--mono);
+    font: var(--fs-sm) / 20px var(--mono);
     user-select: text;
   }
   .body {
@@ -120,24 +120,23 @@
   }
   .note {
     margin: 0;
-    padding: 24px;
+    padding: 48px 24px;
     text-align: center;
     color: var(--muted);
     font-family: var(--font);
-    font-size: 13px;
+    font-size: var(--fs-md);
   }
   .hunk {
     position: sticky;
     left: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
     width: 100cqw;
-    height: 28px;
-    padding: 0 12px;
+    height: 32px;
+    padding: 0 8px 0 12px;
     color: var(--muted);
-    background: var(--raised);
+    background: var(--panel);
     border-block: 1px solid var(--border);
   }
   .hunk span {
@@ -146,22 +145,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .hunk button {
-    flex: none;
-    padding: 1px 10px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--panel);
-    font: 12px var(--font);
-    cursor: pointer;
-  }
-  .hunk button:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .hunk button.danger:hover {
-    border-color: var(--red);
-    color: var(--red);
+  .hunk .btn {
+    font-family: var(--font);
   }
   .line {
     display: flex;
@@ -179,7 +164,7 @@
   }
   .sign {
     flex: none;
-    width: 20px;
+    width: 24px;
     text-align: center;
     color: var(--muted);
     user-select: none;
@@ -187,8 +172,14 @@
   .add {
     background: color-mix(in srgb, var(--green) 14%, transparent);
   }
+  .add .sign {
+    color: var(--green);
+  }
   .del {
     background: color-mix(in srgb, var(--red) 14%, transparent);
+  }
+  .del .sign {
+    color: var(--red);
   }
   .meta {
     color: var(--muted);
@@ -197,9 +188,10 @@
     cursor: pointer;
   }
   .pick:hover {
-    filter: brightness(1.25);
+    box-shadow: inset 3px 0 var(--border-strong);
   }
-  .selected {
+  .selected,
+  .selected:hover {
     box-shadow: inset 3px 0 var(--accent);
     background: var(--accent-soft);
   }

@@ -21,20 +21,26 @@
   .explain {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    line-height: 1.6;
+    gap: 16px;
+    line-height: var(--lh-body);
   }
   p,
   ul {
+    max-width: 36em;
     margin: 0;
   }
   ul {
-    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 16px;
     color: var(--muted);
   }
   .undo {
+    padding: 8px 12px;
+    border-left: 2px solid var(--border-strong);
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
   strong {
     color: var(--text);

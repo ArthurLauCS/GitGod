@@ -19,7 +19,7 @@
       <h2>{t.worktrees}</h2>
       <p>{explain.worktree.what}</p>
     </div>
-    <button class="primary" onclick={onnew}>{t.newWorktree}</button>
+    <button class="btn primary" onclick={onnew}>{t.newWorktree}</button>
   </header>
   <div class="table">
     <div class="row head">
@@ -42,9 +42,9 @@
         <span class="last" title={w.subject}>{w.subject}<small>{w.time ? fmtTime(w.time) : ''}</small></span>
         <span class="actions">
           {#if !w.current}
-            <button onclick={() => onopen(w.path)}>{t.openInTab}</button>
+            <button class="btn small" onclick={() => onopen(w.path)}>{t.openInTab}</button>
             <!-- 第一个是主工作树，git 不允许删除 -->
-            {#if i > 0}<button class="danger" onclick={() => onremove(w)}>{t.wtRemove}</button>{/if}
+            {#if i > 0}<button class="btn small danger" onclick={() => onremove(w)}>{t.wtRemove}</button>{/if}
           {/if}
         </span>
       </div>
@@ -57,41 +57,42 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 20px 24px;
+    padding: 24px 32px;
   }
   header {
     display: flex;
     align-items: flex-start;
     gap: 24px;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
   }
   header div {
     flex: 1;
   }
   h2 {
-    margin: 0 0 6px;
-    font-size: 16px;
+    margin: 0 0 8px;
+    font-size: var(--fs-xl);
     font-weight: 600;
+    letter-spacing: -0.01em;
   }
   p {
     margin: 0;
-    max-width: 720px;
+    max-width: 38em;
     color: var(--muted);
-    line-height: 1.6;
+    line-height: var(--lh-body);
   }
   .table {
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--r-md);
     background: var(--panel);
     overflow: hidden;
   }
   .row {
     display: grid;
-    grid-template-columns: minmax(160px, 1.3fr) minmax(120px, 1fr) 110px 150px minmax(160px, 1.4fr) 150px;
-    gap: 14px;
+    grid-template-columns: minmax(160px, 1.3fr) minmax(120px, 1fr) 96px 160px minmax(160px, 1.4fr) 168px;
+    gap: 16px;
     align-items: center;
-    min-height: 52px;
-    padding: 8px 14px;
+    min-height: 56px;
+    padding: 8px 16px;
     border-top: 1px solid var(--border);
   }
   .row:first-child {
@@ -100,13 +101,14 @@
   .row.head {
     min-height: 32px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
   .row:not(.head):hover {
     background: var(--hover);
   }
   .row.current {
     background: var(--accent-soft);
+    box-shadow: inset 2px 0 var(--accent);
   }
   .row > span {
     min-width: 0;
@@ -116,7 +118,10 @@
   }
   small {
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
+  }
+  .folder small {
+    font-family: var(--mono);
   }
   .folder small,
   .last small {
@@ -125,11 +130,13 @@
     text-overflow: ellipsis;
   }
   .branch {
-    padding: 1px 8px;
-    border-radius: 4px;
+    margin-right: 8px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
     color: var(--accent);
     background: var(--accent-soft);
-    font-size: 12px;
+    font-size: var(--fs-sm);
+    font-weight: 600;
   }
   .dirty {
     color: var(--yellow);
@@ -137,27 +144,6 @@
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 6px;
-  }
-  button {
-    padding: 3px 10px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--raised);
-    cursor: pointer;
-  }
-  button:hover {
-    border-color: var(--muted);
-  }
-  .danger:hover {
-    border-color: var(--red);
-    color: var(--red);
-  }
-  .primary {
-    flex: none;
-    padding: 6px 16px;
-    border-color: var(--accent);
-    background: var(--accent);
-    color: #fff;
+    gap: 8px;
   }
 </style>

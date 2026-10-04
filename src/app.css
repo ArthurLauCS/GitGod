@@ -1,36 +1,120 @@
+/*
+ * 设计令牌。组件里的颜色、字号、间距、圆角、动效都从这里取，不写裸值。
+ * 间距 scale：2 4 8 12 16 24 32 48；字号音阶 1.2：10 12 14 17 21 25。
+ */
 :root {
-  color-scheme: dark light;
-  --bg: #17191e;
-  --panel: #1e2127;
-  --raised: #262a32;
-  --border: #2d313a;
-  --text: #d9dce3;
-  --muted: #868d9b;
-  --accent: #5c9dff;
-  --accent-soft: rgba(92, 157, 255, 0.16);
-  --hover: rgba(255, 255, 255, 0.045);
-  --green: #5fc27e;
-  --yellow: #e0b252;
-  --red: #ef6b73;
-  --font: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
-  --mono: 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
+  color-scheme: dark;
+
+  /* 底色由深到浅三层：窗口底、面板、浮起的控件 */
+  --bg: #121316;
+  --panel: #1a1c21;
+  --raised: #24272e;
+  --border: #2d3139;
+  --border-strong: #454b57;
+  --text: #e4e6eb;
+  --muted: #959ca9;
+  --hover: rgba(255, 255, 255, 0.05);
+
+  --accent: #6aa6ff;
+  --accent-soft: rgba(106, 166, 255, 0.16);
+  --on-accent: #0c1424;
+  --green: #62c684;
+  --yellow: #e2b65a;
+  --red: #f0747c;
+  --on-danger: #1f0b0d;
+
+  /* 提交图泳道 */
+  --lane-0: #6aa6ff;
+  --lane-1: #62c684;
+  --lane-2: #e2b65a;
+  --lane-3: #c792f5;
+  --lane-4: #f0747c;
+  --lane-5: #56c8d2;
+  --lane-6: #f2955a;
+  --lane-7: #a3adbf;
+
+  /* 作者色：按名字哈希取一个，同一个人在任何仓库里颜色都一样 */
+  --author-0: #7fb2ff;
+  --author-1: #6fd08f;
+  --author-2: #e6bd68;
+  --author-3: #cf9ff7;
+  --author-4: #f38a90;
+  --author-5: #62d0d9;
+  --author-6: #f5a26b;
+  --author-7: #b4c96a;
+  --author-8: #f092c8;
+  --author-9: #9aa7ff;
+
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --backdrop: rgba(0, 0, 0, 0.45);
+
+  /* 界面文字、标题、等宽三个字族，各管一个区域 */
+  --font: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+  --display: 'Segoe UI Variable Display', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+  --mono: 'Cascadia Code', 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
+
+  --fs-xs: 10px;
+  --fs-sm: 12px;
+  --fs-md: 14px;
+  --fs-lg: 17px;
+  --fs-xl: 21px;
+  --fs-2xl: 25px;
+  --lh-tight: 1.25;
+  --lh-body: 1.65;
+
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+
+  --row: 28px;
+
+  --t-press: 80ms ease-out;
+  --t-pop: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f4f5f7;
-    --panel: #ffffff;
-    --raised: #eceef2;
-    --border: #dfe2e8;
-    --text: #23262d;
-    --muted: #6d7482;
-    --accent: #2f6fde;
-    --accent-soft: rgba(47, 111, 222, 0.13);
-    --hover: rgba(0, 0, 0, 0.04);
-    --green: #2f9652;
-    --yellow: #a97a12;
-    --red: #d2434c;
-  }
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f1f2f5;
+  --panel: #fafafb;
+  --raised: #e9ebef;
+  --border: #dadde3;
+  --border-strong: #b3b9c4;
+  --text: #1b1e25;
+  --muted: #5a616e;
+  --hover: rgba(15, 20, 30, 0.05);
+
+  --accent: #2460d6;
+  --accent-soft: rgba(36, 96, 214, 0.12);
+  --on-accent: #f7f9fc;
+  --green: #1c7a3e;
+  --yellow: #8a5f00;
+  --red: #c12f3a;
+  --on-danger: #fbf5f5;
+
+  --lane-0: #2460d6;
+  --lane-1: #1c8a47;
+  --lane-2: #a87400;
+  --lane-3: #8a45d1;
+  --lane-4: #c12f3a;
+  --lane-5: #0f8791;
+  --lane-6: #c25a14;
+  --lane-7: #667085;
+
+  --author-0: #1f58c7;
+  --author-1: #187a3d;
+  --author-2: #8a5f00;
+  --author-3: #7a3cc0;
+  --author-4: #b82a35;
+  --author-5: #0a6b74;
+  --author-6: #ad4f10;
+  --author-7: #526610;
+  --author-8: #b0307c;
+  --author-9: #4a55c9;
+
+  --shadow-pop: 0 12px 32px rgba(20, 28, 45, 0.18);
+  --backdrop: rgba(20, 28, 45, 0.3);
 }
+
 * {
   box-sizing: border-box;
 }
@@ -43,30 +127,160 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font: 13px/1.5 var(--font);
+  font: var(--fs-md) / 1.5 var(--font);
   overflow: hidden;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  /* 中英文、中文与数字之间自动留出间隙 */
+  text-autospace: normal;
+  font-variant-numeric: tabular-nums;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  line-height: var(--lh-tight);
+  text-wrap: balance;
+}
+p,
+li {
+  text-wrap: pretty;
 }
 button,
-input {
+input,
+textarea {
   font: inherit;
   color: inherit;
 }
+
+/* 所有按钮共有的四态；各组件只管自己的尺寸和配色 */
+button {
+  transition: transform var(--t-press);
+}
+button:active:enabled {
+  transform: scale(0.96);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 通用按钮：.btn 描边，.btn.primary 主操作，.btn.danger 危险操作，.btn.quiet 无边框 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--raised);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn:hover:enabled {
+  border-color: var(--border-strong);
+}
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.btn.primary:hover:enabled {
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+.btn.danger:hover:enabled {
+  border-color: var(--red);
+  color: var(--red);
+}
+.btn.primary.danger {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--on-danger);
+}
+.btn.primary.danger:hover:enabled {
+  color: var(--on-danger);
+}
+.btn.quiet {
+  border-color: transparent;
+  background: none;
+}
+.btn.quiet:hover:enabled {
+  border-color: transparent;
+  background: var(--hover);
+}
+.btn.small {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--fs-sm);
+}
+.btn.icon {
+  width: 28px;
+  padding: 0;
+}
+.btn.small.icon {
+  width: 24px;
+}
+.btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.field {
+  height: 28px;
+  padding: 0 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+}
+.field:focus {
+  border-color: var(--accent);
+}
+
+dialog {
+  animation: pop var(--t-pop);
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog {
+    animation: fade var(--t-pop);
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+  button:active:enabled {
+    transform: none;
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 5px;
-  border: 2px solid transparent;
+  border-radius: 6px;
+  border: 3px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted);
+  background-color: var(--border-strong);
 }
-:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+::-webkit-scrollbar-corner {
+  background: none;
 }

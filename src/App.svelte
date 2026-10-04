@@ -1,7 +1,9 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
   import * as api from './lib/api'
+  import Icon from './lib/Icon.svelte'
   import RepoView from './lib/RepoView.svelte'
+  import { theme, toggleTheme } from './lib/theme.svelte'
   import { t } from './lib/zh'
 
   interface Tab {
@@ -89,10 +91,14 @@
         onauxclick={(e) => e.button === 1 && close(tab.id)}
       >
         <span>{name(tab.path)}</span>
-        <button title={t.closeTab} onclick={(e) => (e.stopPropagation(), close(tab.id))}>×</button>
+        <button title={t.closeTab} onclick={(e) => (e.stopPropagation(), close(tab.id))}><Icon name="close" size={12} /></button>
       </div>
     {/each}
-    <button class="add" class:active={active === null} title={t.newTab} onclick={() => (active = null)}>+</button>
+    <button class="btn quiet icon" class:on={active === null} title={t.newTab} onclick={() => (active = null)}><Icon name="plus" /></button>
+    <span class="spacer"></span>
+    <button class="btn quiet icon" title={theme.current === 'dark' ? t.themeToLight : t.themeToDark} onclick={toggleTheme}>
+      <Icon name={theme.current === 'dark' ? 'sun' : 'moon'} />
+    </button>
   </nav>
 {/if}
 
@@ -105,7 +111,7 @@
     <div class="welcome">
       <h1>{t.appName}</h1>
       <p class="muted">{t.openRepoHint}</p>
-      <button class="primary" onclick={pick}>{t.openRepo}</button>
+      <button class="btn primary" onclick={pick}>{t.openRepo}</button>
       {#if error}<p class="error">{error}</p>{/if}
       {#if recent.length}
         <h2>{t.recent}</h2>
@@ -126,11 +132,17 @@
     flex: none;
     display: flex;
     align-items: flex-end;
-    height: 38px;
-    padding: 0 8px;
     gap: 2px;
+    height: 40px;
+    padding: 0 8px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+  }
+  nav > .btn {
+    margin-bottom: 4px;
+  }
+  .spacer {
+    flex: 1;
   }
   .body {
     flex: 1;
@@ -142,17 +154,18 @@
   .tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 31px;
+    gap: 8px;
+    height: 32px;
     min-width: 0;
     max-width: 220px;
-    padding: 0 6px 0 14px;
+    padding: 0 8px 0 16px;
     border: 1px solid transparent;
     border-bottom: 0;
-    border-radius: 7px 7px 0 0;
-    color: var(--muted);
-    cursor: default;
+    border-radius: var(--r-md) var(--r-md) 0 0;
     margin-bottom: -1px;
+    color: var(--muted);
+    font-family: var(--display);
+    cursor: default;
   }
   .tab:hover {
     background: var(--hover);
@@ -169,42 +182,31 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .tab button,
-  .add {
+  .tab button {
     flex: none;
+    display: grid;
+    place-items: center;
     width: 20px;
     height: 20px;
     padding: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--r-sm);
     background: none;
     color: var(--muted);
-    font-size: 15px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .tab button {
     visibility: hidden;
+    cursor: pointer;
   }
   .tab:hover button,
   .tab.active button {
     visibility: visible;
   }
-  .tab button:hover,
-  .add:hover,
-  .add.active {
+  .tab button:hover {
     background: var(--raised);
     color: var(--text);
   }
-  .add {
-    width: 28px;
-    height: 28px;
-    margin: 0 0 3px 4px;
-    font-size: 18px;
-  }
   .welcome {
     margin: auto;
-    width: 440px;
+    width: 480px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -212,42 +214,35 @@
   }
   h1 {
     margin: 0;
-    font-size: 30px;
+    font-size: var(--fs-2xl);
     font-weight: 600;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.02em;
   }
   h2 {
-    margin: 24px 0 2px;
-    font-size: 12px;
-    font-weight: 600;
+    margin: 32px 0 4px;
+    font-size: var(--fs-sm);
+    font-weight: 400;
     color: var(--muted);
+    letter-spacing: 0.04em;
   }
   .muted {
-    margin: 0 0 12px;
+    margin: 0 0 16px;
     color: var(--muted);
-  }
-  .primary,
-  .recent {
-    border: 1px solid transparent;
-    border-radius: 5px;
-    cursor: pointer;
-  }
-  .primary {
-    padding: 8px 20px;
-    background: var(--accent);
-    color: #fff;
-  }
-  .primary:hover {
-    filter: brightness(1.1);
   }
   .recent {
     width: 100%;
-    padding: 6px 10px;
+    padding: 8px 12px;
+    margin-left: -12px;
+    border: 0;
+    border-radius: var(--r-md);
     background: none;
+    font-family: var(--mono);
+    font-size: var(--fs-sm);
     text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    cursor: pointer;
   }
   .recent:hover {
     background: var(--hover);

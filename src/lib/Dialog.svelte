@@ -78,7 +78,7 @@
       {#each spec.fields ?? [] as f (f.key)}
         {#if f.type === 'text'}
           <!-- svelte-ignore a11y_autofocus -->
-          <label class="text">{f.label}<input type="text" bind:value={values[f.key]} autofocus spellcheck="false" /></label>
+          <label class="text">{f.label}<input class="field" type="text" bind:value={values[f.key]} autofocus spellcheck="false" /></label>
         {:else if f.type === 'checkbox'}
           <label class="check"><input type="checkbox" bind:checked={values[f.key] as boolean} />{f.label}</label>
         {:else}
@@ -94,8 +94,8 @@
         <label class="check skip"><input type="checkbox" bind:checked={skip} />{t.dontShowAgain}</label>
       {/if}
       <div class="buttons">
-        <button type="button" onclick={() => close(false)}>{t.cancel}</button>
-        <button type="submit" class="primary" class:danger={spec.danger} disabled={!ready}>{spec.confirm ?? t.ok}</button>
+        <button type="button" class="btn" onclick={() => close(false)}>{t.cancel}</button>
+        <button type="submit" class="btn primary" class:danger={spec.danger} disabled={!ready}>{spec.confirm ?? t.ok}</button>
       </div>
     </form>
   {/if}
@@ -103,107 +103,86 @@
 
 <style>
   dialog {
-    width: 560px;
-    max-height: 90vh;
     padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg);
     background: var(--panel);
     color: var(--text);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--shadow-pop);
   }
   dialog::backdrop {
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--backdrop);
+  }
+
+  dialog {
+    width: 560px;
+    max-height: 90vh;
   }
   form {
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 18px 20px;
+    gap: 16px;
+    padding: 24px;
   }
   h2 {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--fs-lg);
     font-weight: 600;
   }
   p {
     margin: 0;
     color: var(--muted);
+    line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
   .warning {
-    padding: 8px 10px;
-    border-radius: 5px;
+    padding: 8px 12px;
+    border-radius: var(--r-md);
     color: var(--red);
     background: color-mix(in srgb, var(--red) 12%, transparent);
   }
   .text {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
   .text input {
-    padding: 6px 9px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    font-size: 13px;
-    outline: none;
-  }
-  .text input:focus {
-    border-color: var(--accent);
-  }
-  .skip {
-    color: var(--muted);
-    font-size: 12px;
+    height: 32px;
+    color: var(--text);
+    font-size: var(--fs-md);
   }
   .check {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
+  }
+  .skip {
+    color: var(--muted);
+    font-size: var(--fs-sm);
   }
   fieldset {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     margin: 0;
     padding: 0;
     border: 0;
   }
   legend {
-    padding: 0 0 6px;
+    padding: 0 0 8px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
   .buttons {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 6px;
   }
-  button {
-    padding: 5px 16px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--raised);
-    cursor: pointer;
-  }
-  button:hover:enabled {
-    border-color: var(--muted);
-  }
-  .primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: #fff;
-  }
-  .primary.danger {
-    border-color: var(--red);
-    background: var(--red);
-  }
-  button:disabled {
-    opacity: 0.45;
-    cursor: default;
+  .buttons .btn {
+    min-width: 80px;
+    height: 32px;
   }
 </style>
