@@ -6,6 +6,7 @@
   import Dialog from './Dialog.svelte'
   import { explain, type ExplainKey } from './explain'
   import Graph from './Graph.svelte'
+  import { graphKey } from './graph-key'
   import Help from './Help.svelte'
   import Icon from './Icon.svelte'
   import Splitter from './Splitter.svelte'
@@ -39,6 +40,7 @@
   let stashes = $state.raw<api.Stash[]>([])
   let worktrees = $state.raw<api.Worktree[]>([])
   let entries = $state.raw<api.Entry[]>([])
+  let identity = $state.raw<api.Identity | null>(null)
   let logs = $state.raw<api.Log[]>([])
   let showLog = $state(false)
   let view = $state<'history' | 'changes' | 'worktrees'>('history')
@@ -75,8 +77,8 @@
   }
 
   async function loadSidebar() {
-    const r = await guard(Promise.all([api.refs(tab), api.stashes(tab), api.worktrees(tab), loadStatus()]))
-    if (r) [refs, stashes, worktrees] = r
+    const r = await guard(Promise.all([api.refs(tab), api.stashes(tab), api.worktrees(tab), loadStatus(), api.commitIdentity(tab)]))
+    if (r) [refs, stashes, worktrees, , identity] = r
     // 各分支的同步状态在分支多时要算一两秒，不等它
     api.tracking(tab).then(
       (list) => (tracks = new Map(list.map((x) => [x.name, x]))),
@@ -113,15 +115,16 @@
     select(row, id)
   }
 
-  /** 提交图只取决于各引用和 HEAD 指向哪些提交 */
-  const tips = () => JSON.stringify([refs.refs.map((r) => r.name + r.id), refs.head_id])
-
   // 回到窗口、切回本页签或执行完操作后：引用指向有变化才重新加载提交图
   async function refresh() {
     if (loadingAll) return
-    const before = tips()
+    const before = graphKey(refs)
+    const beforeHead = refs.head_id
     await loadSidebar()
-    if (tips() === before) return
+    if (graphKey(refs) === before) {
+      if (refs.head_id && refs.head_id !== beforeHead && view === 'history') jump(refs.head_id)
+      return
+    }
     selectedRow = null
     detail = null
     await loadAll()
@@ -210,6 +213,26 @@
   }
 
   const ask = (spec: Parameters<Dialog['ask']>[0]) => dialog!.ask(spec)
+
+  async function editIdentity() {
+    identity = (await guard(api.commitIdentity(tab))) ?? identity
+    const v = await ask({
+      title: t.editIdentity,
+      message: t.identityScope,
+      fields: [
+        { key: 'name', label: t.identityName, type: 'text', value: identity?.name ?? '' },
+        { key: 'email', label: t.identityEmail, type: 'text', value: identity?.email ?? '' },
+      ],
+    })
+    if (!v) return
+    busy = true
+    error = ''
+    identity = (await guard(api.setCommitIdentity(tab, v.name as string, v.email as string)))
+      ?? (await guard(api.commitIdentity(tab))) ?? identity
+    busy = false
+    const expected = `${(v.name as string).trim()} <${(v.email as string).trim()}>`
+    if (!error && (identity?.author !== expected || identity?.committer !== expected)) error = t.identityOverridden
+  }
 
   /** 先用白话和示意图说明这个操作会发生什么，确认后再执行；勾过「不再显示」的直接执行 */
   async function explained(key: ExplainKey, title: string, op: api.Op) {
@@ -599,7 +622,7 @@
         <Detail {detail} onjump={jump} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
-        <WorkingCopy {tab} {entries} reload={refresh} oncommitted={committed} {discard} {discardLines} />
+        <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} reload={refresh} oncommitted={committed} {discard} {discardLines} />
       </div>
       {#if view === 'worktrees'}
         <div class="pane">

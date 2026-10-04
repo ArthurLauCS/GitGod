@@ -2,12 +2,13 @@ pub mod conflict;
 pub mod detail;
 pub mod diff;
 pub mod graph;
+pub mod identity;
 pub mod ops;
 pub mod refs;
 pub mod status;
 
 use std::path::{Path, PathBuf};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -42,16 +43,50 @@ impl Repo {
     pub(crate) fn git_in(&self, args: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
         git_at(&self.path, args, stdin)
     }
+
+    /// 最多保留 limit + 1 字节，超限后终止 Git；多出的一个字节供调用者识别超限。
+    pub(crate) fn git_limited(&self, args: &[&str], limit: usize) -> Result<Vec<u8>> {
+        let mut child = git_command(&self.path).args(args).stdin(Stdio::null()).spawn().map_err(err)?;
+        let mut stderr = child.stderr.take().unwrap();
+        std::thread::scope(|s| {
+            // 同时排空 stderr，避免 Git 在写满错误管道后阻塞 stdout。
+            let errors = s.spawn(move || {
+                let mut bytes = Vec::new();
+                stderr.by_ref().take(64 * 1024).read_to_end(&mut bytes).map_err(err)?;
+                std::io::copy(&mut stderr, &mut std::io::sink()).map_err(err)?;
+                Ok::<_, String>(bytes)
+            });
+            let mut bytes = Vec::new();
+            let read = child.stdout.take().unwrap().take(limit as u64 + 1).read_to_end(&mut bytes);
+            if read.is_err() || bytes.len() > limit {
+                let _ = child.kill();
+            }
+            let status = child.wait().map_err(err);
+            let errors = errors.join().unwrap();
+            read.map_err(err)?;
+            let status = status?;
+            let errors = errors?;
+            if bytes.len() > limit || status.success() {
+                Ok(bytes)
+            } else {
+                Err(String::from_utf8_lossy(&errors).trim().to_owned())
+            }
+        })
+    }
+}
+
+fn git_command(dir: &Path) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(dir);
+    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
+    cmd
 }
 
 /// 在任意目录跑 git（其他工作树不在 `Repo::path` 下）。
 pub(crate) fn git_at(dir: &Path, args: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
-    let mut cmd = Command::new("git");
-    cmd.arg("-C").arg(dir).args(args);
-    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-    #[cfg(windows)]
-    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
-    let mut child = cmd.spawn().map_err(err)?;
+    let mut child = git_command(dir).args(args).spawn().map_err(err)?;
     // 读完 stdin 前就退出的命令会让写入失败，以它的退出状态为准
     let _ = child.stdin.take().unwrap().write_all(stdin);
     let out = child.wait_with_output().map_err(err)?;
@@ -65,11 +100,9 @@ pub(crate) fn git_at(dir: &Path, args: &[&str], stdin: &[u8]) -> Result<Vec<u8>>
 impl Repo {
     /// 跑一条写操作并记录命令和输出，不论成败都返回日志。
     pub(crate) fn git_log(&self, args: &[String]) -> ops::Log {
-        let mut cmd = Command::new("git");
+        let mut cmd = git_command(&self.path);
         // 没有终端可以输入用户名密码，凭据交给 credential helper，否则直接失败而不是挂住
-        cmd.arg("-C").arg(&self.path).args(args).env("GIT_TERMINAL_PROMPT", "0").stdin(Stdio::null());
-        #[cfg(windows)]
-        std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
+        cmd.args(args).env("GIT_TERMINAL_PROMPT", "0").stdin(Stdio::null());
         let command = format!("git {}", args.join(" "));
         match cmd.output() {
             Ok(out) => {

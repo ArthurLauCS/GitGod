@@ -92,3 +92,23 @@ fn unstage_before_first_commit_and_binary() {
     assert_eq!(brief(&repo), [("b.bin".into(), None, Some('?'))]);
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn oversized_diffs_are_bounded_and_cannot_apply_stale_lines() {
+    let dir = init("large-diff");
+    let repo = Repo::open(&dir).unwrap();
+    let large = "a line of text\n".repeat(400_000);
+    std::fs::write(dir.join("large.txt"), &large).unwrap();
+    assert!(diff::worktree(&repo, "large.txt", false, true).unwrap().too_large);
+    status::stage(&repo, &["large.txt".into()]).unwrap();
+    assert!(diff::worktree(&repo, "large.txt", true, false).unwrap().too_large);
+    status::commit(&repo, "large file", false).unwrap();
+    let id = refs::list(&repo).unwrap().head_id.unwrap();
+    assert!(diff::commit(&repo, &id, "large.txt").unwrap().too_large);
+    std::fs::write(dir.join("large.txt"), large.replace('a', "b")).unwrap();
+    assert!(diff::worktree(&repo, "large.txt", false, false).unwrap().too_large);
+    assert!(diff::apply_lines(&repo, "large.txt", false, 0, "@@ -1 +1 @@", &[0]).is_err());
+    assert_eq!(index_content(&dir, "large.txt"), large);
+    assert!(diff::commit(&repo, &"a".repeat(40), "large.txt").is_err());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
