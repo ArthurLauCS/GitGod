@@ -33,10 +33,10 @@ struct Tabs {
 type State<'a> = tauri::State<'a, Tabs>;
 
 fn session(state: &State, tab: u32) -> Result<Session> {
-    state.sessions.read().unwrap().get(&tab).cloned().ok_or_else(|| "页签已关闭".to_owned())
+    state.sessions.read().unwrap().get(&tab).cloned().ok_or_else(|| "PR_TAB_CLOSED".to_owned())
 }
 
-/// 命令行传入的仓库路径：`gitgod <路径>...`
+/// 命令行传入的仓库路径：`pushright <路径>...`
 #[tauri::command]
 fn initial_repos() -> Vec<String> {
     std::env::args().skip(1).collect()

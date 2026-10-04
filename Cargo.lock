@@ -1334,16 +1334,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gitgod"
-version = "0.1.1"
-dependencies = [
- "engine",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
-]
-
-[[package]]
 name = "gix"
 version = "0.88.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3756,6 +3746,16 @@ dependencies = [
  "bytesize",
  "human_format",
  "parking_lot",
+]
+
+[[package]]
+name = "pushright"
+version = "0.2.0"
+dependencies = [
+ "engine",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
 ]
 
 [[package]]

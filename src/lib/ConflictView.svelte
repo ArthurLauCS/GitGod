@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Conflict, Side } from './api'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   let {
     conflict,

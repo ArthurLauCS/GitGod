@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Explain } from './explain'
   import OpDiagram from './OpDiagram.svelte'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   let { explain }: { explain: Explain } = $props()
 </script>

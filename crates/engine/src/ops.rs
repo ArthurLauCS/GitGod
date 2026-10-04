@@ -64,7 +64,7 @@ pub enum Op {
 /// 名字来自界面输入，以 `-` 开头会被 git 当成选项
 fn safe(s: &str) -> Result<&str> {
     if s.is_empty() || s.starts_with('-') {
-        return Err(format!("名称不合法：{s:?}"));
+        return Err(format!("PR_INVALID_NAME: {s:?}"));
     }
     Ok(s)
 }
@@ -104,7 +104,7 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
             }
         }
         Op::Discard { paths } => {
-            args.extend(["stash", "push", "--include-untracked", "-m", "丢弃的改动", "--"]);
+            args.extend(["stash", "push", "--include-untracked", "-m", "PushRight: discarded changes", "--"]);
             args.extend(paths.iter().map(String::as_str));
         }
         Op::StashApply { name, pop } => args.extend(["stash", if *pop { "pop" } else { "apply" }, safe(name)?]),

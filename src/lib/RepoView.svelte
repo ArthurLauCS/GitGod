@@ -4,7 +4,8 @@
   import ContextMenu, { type Item } from './ContextMenu.svelte'
   import Detail from './Detail.svelte'
   import Dialog from './Dialog.svelte'
-  import { explain, type ExplainKey } from './explain'
+  import type { ExplainKey } from './explain'
+  import { explain } from './i18n.svelte'
   import Graph from './Graph.svelte'
   import { graphKey } from './graph-key'
   import Help from './Help.svelte'
@@ -13,7 +14,7 @@
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
   import Worktrees from './Worktrees.svelte'
-  import { t } from './zh'
+  import { t, errorText } from './i18n.svelte'
 
   let {
     tab,
@@ -182,14 +183,14 @@
     }
     const ok = log?.ok ?? false
     const ops = ok && record ? undoFor(op, before) : null
-    if (ops) undos = [...undos, { title: t.opNames[op.op] ?? op.op, ops }]
+    if (ops) undos = [...undos, { title: op.op, ops }]
     await refresh()
     return ok
   }
 
   async function undo() {
     const last = undos.at(-1)
-    if (!last || !(await ask({ title: t.undoTitle(last.title), explain: explain.undo, confirm: t.undo }))) return
+    if (!last || !(await ask({ title: t.undoTitle(t.opNames[last.title] ?? last.title), explain: explain.undo, confirm: t.undo }))) return
     undos = undos.slice(0, -1)
     for (const op of last.ops) if (!(await exec(op, false))) break
   }
@@ -198,7 +199,7 @@
   async function committed() {
     const before = refs.head_id
     await refresh()
-    if (before) undos = [...undos, { title: t.opNames.commit, ops: [{ op: 'reset', target: before, mode: 'soft' }] }]
+    if (before) undos = [...undos, { title: 'commit', ops: [{ op: 'reset', target: before, mode: 'soft' }] }]
   }
 
   async function discard(paths: string[]) {
@@ -421,8 +422,8 @@
     const items: Item[] = []
     if (kind === 'stash') {
       items.push(
-        { label: t.stashApply, hint: '把收起来的改动放回工作区，贮藏保留', action: () => exec({ op: 'stash_apply', name, pop: false }) },
-        { label: t.stashPop, hint: '放回工作区，并从贮藏列表里移除', action: () => exec({ op: 'stash_apply', name, pop: true }) },
+        { label: t.stashApply, hint: t.stashApplyHint, action: () => exec({ op: 'stash_apply', name, pop: false }) },
+        { label: t.stashPop, hint: t.stashPopHint, action: () => exec({ op: 'stash_apply', name, pop: true }) },
         null,
         {
           label: t.stashDrop,
@@ -452,7 +453,7 @@
           ...(current ? [] : [{ label: t.openInWorktree, hint: explain.worktree.short, action: () => addWorktree(s, true) }]),
           {
             label: t.rename,
-            hint: '只改本地分支的名字',
+            hint: t.renameHint,
             action: async () => {
               const v = await ask({ title: t.rename, fields: [{ key: 'name', label: t.newName, type: 'text', value: s }] })
               if (v) exec({ op: 'rename_branch', old: s, new: v.name as string })
@@ -540,7 +541,7 @@
 <div class="repo" class:hidden={!active}>
   <header>
     <div class="tools">
-      <button class="btn quiet" disabled={busy || !undos.length} title={undos.length ? t.undoTitle(undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
+      <button class="btn quiet" disabled={busy || !undos.length} title={undos.length ? t.undoTitle(t.opNames[undos.at(-1)!.title] ?? undos.at(-1)!.title) : t.undoNothing} onclick={undo}>
         <Icon name="undo" /><span>{t.undo}</span>
       </button>
       <span class="sep"></span>
@@ -576,7 +577,7 @@
       <button class="btn quiet" title={t.help} onclick={() => help!.open()}><Icon name="help" /><span>{t.help}</span></button>
     </div>
   </header>
-  {#if error}<p class="error">{error}</p>{/if}
+  {#if error}<p class="error">{errorText(error)}</p>{/if}
   {#if refs.in_progress}
     {@const what = refs.in_progress}
     <p class="progress">

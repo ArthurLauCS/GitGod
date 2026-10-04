@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Graph } from './explain'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   let { before, after }: { before: Graph; after: Graph } = $props()
 

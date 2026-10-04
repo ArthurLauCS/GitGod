@@ -2,7 +2,7 @@
   import type { Refs, Stash, Track, Worktree } from './api'
   import Icon from './Icon.svelte'
   import { layout } from './layout.svelte'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
   type View = 'history' | 'changes' | 'worktrees'

@@ -30,7 +30,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import Explainer from './Explainer.svelte'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   let dialog: HTMLDialogElement
   let skip = $state(false)

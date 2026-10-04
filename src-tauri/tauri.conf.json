@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "GitGod",
-  "version": "0.1.1",
+  "productName": "PushRight",
+  "version": "0.2.0",
   "identifier": "dev.gitgod.app",
   "build": {
     "frontendDist": "../dist",
@@ -12,8 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "GitGod",
-        "width": 1440, "minWidth": 1024, "minHeight": 640,
+        "title": "PushRight",
+        "width": 1440,
+        "minWidth": 1024,
+        "minHeight": 640,
         "height": 860,
         "resizable": true,
         "fullscreen": false
@@ -38,6 +40,15 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    },
+    "windows": {
+      "nsis": {
+        "languages": [
+          "English",
+          "SimpChinese"
+        ],
+        "displayLanguageSelector": true
+      }
     }
   }
 }

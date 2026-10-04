@@ -69,7 +69,7 @@ fn split(bytes: &[u8]) -> Result<Vec<Raw<'_>>> {
         }
     }
     if state != In::Text {
-        return Err("文件里的冲突标记不完整".into());
+        return Err("PR_CONFLICT_MARKERS".into());
     }
     Ok(blocks)
 }
@@ -105,7 +105,7 @@ pub fn resolve(repo: &Repo, path: &str, choices: &[Side]) -> Result<()> {
     let bytes = std::fs::read(&file).map_err(err)?;
     let blocks = split(&bytes)?;
     if blocks.iter().filter(|b| matches!(b, Raw::Conflict { .. })).count() != choices.len() {
-        return Err("文件已经变化，请刷新后重试".into());
+        return Err("PR_FILE_CHANGED".into());
     }
     let mut choices = choices.iter();
     let mut out = Vec::with_capacity(bytes.len());
