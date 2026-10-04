@@ -1,0 +1,12 @@
+[package]
+name = "gitgod"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.7.1", features = [] }
+
+[dependencies]
+engine = { path = "../crates/engine" }
+tauri = { version = "2.12.1", features = [] }
+tauri-plugin-dialog = "2"

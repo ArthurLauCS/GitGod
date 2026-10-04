@@ -1,0 +1,72 @@
+:root {
+  color-scheme: dark light;
+  --bg: #17191e;
+  --panel: #1e2127;
+  --raised: #262a32;
+  --border: #2d313a;
+  --text: #d9dce3;
+  --muted: #868d9b;
+  --accent: #5c9dff;
+  --accent-soft: rgba(92, 157, 255, 0.16);
+  --hover: rgba(255, 255, 255, 0.045);
+  --green: #5fc27e;
+  --yellow: #e0b252;
+  --red: #ef6b73;
+  --font: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, 'Microsoft YaHei UI', monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --raised: #eceef2;
+    --border: #dfe2e8;
+    --text: #23262d;
+    --muted: #6d7482;
+    --accent: #2f6fde;
+    --accent-soft: rgba(47, 111, 222, 0.13);
+    --hover: rgba(0, 0, 0, 0.04);
+    --green: #2f9652;
+    --yellow: #a97a12;
+    --red: #d2434c;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 var(--font);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}

@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/engine"]
+members = ["crates/engine", "src-tauri"]
+
+# 开发构建也优化 engine 和依赖，否则大仓库加载慢一个数量级，看不出真实性能
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.engine]
+opt-level = 3
