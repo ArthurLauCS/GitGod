@@ -6,6 +6,7 @@ use engine::detail::{self, Detail};
 use engine::diff::{self, Diff};
 use engine::status::{self, Entry};
 use engine::graph::{Graph, Row};
+use engine::identity::{self, Identity};
 use engine::ops::{self, Log, Op};
 use engine::refs::{self, Refs, Stash, Track, Worktree};
 use engine::{Repo, Result};
@@ -127,6 +128,16 @@ fn last_message(state: State, tab: u32) -> Result<String> {
 }
 
 #[tauri::command(async)]
+fn commit_identity(state: State, tab: u32) -> Result<Identity> {
+    identity::read(&session(&state, tab)?.repo)
+}
+
+#[tauri::command(async)]
+fn set_commit_identity(state: State, tab: u32, name: String, email: String) -> Result<Identity> {
+    identity::set(&session(&state, tab)?.repo, &name, &email)
+}
+
+#[tauri::command(async)]
 fn diff_worktree(state: State, tab: u32, path: String, staged: bool, untracked: bool) -> Result<Diff> {
     diff::worktree(&session(&state, tab)?.repo, &path, staged, untracked)
 }
@@ -182,7 +193,7 @@ fn main() {
         .manage(Tabs::default())
         .invoke_handler(tauri::generate_handler![
             initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
-            commit, last_message, diff_worktree, diff_commit, apply_lines, op, remotes, tracking, discard_lines, conflict_read, conflict_resolve, conflict_take
+            commit, last_message, commit_identity, set_commit_identity, diff_worktree, diff_commit, apply_lines, op, remotes, tracking, discard_lines, conflict_read, conflict_resolve, conflict_take
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

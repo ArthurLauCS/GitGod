@@ -107,6 +107,12 @@ export interface Entry {
   unstaged: string | null
   conflicted: boolean
 }
+export interface Identity {
+  name: string
+  email: string
+  author: string | null
+  committer: string | null
+}
 export interface Line {
   kind: string
   text: string
@@ -139,6 +145,9 @@ export const stage = (tab: number, paths: string[]) => invoke<void>('stage', { t
 export const unstage = (tab: number, paths: string[]) => invoke<void>('unstage', { tab, paths })
 export const commit = (tab: number, message: string, amend: boolean) => invoke<void>('commit', { tab, message, amend })
 export const lastMessage = (tab: number) => invoke<string>('last_message', { tab })
+export const commitIdentity = (tab: number) => invoke<Identity>('commit_identity', { tab })
+export const setCommitIdentity = (tab: number, name: string, email: string) =>
+  invoke<Identity>('set_commit_identity', { tab, name, email })
 export const diffWorktree = (tab: number, path: string, staged: boolean, untracked: boolean) =>
   invoke<Diff>('diff_worktree', { tab, path, staged, untracked })
 export const diffCommit = (tab: number, id: string, path: string) => invoke<Diff>('diff_commit', { tab, id, path })

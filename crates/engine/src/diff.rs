@@ -1,6 +1,7 @@
 use crate::{decode, err, Repo, Result};
 use gix::ObjectId;
 use serde::Serialize;
+use std::io::Read;
 
 // ponytail: 超过这个大小的补丁不解析不显示；需要时改成按区块分页
 const MAX_PATCH: usize = 4 << 20;
@@ -100,7 +101,7 @@ fn patch(repo: &Repo, path: &str, staged: bool) -> Result<Vec<u8>> {
         args.push("--cached");
     }
     args.extend(["--", path]);
-    repo.git(&args)
+    repo.git_limited(&args, MAX_PATCH)
 }
 
 /// 工作区（`staged` 为 false）或暂存区的单文件改动。未跟踪文件整个显示为新增。
@@ -108,7 +109,9 @@ pub fn worktree(repo: &Repo, path: &str, staged: bool, untracked: bool) -> Resul
     if !untracked {
         return Ok(parse(&patch(repo, path, staged)?));
     }
-    let bytes = std::fs::read(repo.path.join(path)).map_err(err)?;
+    let mut bytes = Vec::new();
+    std::fs::File::open(repo.path.join(path)).map_err(err)?
+        .take(MAX_PATCH as u64 + 1).read_to_end(&mut bytes).map_err(err)?;
     if bytes.len() > MAX_PATCH {
         return Ok(Diff { too_large: true, ..Default::default() });
     }
@@ -128,7 +131,7 @@ pub fn worktree(repo: &Repo, path: &str, staged: bool, untracked: bool) -> Resul
 pub fn commit(repo: &Repo, id: &str, path: &str) -> Result<Diff> {
     let oid = ObjectId::from_hex(id.as_bytes()).map_err(err)?.to_string();
     let args = ["show", "--format=", "--no-color", "--no-ext-diff", "--diff-merges=first-parent", &oid, "--", path];
-    Ok(parse(&repo.git(&args)?))
+    Ok(parse(&repo.git_limited(&args, MAX_PATCH)?))
 }
 
 /// 暂存（`staged` 为 false）或取消暂存第 `hunk` 个区块里选中的行。`lines` 是区块内的行下标。
@@ -156,6 +159,9 @@ pub fn discard_lines(repo: &Repo, path: &str, hunk: usize, header: &str, lines: 
 /// `staged` 决定用暂存区还是工作区的补丁，`reverse` 说明这个补丁之后会不会被反向应用。
 fn partial(repo: &Repo, path: &str, staged: bool, reverse: bool, hunk: usize, header: &str, lines: &[usize]) -> Result<Vec<u8>> {
     let patch = patch(repo, path, staged)?;
+    if patch.len() > MAX_PATCH {
+        return Err("改动超过 4 MiB，请按整个文件操作".into());
+    }
     let raw = split(&patch);
     let (raw_header, raw_lines) =
         raw.hunks.get(hunk).filter(|h| decode(h.0) == header).ok_or("文件已经变化，请刷新后重试")?;

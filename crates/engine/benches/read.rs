@@ -23,6 +23,7 @@ fn bench(c: &mut Criterion) {
     // 窗口起点取在两个快照正中间之后，重放成本最大
     c.bench_function("rows_60_before_checkpoint", |b| b.iter(|| graph.rows(&repo, 150_000 + 1023, 60).unwrap().len()));
     c.bench_function("refs_list", |b| b.iter(|| refs::list(&repo).unwrap().refs.len()));
+    c.bench_function("tracking", |b| b.iter(|| refs::tracking(&repo).unwrap().len()));
     c.bench_function("status", |b| b.iter(|| status::status(&repo).unwrap().len()));
     c.bench_function("detail", |b| b.iter(|| detail::detail(&repo, &id).unwrap().files.len()));
 }

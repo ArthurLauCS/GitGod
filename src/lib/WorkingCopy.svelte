@@ -10,6 +10,9 @@
   let {
     tab,
     entries,
+    identity,
+    editIdentity,
+    identityBusy,
     reload,
     oncommitted,
     discard,
@@ -17,6 +20,9 @@
   }: {
     tab: number
     entries: api.Entry[]
+    identity: api.Identity | null
+    editIdentity: () => void
+    identityBusy: boolean
     reload: () => Promise<void>
     oncommitted: () => void
     /** 丢弃这些路径的改动；确认对话框和执行都由上层负责 */
@@ -36,7 +42,7 @@
 
   const unstaged = $derived(entries.filter((e) => e.unstaged))
   const staged = $derived(entries.filter((e) => e.staged))
-  const canCommit = $derived(!busy && message.trim() !== '' && (staged.length > 0 || amend))
+  const canCommit = $derived(!busy && !identityBusy && message.trim() !== '' && (staged.length > 0 || amend))
 
   $effect(() => {
     const s = sel
@@ -139,6 +145,17 @@
     {@render list(t.staged, t.stagedHint, staged, true)}
     <div class="commit">
       {#if error}<p class="error">{error}</p>{/if}
+      <div class="identity">
+        <span title={(amend ? identity?.committer : identity?.author) ?? t.identityMissing}>
+          <small>{amend ? t.committer : t.commitIdentity}</small>
+          <strong>{(amend ? identity?.committer : identity?.author) ?? t.identityMissing}</strong>
+        </span>
+        <button class="btn small" disabled={busy || identityBusy} onclick={editIdentity}>{t.editIdentity}</button>
+      </div>
+      {#if amend}<small class="identity-note">{t.amendIdentityHint}</small>
+      {:else if identity?.committer && identity.committer !== identity.author}
+        <small class="identity-note">{t.committer}：{identity.committer}</small>
+      {/if}
       <textarea
         placeholder={t.commitPlaceholder}
         bind:value={message}
@@ -298,6 +315,31 @@
     font-size: var(--fs-md);
     line-height: var(--lh-body);
     outline: none;
+    user-select: text;
+  }
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .identity > span {
+    flex: 1;
+    min-width: 0;
+  }
+  .identity small,
+  .identity strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .identity small,
+  .identity-note {
+    color: var(--muted);
+  }
+  .identity strong {
+    font-size: var(--fs-sm);
+    font-weight: 500;
     user-select: text;
   }
   textarea:focus {
