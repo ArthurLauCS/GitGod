@@ -1,100 +1,120 @@
-# GitGod
+# PushRight
 
-面向多分支日常工作的 Git 桌面可视化客户端，使用 Svelte、Tauri 和 Rust 构建。
+**See your branches. Push to the right place.**
 
-当前版本为 **v0.1.1 预览版**，提供 Windows x64 安装包。
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-![GitGod 桌面版：提交图、独立作者样式与差异视图](docs/images/desktop.jpg)
+A Git desktop client built with Svelte, Tauri and Rust. PushRight makes push destinations explicit, recommends a remote branch with the same name, and defaults Pull to **Rebase instead of merge**.
 
-截图来自桌面程序，使用虚构作者和本地示例仓库。
+**v0.2.0 preview** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
 
-## 下载与安装
+![PushRight: commit graph, individual author styling and file differences](docs/images/desktop.jpg)
 
-从 [GitHub Releases](https://github.com/ArthurLauCS/GitGod/releases) 下载 `GitGod_0.1.1_x64-setup.exe`，运行安装程序。
+Screenshots show the actual desktop app with a local demo repository and fictional identities.
 
-- 支持 Windows 10 / 11 x64；本次发布在 Windows x64 上构建和验证。
-- 需要安装 [Git for Windows](https://git-scm.com/downloads/win)，并确保 `git` 在 PATH 中可用。
-- 需要 Microsoft Edge WebView2 Runtime；缺少时安装程序会尝试联网安装。
-- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\GitGod_0.1.1_x64-setup.exe -Algorithm SHA256` 核对文件。
+## Download and install
 
-首次使用前，在 Git 中配置提交身份及远程认证：
+Download `PushRight_0.2.0_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v0.2.0).
+
+- Windows 10 / 11 x64; built and checked on Windows x64.
+- Install [Git for Windows](https://git-scm.com/downloads/win) and make `git` available on PATH.
+- Microsoft Edge WebView2 Runtime is required; the installer attempts an online installation if missing.
+- The installer offers English and Simplified Chinese. App language is selected independently.
+- This preview is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_0.2.0_x64-setup.exe -Algorithm SHA256`.
+
+Previously named GitGod. PushRight retains the application data identifier for settings compatibility. The old GitGod installation may remain separately installed; it is not removed automatically.
+
+Configure your identity in Git or edit it per repository in the app:
 
 ```sh
 git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
 ```
 
-GitGod 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败，先在终端完成相应仓库的 Git 认证。应用本身不提供账号登录或交互式终端提示。
+PushRight uses system Git credentials or SSH configuration. Complete authentication in a terminal first if needed; the app does not provide account sign-in or interactive terminal prompts.
 
-## 使用
+## Usage
 
-打开应用后选择本地 Git 仓库。也可将仓库路径作为启动参数传入：
+Open a local repository, or pass its path when launching:
 
 ```powershell
-& "C:\path\to\gitgod.exe" "C:\path\to\repository"
+& "C:\path\to\pushright.exe" "C:\path\to\repository"
 ```
 
-### 提交与推送
+### Commit and push
 
-1. 在工作区查看变更，按文件、差异块或选中行暂存，然后填写提交说明。
-2. 推送时检查目标远程和分支。当前分支与 upstream 名称不一致时，应用要求明确选择，并优先推荐同名远程分支。
-3. 推送使用明确的远程和分支 refspec。强制推送采用 `--force-with-lease`；仍需确认目标和预期影响。
+1. Review changes, stage files, hunks or selected lines, and enter a commit message.
+2. Check the remote and branch before pushing. When a branch name differs from its upstream, the app requires an explicit choice and recommends the same-name remote branch.
+3. Push uses an explicit remote and branch refspec. Force push uses `--force-with-lease`; check the destination and expected effect first.
 
-例如本地 `feature/login` 误跟踪 `origin/main` 时，推送候选会优先推荐 `origin/feature/login`，避免直接沿用错误的 upstream。
+For example, if local `feature/login` accidentally tracks `origin/main`, the dialog recommends `origin/feature/login` and makes the mismatch visible.
 
-### 单独设置作者样式
+### Pull with Rebase instead of merge
 
-在提交列表中右键某个作者，独立设置该作者的底色和边框。设置按作者原始邮箱保存；没有邮箱时按姓名匹配。同名、不同邮箱的作者不会互相影响。设置跨仓库保存在本机。
+Click **Pull**. The dialog shows the upstream and checks **Rebase instead of merge** every time, even if the previous pull used merge. The dialog cannot be skipped with “Don't show again.”
 
-左键作者可临时聚焦其提交；作者获得键盘焦点后，按 `Shift+F10` 也可打开样式设置。
+- Checked: explicitly runs `git pull --rebase`, overriding `pull.rebase=false` and branch-level merge preferences.
+- Unchecked: explicitly runs `git pull --no-rebase`, which may create a merge commit. Keep the box checked when your team requires it.
+- Commit or stash unfinished work first. Automatic stashing and updates to other local branch refs are disabled for this operation.
+- On conflicts, resolve and **Continue**, or **Abort** to restore the previous local state. During rebase, “ours” is upstream plus commits already replayed; “theirs” is the local commit being replayed.
 
-### 查看和修改提交身份
+![Pull with Rebase instead of merge checked by default](docs/images/pull-rebase.jpg)
 
-“本地更改”的提交区域显示 Git 实际使用的姓名和邮箱。点击“修改身份”，可保存当前仓库的 `user.name` 和 `user.email`，不影响全局配置或已有提交；关联工作树共享仓库配置。
+This is a **pull strategy** for any current branch. It does not determine how a feature branch merges into `dev`, `main` or `master`, or approve a hosted PR/MR. Follow the repository's separate merge policy. Rebase rewrites replayed commit IDs; coordinate before rewriting shared history. See the [Git pull reference](https://git-scm.com/docs/git-pull).
 
-如果环境变量或 `author.*` / `committer.*` / 工作树配置覆盖了这两个值，界面会显示实际身份并提示覆盖情况。修补上次提交会保留原作者，界面显示本次提交者。
+### Individual author styles
 
-![在提交区查看和修改当前仓库的提交身份](docs/images/commit-identity.jpg)
+Right-click an author to set that person's background and border. Styles use the raw email, falling back to the name only when email is absent. Identical names with different emails remain separate. Settings are saved locally across repositories.
 
-### 大仓库与大文件
+Left-click an author to highlight their commits temporarily. Keyboard users can focus an author and press `Shift+F10` to open styling.
 
-首屏只加载 2000 条提交，完整历史后台补齐；提交图使用紧凑骨架、每 1024 行的检查点，以及按可见窗口获取作者和标题。切换已有分支、引用重命名时，只更新标记和选中行，提交起点集合不变就复用提交图。
+### Commit identity
 
-差异读取最多保留 4 MiB + 1 字节；超限后停止读取，Git 差异进程会被终止。超过上限的文件仍可整文件暂存或提交。
+The **Local changes** commit panel shows the effective Git name and email. **Edit identity** saves repository-level `user.name` and `user.email`, without changing global configuration or existing commits. Linked worktrees share repository configuration.
 
-在本机的 148 万提交 Linux 仓库及 128 MiB 文件上进行了复测，环境、数据规模、结果和复现命令见 [性能记录](docs/PERFORMANCE.md)。
+The app reports effective identities and overrides from environment variables, `author.*`, `committer.*` or worktree configuration. Amending preserves the original author; the panel shows the current committer.
 
-### 已提供的功能
+![Repository commit identity](docs/images/commit-identity.jpg)
 
-- 多仓库标签页、最近仓库与会话恢复。
-- 虚拟滚动提交图、分支和标签标记、提交详情及文件差异。
-- 暂存、取消暂存、提交、修改上次提交；按文件、差异块或选中行处理变更。
-- 分支创建、切换、重命名与删除；合并、变基、cherry-pick、revert、reset 和标签操作。
-- Fetch、Pull、明确选择目标的 Push，以及 stash 操作。
-- Worktree 管理、冲突块处理、进行中操作的继续与中止。
-- 深浅主题、可调面板、独立作者样式、操作说明和命令日志。
+### Large repositories and files
 
-## 当前边界
+The initial view loads 2,000 commits; full history follows in the background. The graph uses a compact skeleton, checkpoints every 1,024 rows and visible-window metadata. Existing branch switches and ref renames reuse the graph when the set of starting commit IDs stays unchanged.
 
-- 这是桌面预览版。VS Code 扩展、行级 Blame、PR / Issue 和托管平台协作集成尚未交付。
-- 提交列表只渲染可见行，但完整历史仍会在后台读取；超大仓库的时间和内存开销需要进一步实测优化。
-- 超过 4 MiB 的补丁不显示完整差异。读取限制约束的是应用保留的数据，Git 子进程在输出补丁前仍可能消耗较多时间和内存。
-- 提交图最多显示 24 条轨道，实际数量随面板宽度变化；高度并行的复杂历史可能无法显示所有连线。
-- 尚未提供自动更新，也未发布 macOS / Linux 安装包。
-- 部分操作提供撤销入口，并非所有 Git 操作都能撤销；删除分支、丢弃变更、重置等操作前应检查提示。
+Diff reads retain at most 4 MiB + 1 byte. Oversized output stops the reader and terminates the Git diff process. Whole-file staging and commits remain available.
 
-## 本地开发
+Measurements on a local Linux repository with 1.48 million commits and a 128 MiB file, including scope and reproduction commands, are in the [performance report (Chinese)](docs/PERFORMANCE.md).
 
-需要 Node.js 24、Rust stable，以及 Windows 的 MSVC C++ 工具链和 Windows SDK。完整环境要求见 [Tauri 官方文档](https://v2.tauri.app/start/prerequisites/)。
+### Included features
+
+- Multiple repository tabs, recent repositories and session restoration.
+- Virtualized graph, branches, tags, commit details and file diffs.
+- Stage, unstage, commit and amend; file, hunk and selected-line operations.
+- Create, switch, rename and delete branches; merge, rebase, cherry-pick, revert, reset and tags.
+- Fetch, explicit Pull mode, destination-aware Push and stashes.
+- Worktrees, conflict resolution, Continue and Abort.
+- English / Simplified Chinese, light / dark themes, resizable panels, individual author styles, operation explanations and command logs.
+
+App text, tooltips, explanations and app-generated errors are translated. Repository content, commit messages, branch names and raw Git/OS output stay verbatim. Native OS dialogs use the system language.
+
+## Current limits
+
+- Desktop preview. VS Code extension, line-level blame, PR / Issue and hosting-provider collaboration are not delivered yet.
+- Visible rows are virtualized, but complete history is still read in the background.
+- Patches over 4 MiB are not displayed in full. The limit bounds retained app data; Git may still consume time and memory before producing output.
+- The graph has at most 24 lanes, reduced by available width. Highly parallel histories can omit connections.
+- No automatic updates or macOS / Linux installers yet.
+- Undo covers some local operations, not every Git action. Check prompts before destructive operations.
+
+## Development
+
+Requires Node.js 24, Rust stable, MSVC C++ tools and Windows SDK. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```sh
 npm ci
 npm run desktop:dev
 ```
 
-`npm run dev` 只启动前端网页，不能独立调用桌面 Git 后端。
-
-检查与构建：
+`npm run dev` starts only the frontend; Git operations require the desktop backend.
 
 ```sh
 npm run check
@@ -103,19 +123,18 @@ cargo test -p engine
 npm run desktop:build
 ```
 
-Windows 安装包输出到 `target/release/bundle/nsis/`。首次构建可能需要联网下载 Rust 依赖及 NSIS 打包工具。安装包构建方式见 [Tauri Windows Installer 文档](https://v2.tauri.app/distribute/windows-installer/)。
+The installer is written to `target/release/bundle/nsis/`. The first build may download dependencies and NSIS tools. See [Tauri Windows installers](https://v2.tauri.app/distribute/windows-installer/).
 
-目录：
-
-| 路径 | 职责 |
+| Path | Responsibility |
 | --- | --- |
-| `src/` | Svelte 界面、提交图、操作交互 |
-| `crates/engine/` | Rust Git 引擎：gix 读取、Git CLI 操作 |
-| `src-tauri/` | 桌面窗口、命令接口和安装包配置 |
-| `tests/` | 前端回归检查 |
+| `src/` | Svelte UI, graph and operation workflows |
+| `src/lib/locales/` | English and Simplified Chinese packs |
+| `crates/engine/` | Rust Git engine: gix reads and Git CLI operations |
+| `src-tauri/` | Desktop window, command bridge and installer |
+| `tests/` | Frontend regression checks |
 
-## 反馈与许可
+## Feedback and licenses
 
-请在 [Issues](https://github.com/ArthurLauCS/GitGod/issues) 中提交问题，附上版本、系统、复现步骤和必要日志；分享日志前请移除凭据及私密仓库信息。
+Report problems in [Issues](https://github.com/ArthurLauCS/PushRight/issues) with the version, OS, reproduction steps and relevant logs. Remove credentials and private repository information before sharing logs.
 
-第三方组件的许可声明见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)，安装目录也包含该文件。仓库公开不代表已授予本项目的开源使用许可；项目许可证尚待作者确定。
+Third-party notices are in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) and included in the installation. A public repository does not itself grant an open-source license; the project license has not yet been selected by the author.
