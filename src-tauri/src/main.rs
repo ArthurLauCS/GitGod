@@ -5,6 +5,7 @@ use engine::detail::{self, Detail};
 use engine::diff::{self, Diff};
 use engine::status::{self, Entry};
 use engine::graph::{Graph, Row};
+use engine::ops::{self, Log, Op};
 use engine::refs::{self, Refs, Stash, Worktree};
 use engine::{Repo, Result};
 use std::collections::HashMap;
@@ -139,13 +140,23 @@ fn apply_lines(state: State, tab: u32, path: String, staged: bool, hunk: usize, 
     diff::apply_lines(&session(&state, tab)?.repo, &path, staged, hunk, &header, &lines)
 }
 
+#[tauri::command(async)]
+fn op(state: State, tab: u32, op: Op) -> Result<Log> {
+    ops::run(&session(&state, tab)?.repo, op)
+}
+
+#[tauri::command(async)]
+fn remotes(state: State, tab: u32) -> Result<Vec<String>> {
+    refs::remotes(&session(&state, tab)?.repo)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Tabs::default())
         .invoke_handler(tauri::generate_handler![
             initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
-            commit, last_message, diff_worktree, diff_commit, apply_lines
+            commit, last_message, diff_worktree, diff_commit, apply_lines, op, remotes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

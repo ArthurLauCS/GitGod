@@ -1,7 +1,9 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import * as api from './api'
+  import ContextMenu, { type Item } from './ContextMenu.svelte'
   import Detail from './Detail.svelte'
+  import Dialog from './Dialog.svelte'
   import Graph from './Graph.svelte'
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
@@ -12,15 +14,20 @@
   let count = $state(untrack(() => initialCount))
   let version = $state(0)
   let loadingAll = $state(false)
+  let busy = $state(false)
   let error = $state('')
-  let refs = $state.raw<api.Refs>({ head: null, head_id: null, refs: [] })
+  let refs = $state.raw<api.Refs>({ head: null, head_id: null, ahead_behind: null, in_progress: null, refs: [] })
   let stashes = $state.raw<api.Stash[]>([])
   let worktrees = $state.raw<api.Worktree[]>([])
   let entries = $state.raw<api.Entry[]>([])
+  let logs = $state.raw<api.Log[]>([])
+  let showLog = $state(false)
   let view = $state<'history' | 'changes'>('history')
   let selectedRow = $state<number | null>(null)
   let detail = $state.raw<api.Detail | null>(null)
   let graph = $state<Graph>()
+  let dialog = $state<Dialog>()
+  let menu = $state<ContextMenu>()
   let pendingJump: string | null = null
 
   const badges = $derived.by(() => {
@@ -28,7 +35,9 @@
     for (const r of refs.refs) map.set(r.id, [...(map.get(r.id) ?? []), r])
     return map
   })
-  const headLabel = $derived(refs.head?.startsWith('refs/heads/') ? refs.head.slice(11) : t.detached)
+  /** 当前分支的短名；游离 HEAD 时为 null */
+  const head = $derived(refs.head?.startsWith('refs/heads/') ? refs.head.slice(11) : null)
+  const short = (name: string) => name.replace(/^refs\/(heads|tags|remotes)\//, '')
 
   async function guard<T>(p: Promise<T>): Promise<T | undefined> {
     try {
@@ -76,15 +85,228 @@
     select(row, id)
   }
 
-  // 回到窗口或切回本页签时，引用有变化才重新加载提交图
+  /** 提交图只取决于各引用和 HEAD 指向哪些提交 */
+  const tips = () => JSON.stringify([refs.refs.map((r) => r.name + r.id), refs.head_id])
+
+  // 回到窗口、切回本页签或执行完操作后：引用指向有变化才重新加载提交图
   async function refresh() {
     if (loadingAll) return
-    const before = JSON.stringify(refs)
+    const before = tips()
     await loadSidebar()
-    if (JSON.stringify(refs) === before) return
+    if (tips() === before) return
     selectedRow = null
     detail = null
     await loadAll()
+    if (refs.head_id) jump(refs.head_id)
+  }
+
+  /** 执行一个写操作，记入命令日志；失败时展开日志。返回是否成功。 */
+  async function exec(op: api.Op): Promise<boolean> {
+    busy = true
+    error = ''
+    const log = await guard(api.op(tab, op))
+    busy = false
+    if (log) {
+      logs = [...logs, log]
+      if (!log.ok) showLog = true
+    }
+    await refresh()
+    return log?.ok ?? false
+  }
+
+  const ask = (spec: Parameters<Dialog['ask']>[0]) => dialog!.ask(spec)
+
+  async function newBranch(start: string) {
+    const v = await ask({
+      title: t.newBranch,
+      fields: [
+        { key: 'name', label: t.branchName, type: 'text' },
+        { key: 'checkout', label: t.checkoutAfterCreate, type: 'checkbox', value: true },
+      ],
+    })
+    if (v) exec({ op: 'create_branch', name: v.name as string, start, checkout: v.checkout as boolean })
+  }
+
+  async function stash() {
+    const v = await ask({
+      title: t.stashTitle,
+      fields: [
+        { key: 'message', label: t.stashMessage, type: 'text', optional: true },
+        { key: 'untracked', label: t.includeUntracked, type: 'checkbox', value: true },
+      ],
+    })
+    if (v) exec({ op: 'stash_push', message: v.message as string, include_untracked: v.untracked as boolean })
+  }
+
+  async function push(branch: string | null) {
+    if (!branch) return void (error = t.noBranch)
+    const remotes = (await guard(api.remotes(tab))) ?? []
+    if (!remotes.length) return void (error = t.noRemote)
+    const upstream = refs.refs.find((r) => r.name === `refs/heads/${branch}`)?.upstream
+    // 远程名可以带斜杠，用已知的远程列表来拆 refs/remotes/<远程>/<分支>
+    const remote = remotes.find((r) => upstream?.startsWith(`refs/remotes/${r}/`))
+    const upBranch = remote && upstream!.slice(`refs/remotes/${remote}/`.length)
+    const force = { key: 'force', label: t.forcePush, type: 'checkbox' as const }
+
+    if (remote && upBranch === branch) {
+      const v = await ask({ title: t.pushTitle(branch), message: t.pushTo(`${remote}/${branch}`), confirm: t.push, fields: [force] })
+      if (v) exec({ op: 'push', remote, branch, remote_branch: branch, force: v.force as boolean, set_upstream: false })
+    } else if (remote && upBranch) {
+      // 上游与本地分支不同名：不给默认值，必须明确选一个目标
+      const v = await ask({
+        title: t.pushTitle(branch),
+        warning: t.pushMismatch(branch, `${remote}/${upBranch}`),
+        confirm: t.push,
+        fields: [
+          {
+            key: 'target',
+            label: t.pushTarget,
+            type: 'radio',
+            options: [
+              { value: 'upstream', label: t.pushToUpstream(`${remote}/${upBranch}`) },
+              { value: 'same', label: t.pushToSameName(`${remote}/${branch}`) },
+            ],
+          },
+          force,
+        ],
+      })
+      if (!v) return
+      const same = v.target === 'same'
+      exec({ op: 'push', remote, branch, remote_branch: same ? branch : upBranch, force: v.force as boolean, set_upstream: same })
+    } else {
+      const v = await ask({
+        title: t.pushTitle(branch),
+        message: t.pushNew(`${remotes.length === 1 ? remotes[0] : '<' + t.remote + '>'}/${branch}`),
+        confirm: t.push,
+        fields: [
+          ...(remotes.length > 1
+            ? [{ key: 'remote', label: t.remote, type: 'radio' as const, value: remotes[0], options: remotes.map((r) => ({ value: r, label: r })) }]
+            : []),
+          force,
+        ],
+      })
+      if (v) exec({ op: 'push', remote: (v.remote as string) ?? remotes[0], branch, remote_branch: branch, force: v.force as boolean, set_upstream: true })
+    }
+  }
+
+  async function reset(target: string) {
+    const v = await ask({
+      title: t.resetTitle(head ?? 'HEAD'),
+      warning: t.resetHardWarning,
+      danger: true,
+      fields: [
+        {
+          key: 'mode',
+          label: t.resetMode,
+          type: 'radio',
+          value: 'mixed',
+          options: [
+            { value: 'soft', label: t.resetSoft },
+            { value: 'mixed', label: t.resetMixed },
+            { value: 'hard', label: t.resetHard },
+          ],
+        },
+      ],
+    })
+    if (v) exec({ op: 'reset', target, mode: v.mode as 'soft' | 'mixed' | 'hard' })
+  }
+
+  type Kind = 'branch' | 'remote' | 'tag' | 'stash'
+
+  function activate(kind: Kind, name: string) {
+    if (kind === 'branch' || kind === 'tag') exec({ op: 'checkout', target: short(name) })
+    else if (kind === 'remote') exec({ op: 'track', remote_branch: short(name) })
+    else exec({ op: 'stash_apply', name, pop: false })
+  }
+
+  function refMenu(e: MouseEvent, kind: Kind, name: string) {
+    const s = short(name)
+    const current = name === refs.head
+    const onto = head ?? 'HEAD'
+    const items: Item[] = []
+    if (kind === 'stash') {
+      items.push(
+        { label: t.stashApply, action: () => exec({ op: 'stash_apply', name, pop: false }) },
+        { label: t.stashPop, action: () => exec({ op: 'stash_apply', name, pop: true }) },
+        null,
+        {
+          label: t.stashDrop,
+          danger: true,
+          action: async () => {
+            if (await ask({ title: t.dropStashTitle, warning: t.dropStashWarning, danger: true })) exec({ op: 'stash_drop', name })
+          },
+        },
+      )
+    } else {
+      if (!current) {
+        items.push(
+          { label: kind === 'remote' ? t.checkoutRemote : t.checkout, action: () => activate(kind, name) },
+          { label: t.mergeInto(onto), action: () => exec({ op: 'merge', target: s }) },
+          { label: t.rebaseOnto(onto), action: () => exec({ op: 'rebase', onto: s }) },
+          null,
+        )
+      }
+      if (kind === 'branch') {
+        items.push(
+          { label: t.pushBranch, action: () => push(s) },
+          {
+            label: t.rename,
+            action: async () => {
+              const v = await ask({ title: t.rename, fields: [{ key: 'name', label: t.newName, type: 'text', value: s }] })
+              if (v) exec({ op: 'rename_branch', old: s, new: v.name as string })
+            },
+          },
+        )
+        if (!current) {
+          items.push(null, {
+            label: t.delete,
+            danger: true,
+            action: async () => {
+              const v = await ask({ title: t.deleteBranchTitle(s), danger: true, fields: [{ key: 'force', label: t.forceDelete, type: 'checkbox' }] })
+              if (v) exec({ op: 'delete_branch', name: s, force: v.force as boolean })
+            },
+          })
+        }
+      } else if (kind === 'tag') {
+        items.push({
+          label: t.deleteTag,
+          danger: true,
+          action: async () => {
+            if (await ask({ title: t.deleteTagTitle(s), danger: true })) exec({ op: 'delete_tag', name: s })
+          },
+        })
+      } else {
+        items.pop()
+      }
+    }
+    menu!.show(e, items)
+  }
+
+  function commitMenu(e: MouseEvent, id: string) {
+    const onto = head ?? 'HEAD'
+    menu!.show(e, [
+      { label: t.checkoutCommit, action: () => exec({ op: 'checkout', target: id }) },
+      { label: t.newBranchHere, action: () => newBranch(id) },
+      {
+        label: t.newTagHere,
+        action: async () => {
+          const v = await ask({
+            title: t.newTagHere,
+            fields: [
+              { key: 'name', label: t.tagName, type: 'text' },
+              { key: 'message', label: t.tagMessage, type: 'text', optional: true },
+            ],
+          })
+          if (v) exec({ op: 'create_tag', name: v.name as string, target: id, message: v.message as string })
+        },
+      },
+      null,
+      { label: t.cherryPick, action: () => exec({ op: 'cherry_pick', id }) },
+      { label: t.revertCommit, action: () => exec({ op: 'revert', id }) },
+      { label: t.resetTo(onto), danger: true, action: () => reset(id) },
+      null,
+      { label: t.copyId, action: () => navigator.clipboard.writeText(id) },
+    ])
   }
 
   let started = false
@@ -104,16 +326,45 @@
   })
 </script>
 
-<svelte:window onfocus={() => active && started && refresh()} />
+<svelte:window onfocus={() => active && started && !busy && refresh()} />
 
 <div class="repo" class:hidden={!active}>
   <header>
-    <span class="branch">{headLabel}</span>
-    <span class="muted">{loadingAll ? t.loadingHistory : t.commits(count)}</span>
+    <span class="branch">{head ?? t.detached}</span>
+    {#if refs.ahead_behind}
+      <span class="muted">↑{refs.ahead_behind[0]} ↓{refs.ahead_behind[1]}</span>
+    {/if}
+    <span class="muted">{busy ? t.working : loadingAll ? t.loadingHistory : t.commits(count)}</span>
+    <span class="spacer"></span>
+    <button disabled={busy} onclick={() => exec({ op: 'fetch' })}>{t.fetch}</button>
+    <button disabled={busy} onclick={() => exec({ op: 'pull' })}>{t.pull}</button>
+    <button disabled={busy} onclick={() => push(head)}>{t.push}</button>
+    <button disabled={busy} onclick={stash}>{t.stash}</button>
+    <button disabled={busy} onclick={() => newBranch('HEAD')}>{t.newBranch}</button>
+    <button class:on={showLog} onclick={() => (showLog = !showLog)}>{t.log}</button>
   </header>
   {#if error}<p class="error">{error}</p>{/if}
+  {#if refs.in_progress}
+    {@const what = refs.in_progress}
+    <p class="progress">
+      <strong>{t.inProgress[what]}</strong>
+      <span>{t.inProgressHint}</span>
+      <button disabled={busy} onclick={() => exec({ op: 'continue', what })}>{t.continue}</button>
+      <button disabled={busy} onclick={() => exec({ op: 'abort', what })}>{t.abort}</button>
+    </p>
+  {/if}
   <main>
-    <Sidebar {refs} {stashes} {worktrees} {view} changes={entries.length} onview={(v) => (view = v)} onjump={jump} />
+    <Sidebar
+      {refs}
+      {stashes}
+      {worktrees}
+      {view}
+      changes={entries.length}
+      onview={(v) => (view = v)}
+      onjump={jump}
+      onactivate={activate}
+      onmenu={(e, kind, name) => refMenu(e, kind, name)}
+    />
     <div class="content">
       <div class="pane" class:hidden={view !== 'history'}>
         {#if count}
@@ -126,6 +377,7 @@
             headId={refs.head_id}
             {selectedRow}
             onselect={select}
+            onmenu={commitMenu}
           />
         {:else}
           <p class="none">{t.noCommits}</p>
@@ -137,7 +389,22 @@
       </div>
     </div>
   </main>
+  {#if showLog}
+    <div class="log">
+      {#each logs as log, i (i)}
+        <div class:failed={!log.ok}>
+          <code>$ {log.command}</code>
+          {#if log.output}<pre>{log.output}</pre>{/if}
+        </div>
+      {:else}
+        <p class="muted">{t.logEmpty}</p>
+      {/each}
+    </div>
+  {/if}
 </div>
+
+<Dialog bind:this={dialog} />
+<ContextMenu bind:this={menu} />
 
 <style>
   .repo {
@@ -156,9 +423,9 @@
     flex: none;
     display: flex;
     align-items: center;
-    gap: 12px;
-    height: 36px;
-    padding: 0 14px;
+    gap: 8px;
+    height: 40px;
+    padding: 0 10px 0 14px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
   }
@@ -172,6 +439,29 @@
   .muted {
     color: var(--muted);
     font-size: 12px;
+  }
+  .spacer {
+    flex: 1;
+  }
+  header button,
+  .progress button {
+    padding: 3px 12px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--raised);
+    cursor: pointer;
+  }
+  header button:hover:enabled,
+  .progress button:hover:enabled {
+    border-color: var(--muted);
+  }
+  header button.on {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
   main {
     flex: 1;
@@ -203,5 +493,44 @@
     color: var(--red);
     background: color-mix(in srgb, var(--red) 12%, transparent);
     user-select: text;
+  }
+  .progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 6px 14px;
+    color: var(--yellow);
+    background: color-mix(in srgb, var(--yellow) 12%, transparent);
+  }
+  .progress span {
+    flex: 1;
+    color: var(--muted);
+  }
+  .log {
+    flex: none;
+    height: 180px;
+    overflow: auto;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    font: 12px/1.6 var(--mono);
+    user-select: text;
+  }
+  .log div {
+    margin-bottom: 8px;
+  }
+  .log code {
+    color: var(--accent);
+  }
+  .log pre {
+    margin: 0;
+    font: inherit;
+    color: var(--muted);
+    white-space: pre-wrap;
+  }
+  .log .failed code,
+  .log .failed pre {
+    color: var(--red);
   }
 </style>

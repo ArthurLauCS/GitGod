@@ -1,6 +1,7 @@
 pub mod detail;
 pub mod diff;
 pub mod graph;
+pub mod ops;
 pub mod refs;
 pub mod status;
 
@@ -51,6 +52,25 @@ impl Repo {
             Ok(out.stdout)
         } else {
             Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+        }
+    }
+}
+
+impl Repo {
+    /// 跑一条写操作并记录命令和输出，不论成败都返回日志。
+    pub(crate) fn git_log(&self, args: &[String]) -> ops::Log {
+        let mut cmd = Command::new("git");
+        // 没有终端可以输入用户名密码，凭据交给 credential helper，否则直接失败而不是挂住
+        cmd.arg("-C").arg(&self.path).args(args).env("GIT_TERMINAL_PROMPT", "0").stdin(Stdio::null());
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
+        let command = format!("git {}", args.join(" "));
+        match cmd.output() {
+            Ok(out) => {
+                let text = [decode(&out.stdout), decode(&out.stderr)].concat();
+                ops::Log { command, output: text.trim().to_owned(), ok: out.status.success() }
+            }
+            Err(e) => ops::Log { command, output: e.to_string(), ok: false },
         }
     }
 }

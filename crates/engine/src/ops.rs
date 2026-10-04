@@ -1,0 +1,136 @@
+use crate::{Repo, Result};
+use serde::{Deserialize, Serialize};
+
+/// 一次写操作实际执行的命令和它的输出，界面的命令日志原样展示。
+#[derive(Serialize, Debug)]
+pub struct Log {
+    pub command: String,
+    pub output: String,
+    pub ok: bool,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum ResetMode {
+    Soft,
+    Mixed,
+    Hard,
+}
+
+/// 进行到一半、可以继续或中止的操作
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum InProgress {
+    Merge,
+    Rebase,
+    CherryPick,
+    Revert,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+pub enum Op {
+    /// 检出分支、标签或提交
+    Checkout { target: String },
+    /// 检出远程分支：建立同名本地分支并跟踪它
+    Track { remote_branch: String },
+    CreateBranch { name: String, start: String, checkout: bool },
+    DeleteBranch { name: String, force: bool },
+    RenameBranch { old: String, new: String },
+    Merge { target: String },
+    Rebase { onto: String },
+    CherryPick { id: String },
+    Revert { id: String },
+    Reset { target: String, mode: ResetMode },
+    StashPush { message: String, include_untracked: bool },
+    StashApply { name: String, pop: bool },
+    StashDrop { name: String },
+    Fetch,
+    Pull,
+    Push { remote: String, branch: String, remote_branch: String, force: bool, set_upstream: bool },
+    CreateTag { name: String, target: String, message: String },
+    DeleteTag { name: String },
+    Continue { what: InProgress },
+    Abort { what: InProgress },
+}
+
+/// 名字来自界面输入，以 `-` 开头会被 git 当成选项
+fn safe(s: &str) -> Result<&str> {
+    if s.is_empty() || s.starts_with('-') {
+        return Err(format!("名称不合法：{s:?}"));
+    }
+    Ok(s)
+}
+
+pub fn run(repo: &Repo, op: Op) -> Result<Log> {
+    let mut args: Vec<&str> = Vec::new();
+    let refspec;
+    match &op {
+        Op::Checkout { target } => args.extend(["checkout", safe(target)?]),
+        Op::Track { remote_branch } => args.extend(["checkout", "--track", safe(remote_branch)?]),
+        Op::CreateBranch { name, start, checkout } => {
+            args.extend(if *checkout { &["checkout", "-b"][..] } else { &["branch"] });
+            args.extend([safe(name)?, safe(start)?]);
+        }
+        Op::DeleteBranch { name, force } => args.extend(["branch", if *force { "-D" } else { "-d" }, safe(name)?]),
+        Op::RenameBranch { old, new } => args.extend(["branch", "-m", safe(old)?, safe(new)?]),
+        Op::Merge { target } => args.extend(["merge", "--no-edit", safe(target)?]),
+        Op::Rebase { onto } => args.extend(["rebase", safe(onto)?]),
+        Op::CherryPick { id } => args.extend(["cherry-pick", safe(id)?]),
+        Op::Revert { id } => args.extend(["revert", "--no-edit", safe(id)?]),
+        Op::Reset { target, mode } => {
+            let mode = match mode {
+                ResetMode::Soft => "--soft",
+                ResetMode::Mixed => "--mixed",
+                ResetMode::Hard => "--hard",
+            };
+            args.extend(["reset", mode, safe(target)?]);
+        }
+        Op::StashPush { message, include_untracked } => {
+            args.extend(["stash", "push"]);
+            if *include_untracked {
+                args.push("--include-untracked");
+            }
+            if !message.is_empty() {
+                args.extend(["-m", message]);
+            }
+        }
+        Op::StashApply { name, pop } => args.extend(["stash", if *pop { "pop" } else { "apply" }, safe(name)?]),
+        Op::StashDrop { name } => args.extend(["stash", "drop", safe(name)?]),
+        Op::Fetch => args.extend(["fetch", "--all", "--prune"]),
+        Op::Pull => args.push("pull"),
+        Op::Push { remote, branch, remote_branch, force, set_upstream } => {
+            args.push("push");
+            if *force {
+                // 远程在上次 fetch 之后有新提交时拒绝覆盖
+                args.push("--force-with-lease");
+            }
+            if *set_upstream {
+                args.push("--set-upstream");
+            }
+            refspec = format!("refs/heads/{}:refs/heads/{}", safe(branch)?, safe(remote_branch)?);
+            args.extend([safe(remote)?, &refspec]);
+        }
+        Op::CreateTag { name, target, message } => {
+            args.push("tag");
+            if !message.is_empty() {
+                args.extend(["-a", "-m", message]);
+            }
+            args.extend([safe(name)?, safe(target)?]);
+        }
+        Op::DeleteTag { name } => args.extend(["tag", "-d", safe(name)?]),
+        Op::Continue { what } | Op::Abort { what } => {
+            let cmd = match what {
+                InProgress::Merge => "merge",
+                InProgress::Rebase => "rebase",
+                InProgress::CherryPick => "cherry-pick",
+                InProgress::Revert => "revert",
+            };
+            // 继续时沿用已有的提交信息，不弹编辑器
+            let flag = if matches!(op, Op::Abort { .. }) { "--abort" } else { "--continue" };
+            args.extend(["-c", "core.editor=true", cmd, flag]);
+        }
+    }
+    let args: Vec<String> = args.into_iter().map(str::to_owned).collect();
+    Ok(repo.git_log(&args))
+}

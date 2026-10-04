@@ -1,6 +1,7 @@
 use crate::{err, Repo, Result};
 use gix::ObjectId;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Serialize)]
 pub struct Ref {
@@ -8,6 +9,8 @@ pub struct Ref {
     pub name: String,
     /// 剥到提交后的 id
     pub id: String,
+    /// 本地分支的上游，完整引用名如 refs/remotes/origin/main
+    pub upstream: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -15,6 +18,10 @@ pub struct Refs {
     /// HEAD 指向的完整引用名；游离 HEAD 时为 None
     pub head: Option<String>,
     pub head_id: Option<String>,
+    /// 当前分支相对上游的 (领先, 落后) 提交数；没有上游时为 None
+    pub ahead_behind: Option<(u32, u32)>,
+    /// 进行到一半的操作：merge / rebase / cherry-pick / revert
+    pub in_progress: Option<&'static str>,
     pub refs: Vec<Ref>,
 }
 
@@ -56,11 +63,42 @@ pub(crate) fn tips(gix: &gix::Repository) -> Result<Vec<ObjectId>> {
 
 pub fn list(repo: &Repo) -> Result<Refs> {
     let gix = repo.gix();
+    // 上游信息走 CLI：gix 的配置是打开仓库时的快照，push -u 之后不会更新
+    let out = repo.git(&["for-each-ref", "--format=%(refname)%00%(upstream)", "refs/heads"])?;
+    let out = String::from_utf8_lossy(&out);
+    let upstreams: HashMap<_, _> = out.lines().filter_map(|l| l.split_once('\0')).filter(|(_, u)| !u.is_empty()).collect();
+    let head = gix.head_name().map_err(err)?.map(|n| n.as_bstr().to_string());
+    let ahead_behind = head.as_deref().filter(|h| upstreams.contains_key(h)).and_then(|_| {
+        let out = repo.git(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).ok()?;
+        let out = String::from_utf8_lossy(&out);
+        let mut n = out.split_whitespace().map(|n| n.parse().ok());
+        Some((n.next()??, n.next()??))
+    });
+    let dir = gix.git_dir();
+    let in_progress = [
+        ("merge", "MERGE_HEAD"),
+        ("rebase", "rebase-merge"),
+        ("rebase", "rebase-apply"),
+        ("cherry-pick", "CHERRY_PICK_HEAD"),
+        ("revert", "REVERT_HEAD"),
+    ]
+    .into_iter()
+    .find(|(_, marker)| dir.join(marker).exists())
+    .map(|(what, _)| what);
     Ok(Refs {
-        head: gix.head_name().map_err(err)?.map(|n| n.as_bstr().to_string()),
         head_id: gix.head_id().ok().map(|id| id.to_string()),
-        refs: commits(&gix)?.into_iter().map(|(name, id)| Ref { name, id: id.to_string() }).collect(),
+        ahead_behind,
+        in_progress,
+        refs: commits(&gix)?
+            .into_iter()
+            .map(|(name, id)| Ref { upstream: upstreams.get(name.as_str()).map(|u| u.to_string()), name, id: id.to_string() })
+            .collect(),
+        head,
     })
+}
+
+pub fn remotes(repo: &Repo) -> Result<Vec<String>> {
+    Ok(String::from_utf8_lossy(&repo.git(&["remote"])?).lines().map(str::to_owned).collect())
 }
 
 pub fn stashes(repo: &Repo) -> Result<Vec<Stash>> {

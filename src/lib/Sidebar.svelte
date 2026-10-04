@@ -2,6 +2,8 @@
   import type { Refs, Stash, Worktree } from './api'
   import { t } from './zh'
 
+  type Kind = 'branch' | 'remote' | 'tag' | 'stash'
+
   let {
     refs,
     stashes,
@@ -10,6 +12,8 @@
     changes,
     onview,
     onjump,
+    onactivate,
+    onmenu,
   }: {
     refs: Refs
     stashes: Stash[]
@@ -19,6 +23,9 @@
     changes: number
     onview: (view: 'history' | 'changes') => void
     onjump: (id: string) => void
+    /** 双击：name 是引用全名或贮藏名 */
+    onactivate: (kind: Kind, name: string) => void
+    onmenu: (e: MouseEvent, kind: Kind, name: string, id: string) => void
   } = $props()
 
   let filter = $state('')
@@ -44,21 +51,31 @@
   </nav>
   <input type="search" placeholder={t.filter} bind:value={filter} />
   <div class="scroll">
-    {#snippet section(title: string, items: { name: string; id: string; label: string }[], open: boolean)}
+    {#snippet section(kind: Kind, title: string, items: { name: string; id: string; label: string }[], open: boolean)}
       <details {open}>
         <summary>{title}<span class="count">{items.length}</span></summary>
         {#each items as r (r.name)}
-          <button class:head={r.name === refs.head} title={r.label} onclick={() => onjump(r.id)}>{r.label}</button>
+          <button
+            class:head={r.name === refs.head}
+            title={r.label}
+            onclick={() => onjump(r.id)}
+            ondblclick={() => onactivate(kind, r.name)}
+            oncontextmenu={(e) => onmenu(e, kind, r.name, r.id)}
+          >
+            {r.label}
+          </button>
         {/each}
       </details>
     {/snippet}
-    {@render section(t.branches, branches, true)}
-    {@render section(t.remotes, remotes, filter !== '')}
-    {@render section(t.tags, tags, filter !== '')}
+    {@render section('branch', t.branches, branches, true)}
+    {@render section('remote', t.remotes, remotes, filter !== '')}
+    {@render section('tag', t.tags, tags, filter !== '')}
     <details>
       <summary>{t.stashes}<span class="count">{stashes.length}</span></summary>
       {#each stashes as s (s.name)}
-        <button title={s.subject} onclick={() => onjump(s.id)}>{s.subject}</button>
+        <button title={s.subject} onclick={() => onjump(s.id)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
+          {s.subject}
+        </button>
       {/each}
     </details>
     <details open>

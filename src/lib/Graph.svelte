@@ -20,6 +20,7 @@
     headId,
     selectedRow,
     onselect,
+    onmenu,
   }: {
     fetchRows: (start: number, count: number) => Promise<Row[]>
     count: number
@@ -29,6 +30,7 @@
     headId: string | null
     selectedRow: number | null
     onselect: (row: number, id: string) => void
+    onmenu: (e: MouseEvent, id: string) => void
   } = $props()
 
   let viewport: HTMLDivElement
@@ -162,6 +164,7 @@
           role="row"
           tabindex="-1"
           onclick={() => row && onselect(first + i, row.id)}
+          oncontextmenu={(e) => row && (onselect(first + i, row.id), onmenu(e, row.id))}
         >
           {#if row}
             <span class="subject">

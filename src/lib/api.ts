@@ -13,12 +13,43 @@ export interface Row {
 export interface Ref {
   name: string
   id: string
+  upstream: string | null
 }
 export interface Refs {
   head: string | null
   head_id: string | null
+  /** 当前分支相对上游的 [领先, 落后] */
+  ahead_behind: [number, number] | null
+  in_progress: InProgress | null
   refs: Ref[]
 }
+export type InProgress = 'merge' | 'rebase' | 'cherry-pick' | 'revert'
+export interface Log {
+  command: string
+  output: string
+  ok: boolean
+}
+export type Op =
+  | { op: 'checkout'; target: string }
+  | { op: 'track'; remote_branch: string }
+  | { op: 'create_branch'; name: string; start: string; checkout: boolean }
+  | { op: 'delete_branch'; name: string; force: boolean }
+  | { op: 'rename_branch'; old: string; new: string }
+  | { op: 'merge'; target: string }
+  | { op: 'rebase'; onto: string }
+  | { op: 'cherry_pick'; id: string }
+  | { op: 'revert'; id: string }
+  | { op: 'reset'; target: string; mode: 'soft' | 'mixed' | 'hard' }
+  | { op: 'stash_push'; message: string; include_untracked: boolean }
+  | { op: 'stash_apply'; name: string; pop: boolean }
+  | { op: 'stash_drop'; name: string }
+  | { op: 'fetch' }
+  | { op: 'pull' }
+  | { op: 'push'; remote: string; branch: string; remote_branch: string; force: boolean; set_upstream: boolean }
+  | { op: 'create_tag'; name: string; target: string; message: string }
+  | { op: 'delete_tag'; name: string }
+  | { op: 'continue'; what: InProgress }
+  | { op: 'abort'; what: InProgress }
 export interface Stash {
   name: string
   id: string
@@ -90,3 +121,5 @@ export const diffWorktree = (tab: number, path: string, staged: boolean, untrack
 export const diffCommit = (tab: number, id: string, path: string) => invoke<Diff>('diff_commit', { tab, id, path })
 export const applyLines = (tab: number, path: string, staged: boolean, hunk: number, header: string, lines: number[]) =>
   invoke<void>('apply_lines', { tab, path, staged, hunk, header, lines })
+export const op = (tab: number, op: Op) => invoke<Log>('op', { tab, op })
+export const remotes = (tab: number) => invoke<string[]>('remotes', { tab })
