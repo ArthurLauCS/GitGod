@@ -6,8 +6,20 @@
     refs,
     stashes,
     worktrees,
+    view,
+    changes,
+    onview,
     onjump,
-  }: { refs: Refs; stashes: Stash[]; worktrees: Worktree[]; onjump: (id: string) => void } = $props()
+  }: {
+    refs: Refs
+    stashes: Stash[]
+    worktrees: Worktree[]
+    view: 'history' | 'changes'
+    /** 有改动的文件数 */
+    changes: number
+    onview: (view: 'history' | 'changes') => void
+    onjump: (id: string) => void
+  } = $props()
 
   let filter = $state('')
 
@@ -24,6 +36,12 @@
 </script>
 
 <aside>
+  <nav>
+    <button class:on={view === 'changes'} onclick={() => onview('changes')}>
+      {t.changes}{#if changes}<span class="pill">{changes}</span>{/if}
+    </button>
+    <button class:on={view === 'history'} onclick={() => onview('history')}>{t.history}</button>
+  </nav>
   <input type="search" placeholder={t.filter} bind:value={filter} />
   <div class="scroll">
     {#snippet section(title: string, items: { name: string; id: string; label: string }[], open: boolean)}
@@ -63,6 +81,29 @@
     flex-direction: column;
     background: var(--panel);
     border-right: 1px solid var(--border);
+  }
+  nav {
+    padding: 8px 8px 0;
+  }
+  nav button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-weight: 600;
+  }
+  nav button.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .pill {
+    padding: 0 7px;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
   }
   input {
     margin: 10px;

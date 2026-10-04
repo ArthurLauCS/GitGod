@@ -2,7 +2,7 @@
 //! M0 的候选对比（git CLI / gix / git2）见提交 f6d95b3 的同名文件。
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use engine::{detail, graph::Graph, refs, Repo};
+use engine::{detail, graph::Graph, refs, status, Repo};
 
 fn repo() -> Repo {
     let path = std::env::var("GITGOD_BENCH_REPO").unwrap_or_else(|_| "../../../GitGod-bench/linux".into());
@@ -23,6 +23,7 @@ fn bench(c: &mut Criterion) {
     // 窗口起点取在两个快照正中间之后，重放成本最大
     c.bench_function("rows_60_before_checkpoint", |b| b.iter(|| graph.rows(&repo, 150_000 + 1023, 60).unwrap().len()));
     c.bench_function("refs_list", |b| b.iter(|| refs::list(&repo).unwrap().refs.len()));
+    c.bench_function("status", |b| b.iter(|| status::status(&repo).unwrap().len()));
     c.bench_function("detail", |b| b.iter(|| detail::detail(&repo, &id).unwrap().files.len()));
 }
 

@@ -46,6 +46,29 @@ export interface Detail {
   files: FileChange[]
 }
 
+export interface Entry {
+  path: string
+  old_path: string | null
+  staged: string | null
+  unstaged: string | null
+  conflicted: boolean
+}
+export interface Line {
+  kind: string
+  text: string
+  old_no: number | null
+  new_no: number | null
+}
+export interface Hunk {
+  header: string
+  lines: Line[]
+}
+export interface Diff {
+  binary: boolean
+  too_large: boolean
+  hunks: Hunk[]
+}
+
 export const initialRepos = () => invoke<string[]>('initial_repos')
 /** 返回 [页签 id, 工作区路径, 已加载的提交数] */
 export const openRepo = (path: string) => invoke<[number, string, number]>('open_repo', { path })
@@ -57,3 +80,13 @@ export const refs = (tab: number) => invoke<Refs>('refs', { tab })
 export const stashes = (tab: number) => invoke<Stash[]>('stashes', { tab })
 export const worktrees = (tab: number) => invoke<Worktree[]>('worktrees', { tab })
 export const detail = (tab: number, id: string) => invoke<Detail>('detail', { tab, id })
+export const status = (tab: number) => invoke<Entry[]>('status', { tab })
+export const stage = (tab: number, paths: string[]) => invoke<void>('stage', { tab, paths })
+export const unstage = (tab: number, paths: string[]) => invoke<void>('unstage', { tab, paths })
+export const commit = (tab: number, message: string, amend: boolean) => invoke<void>('commit', { tab, message, amend })
+export const lastMessage = (tab: number) => invoke<string>('last_message', { tab })
+export const diffWorktree = (tab: number, path: string, staged: boolean, untracked: boolean) =>
+  invoke<Diff>('diff_worktree', { tab, path, staged, untracked })
+export const diffCommit = (tab: number, id: string, path: string) => invoke<Diff>('diff_commit', { tab, id, path })
+export const applyLines = (tab: number, path: string, staged: boolean, hunk: number, header: string, lines: number[]) =>
+  invoke<void>('apply_lines', { tab, path, staged, hunk, header, lines })

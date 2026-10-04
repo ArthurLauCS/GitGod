@@ -4,6 +4,7 @@
   import Detail from './Detail.svelte'
   import Graph from './Graph.svelte'
   import Sidebar from './Sidebar.svelte'
+  import WorkingCopy from './WorkingCopy.svelte'
   import { t } from './zh'
 
   let { tab, initialCount, active }: { tab: number; initialCount: number; active: boolean } = $props()
@@ -15,6 +16,8 @@
   let refs = $state.raw<api.Refs>({ head: null, head_id: null, refs: [] })
   let stashes = $state.raw<api.Stash[]>([])
   let worktrees = $state.raw<api.Worktree[]>([])
+  let entries = $state.raw<api.Entry[]>([])
+  let view = $state<'history' | 'changes'>('history')
   let selectedRow = $state<number | null>(null)
   let detail = $state.raw<api.Detail | null>(null)
   let graph = $state<Graph>()
@@ -35,8 +38,12 @@
     }
   }
 
+  async function loadStatus() {
+    entries = (await guard(api.status(tab))) ?? entries
+  }
+
   async function loadSidebar() {
-    const r = await guard(Promise.all([api.refs(tab), api.stashes(tab), api.worktrees(tab)]))
+    const r = await guard(Promise.all([api.refs(tab), api.stashes(tab), api.worktrees(tab), loadStatus()]))
     if (r) [refs, stashes, worktrees] = r
   }
 
@@ -64,6 +71,7 @@
       if (loadingAll) pendingJump = id
       return
     }
+    view = 'history'
     graph?.scrollToRow(row, true)
     select(row, id)
   }
@@ -105,23 +113,28 @@
   </header>
   {#if error}<p class="error">{error}</p>{/if}
   <main>
-    <Sidebar {refs} {stashes} {worktrees} onjump={jump} />
-    <div class="center">
-      {#if count}
-        <Graph
-          bind:this={graph}
-          fetchRows={(start, n) => api.rows(tab, start, n)}
-          {count}
-          {version}
-          {badges}
-          headId={refs.head_id}
-          {selectedRow}
-          onselect={select}
-        />
-      {:else}
-        <p class="none">{t.noCommits}</p>
-      {/if}
-      <Detail {detail} onjump={jump} />
+    <Sidebar {refs} {stashes} {worktrees} {view} changes={entries.length} onview={(v) => (view = v)} onjump={jump} />
+    <div class="content">
+      <div class="pane" class:hidden={view !== 'history'}>
+        {#if count}
+          <Graph
+            bind:this={graph}
+            fetchRows={(start, n) => api.rows(tab, start, n)}
+            {count}
+            {version}
+            {badges}
+            headId={refs.head_id}
+            {selectedRow}
+            onselect={select}
+          />
+        {:else}
+          <p class="none">{t.noCommits}</p>
+        {/if}
+        <Detail {detail} onjump={jump} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} />
+      </div>
+      <div class="pane" class:hidden={view !== 'changes'}>
+        <WorkingCopy {tab} {entries} reload={loadStatus} oncommitted={refresh} />
+      </div>
     </div>
   </main>
 </div>
@@ -165,7 +178,13 @@
     min-height: 0;
     display: flex;
   }
-  .center {
+  .content {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    display: flex;
+  }
+  .pane {
     flex: 1;
     min-width: 0;
     display: flex;

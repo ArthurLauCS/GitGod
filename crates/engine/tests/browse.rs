@@ -1,27 +1,12 @@
-use engine::{detail, graph::Graph, refs, Repo};
-use std::path::{Path, PathBuf};
-use std::process::Command;
+mod common;
 
-fn git(dir: &Path, time: u32, args: &[&str]) {
-    let date = format!("@{} +0000", 1_700_000_000 + time);
-    let ok = Command::new("git")
-        .current_dir(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
-        .args(args)
-        .env("GIT_AUTHOR_DATE", &date)
-        .env("GIT_COMMITTER_DATE", &date)
-        .status()
-        .unwrap()
-        .success();
-    assert!(ok, "git {args:?}");
-}
+use common::{git, init};
+use engine::{detail, graph::Graph, refs, Repo};
+use std::path::PathBuf;
 
 /// main: A → C(把 a.txt 改名为 c.txt) → M(合并 feat)，feat: A → B(新增 b.txt)，标签 v1 在 M
 fn fixture(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("gitgod-test-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    git(&dir, 0, &["init", "-q", "-b", "main"]);
+    let dir = init(name);
     std::fs::write(dir.join("a.txt"), "hello\nworld\n").unwrap();
     git(&dir, 0, &["add", "."]);
     git(&dir, 1, &["commit", "-q", "-m", "A"]);
@@ -84,10 +69,7 @@ fn graph_rows_refs_and_detail() {
 
 #[test]
 fn empty_repo() {
-    let dir = std::env::temp_dir().join(format!("gitgod-test-empty-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    git(&dir, 0, &["init", "-q", "-b", "main"]);
+    let dir = init("empty");
     let repo = Repo::open(&dir).unwrap();
     let graph = Graph::load(&repo, usize::MAX).unwrap();
     assert_eq!(graph.len(), 0);

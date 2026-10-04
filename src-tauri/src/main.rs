@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use engine::detail::{self, Detail};
+use engine::diff::{self, Diff};
+use engine::status::{self, Entry};
 use engine::graph::{Graph, Row};
 use engine::refs::{self, Refs, Stash, Worktree};
 use engine::{Repo, Result};
@@ -97,11 +99,54 @@ fn detail(state: State, tab: u32, id: String) -> Result<Detail> {
     detail::detail(&session(&state, tab)?.repo, &id)
 }
 
+#[tauri::command(async)]
+fn status(state: State, tab: u32) -> Result<Vec<Entry>> {
+    status::status(&session(&state, tab)?.repo)
+}
+
+#[tauri::command(async)]
+fn stage(state: State, tab: u32, paths: Vec<String>) -> Result<()> {
+    status::stage(&session(&state, tab)?.repo, &paths)
+}
+
+#[tauri::command(async)]
+fn unstage(state: State, tab: u32, paths: Vec<String>) -> Result<()> {
+    status::unstage(&session(&state, tab)?.repo, &paths)
+}
+
+#[tauri::command(async)]
+fn commit(state: State, tab: u32, message: String, amend: bool) -> Result<()> {
+    status::commit(&session(&state, tab)?.repo, &message, amend)
+}
+
+#[tauri::command(async)]
+fn last_message(state: State, tab: u32) -> Result<String> {
+    status::last_message(&session(&state, tab)?.repo)
+}
+
+#[tauri::command(async)]
+fn diff_worktree(state: State, tab: u32, path: String, staged: bool, untracked: bool) -> Result<Diff> {
+    diff::worktree(&session(&state, tab)?.repo, &path, staged, untracked)
+}
+
+#[tauri::command(async)]
+fn diff_commit(state: State, tab: u32, id: String, path: String) -> Result<Diff> {
+    diff::commit(&session(&state, tab)?.repo, &id, &path)
+}
+
+#[tauri::command(async)]
+fn apply_lines(state: State, tab: u32, path: String, staged: bool, hunk: usize, header: String, lines: Vec<usize>) -> Result<()> {
+    diff::apply_lines(&session(&state, tab)?.repo, &path, staged, hunk, &header, &lines)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Tabs::default())
-        .invoke_handler(tauri::generate_handler![initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail])
+        .invoke_handler(tauri::generate_handler![
+            initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
+            commit, last_message, diff_worktree, diff_commit, apply_lines
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
