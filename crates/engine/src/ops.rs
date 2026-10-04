@@ -45,6 +45,9 @@ pub enum Op {
     StashPush { message: String, include_untracked: bool },
     StashApply { name: String, pop: bool },
     StashDrop { name: String },
+    /// 在 `path` 新建工作树：检出已有分支，或（给了 `new_branch`）从 `start` 新建分支
+    WorktreeAdd { path: String, start: String, new_branch: Option<String> },
+    WorktreeRemove { path: String, force: bool },
     Fetch,
     Pull,
     Push { remote: String, branch: String, remote_branch: String, force: bool, set_upstream: bool },
@@ -97,7 +100,22 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
         }
         Op::StashApply { name, pop } => args.extend(["stash", if *pop { "pop" } else { "apply" }, safe(name)?]),
         Op::StashDrop { name } => args.extend(["stash", "drop", safe(name)?]),
-        Op::Fetch => args.extend(["fetch", "--all", "--prune"]),
+        Op::WorktreeAdd { path, start, new_branch } => {
+            args.extend(["worktree", "add"]);
+            if let Some(b) = new_branch {
+                args.extend(["-b", safe(b)?]);
+            }
+            args.extend([safe(path)?, safe(start)?]);
+        }
+        Op::WorktreeRemove { path, force } => {
+            args.extend(["worktree", "remove"]);
+            if *force {
+                args.push("--force");
+            }
+            args.push(safe(path)?);
+        }
+        // 多个远程并行获取
+        Op::Fetch => args.extend(["fetch", "--all", "--prune", "--jobs=8"]),
         Op::Pull => args.push("pull"),
         Op::Push { remote, branch, remote_branch, force, set_upstream } => {
             args.push("push");

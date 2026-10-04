@@ -1,32 +1,42 @@
 <script lang="ts">
-  import type { Refs, Stash, Worktree } from './api'
+  import type { Refs, Stash, Track, Worktree } from './api'
   import { t } from './zh'
 
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
+  type View = 'history' | 'changes' | 'worktrees'
 
   let {
     refs,
     stashes,
     worktrees,
+    tracks,
     view,
     changes,
     onview,
     onjump,
     onactivate,
     onmenu,
+    onworktree,
   }: {
     refs: Refs
     stashes: Stash[]
     worktrees: Worktree[]
-    view: 'history' | 'changes'
+    /** 各本地分支与上游的同步状态，键是完整引用名 */
+    tracks: Map<string, Track>
+    view: View
     /** 有改动的文件数 */
     changes: number
-    onview: (view: 'history' | 'changes') => void
+    onview: (view: View) => void
     onjump: (id: string) => void
     /** 双击：name 是引用全名或贮藏名 */
     onactivate: (kind: Kind, name: string) => void
     onmenu: (e: MouseEvent, kind: Kind, name: string, id: string) => void
+    /** 双击工作树：在页签中打开 */
+    onworktree: (path: string) => void
   } = $props()
+
+  /** 在别的工作树里打开着的分支 */
+  const elsewhere = $derived(new Set(worktrees.filter((w) => !w.current && w.branch).map((w) => w.branch)))
 
   let filter = $state('')
 
@@ -48,6 +58,9 @@
       {t.changes}{#if changes}<span class="pill">{changes}</span>{/if}
     </button>
     <button class:on={view === 'history'} onclick={() => onview('history')}>{t.history}</button>
+    <button class:on={view === 'worktrees'} onclick={() => onview('worktrees')}>
+      {t.worktreesNav}{#if worktrees.length > 1}<span class="pill quiet">{worktrees.length}</span>{/if}
+    </button>
   </nav>
   <input type="search" placeholder={t.filter} bind:value={filter} />
   <div class="scroll">
@@ -63,6 +76,13 @@
             oncontextmenu={(e) => onmenu(e, kind, r.name, r.id)}
           >
             {r.label}
+            {#if elsewhere.has(r.name)}<span class="sub" title={t.inOtherWorktreeMark}>⧉</span>{/if}
+            {#if tracks.get(r.name)}
+              {@const tr = tracks.get(r.name)!}
+              <span class="sub" title={tr.gone ? t.gone : `${t.toPush(tr.ahead)} · ${t.toPull(tr.behind)}`}>
+                {tr.gone ? t.gone : `${tr.ahead ? '↑' + tr.ahead : ''} ${tr.behind ? '↓' + tr.behind : ''}`}
+              </span>
+            {/if}
           </button>
         {/each}
       </details>
@@ -81,9 +101,9 @@
     <details open>
       <summary>{t.worktrees}<span class="count">{worktrees.length}</span></summary>
       {#each worktrees as w (w.path)}
-        <button title={w.path} onclick={() => onjump(w.head)}>
+        <button class:head={w.current} title={w.path} onclick={() => onjump(w.head)} ondblclick={() => w.current || onworktree(w.path)}>
           {basename(w.path)}
-          <span class="sub">{w.branch ? w.branch.replace('refs/heads/', '') : t.detached}</span>
+          <span class="sub">{w.branch ? w.branch.replace('refs/heads/', '') : t.detached}{w.changes ? ` · ${t.wtDirty(w.changes)}` : ''}</span>
         </button>
       {/each}
     </details>
@@ -113,6 +133,10 @@
   nav button.on {
     background: var(--accent-soft);
     color: var(--accent);
+  }
+  .pill.quiet {
+    background: var(--raised);
+    color: var(--muted);
   }
   .pill {
     padding: 0 7px;

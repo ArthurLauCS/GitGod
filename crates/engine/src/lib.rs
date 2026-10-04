@@ -39,20 +39,25 @@ impl Repo {
 
     /// 同 `git`，并把 `stdin` 写给子进程（提交信息、补丁、路径列表）。
     pub(crate) fn git_in(&self, args: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(&self.path).args(args);
-        cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        #[cfg(windows)]
-        std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
-        let mut child = cmd.spawn().map_err(err)?;
-        // 读完 stdin 前就退出的命令会让写入失败，以它的退出状态为准
-        let _ = child.stdin.take().unwrap().write_all(stdin);
-        let out = child.wait_with_output().map_err(err)?;
-        if out.status.success() {
-            Ok(out.stdout)
-        } else {
-            Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
-        }
+        git_at(&self.path, args, stdin)
+    }
+}
+
+/// 在任意目录跑 git（其他工作树不在 `Repo::path` 下）。
+pub(crate) fn git_at(dir: &Path, args: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(dir).args(args);
+    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW
+    let mut child = cmd.spawn().map_err(err)?;
+    // 读完 stdin 前就退出的命令会让写入失败，以它的退出状态为准
+    let _ = child.stdin.take().unwrap().write_all(stdin);
+    let out = child.wait_with_output().map_err(err)?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
     }
 }
 

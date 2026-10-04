@@ -19,7 +19,7 @@ pub fn status(repo: &Repo) -> Result<Vec<Entry>> {
 }
 
 /// porcelain v2 的记录以 NUL 分隔；重命名记录后面多跟一个来源路径字段。
-fn parse(out: &str) -> Vec<Entry> {
+pub(crate) fn parse(out: &str) -> Vec<Entry> {
     let state = |c: Option<char>| c.filter(|&c| c != '.');
     let mut fields = out.split('\0');
     let mut entries = Vec::new();

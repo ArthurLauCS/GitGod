@@ -9,9 +9,24 @@
   import Help from './Help.svelte'
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
+  import Worktrees from './Worktrees.svelte'
   import { t } from './zh'
 
-  let { tab, initialCount, active }: { tab: number; initialCount: number; active: boolean } = $props()
+  let {
+    tab,
+    path,
+    initialCount,
+    active,
+    onopen,
+  }: {
+    tab: number
+    /** 这个页签的工作区路径 */
+    path: string
+    initialCount: number
+    active: boolean
+    /** 在（新）页签中打开另一个仓库或工作树 */
+    onopen: (path: string) => void
+  } = $props()
 
   let count = $state(untrack(() => initialCount))
   let version = $state(0)
@@ -24,7 +39,8 @@
   let entries = $state.raw<api.Entry[]>([])
   let logs = $state.raw<api.Log[]>([])
   let showLog = $state(false)
-  let view = $state<'history' | 'changes'>('history')
+  let view = $state<'history' | 'changes' | 'worktrees'>('history')
+  let tracks = $state.raw(new Map<string, api.Track>())
   let selectedRow = $state<number | null>(null)
   let detail = $state.raw<api.Detail | null>(null)
   let graph = $state<Graph>()
@@ -57,6 +73,11 @@
   async function loadSidebar() {
     const r = await guard(Promise.all([api.refs(tab), api.stashes(tab), api.worktrees(tab), loadStatus()]))
     if (r) [refs, stashes, worktrees] = r
+    // 各分支的同步状态在分支多时要算一两秒，不等它
+    api.tracking(tab).then(
+      (list) => (tracks = new Map(list.map((x) => [x.name, x]))),
+      () => {},
+    )
   }
 
   async function loadAll() {
@@ -228,10 +249,72 @@
     if (v) exec({ op: 'reset', target, mode: v.mode as 'soft' | 'mixed' | 'hard' })
   }
 
+  /** 切换到本地分支；有未提交的改动或分支已在别处打开时先问清楚 */
+  async function switchTo(branch: string) {
+    const other = worktrees.find((w) => !w.current && w.branch === `refs/heads/${branch}`)
+    if (other) {
+      const v = await ask({ title: t.switchDirtyTitle(branch), message: t.inOtherWorktree(branch, other.path), confirm: t.openInTab })
+      if (v) onopen(other.path)
+      return
+    }
+    // 未跟踪的文件不受切换影响
+    if (!entries.some((e) => e.unstaged !== '?')) return void exec({ op: 'checkout', target: branch })
+    const v = await ask({
+      title: t.switchDirtyTitle(branch),
+      explain: explain.switch_dirty,
+      fields: [
+        {
+          key: 'how',
+          label: t.switchHow,
+          type: 'radio',
+          value: 'stash',
+          options: [
+            { value: 'stash', label: t.switchStash },
+            { value: 'carry', label: t.switchCarry },
+            { value: 'worktree', label: t.switchWorktree },
+          ],
+        },
+      ],
+    })
+    if (!v) return
+    if (v.how === 'carry') exec({ op: 'checkout', target: branch })
+    else if (v.how === 'worktree') addWorktree(branch, true)
+    else if (await exec({ op: 'stash_push', message: t.autoStash(branch), include_untracked: false })) {
+      // 切换失败时改动也要放回来，所以不看 checkout 的结果
+      await exec({ op: 'checkout', target: branch })
+      await exec({ op: 'stash_apply', name: 'stash@{0}', pop: true })
+    }
+  }
+
+  /** 新建工作树并在页签中打开。`existing` 为 true 时直接检出 `start` 这个分支，否则从 `start` 新建分支 */
+  async function addWorktree(start: string, existing: boolean) {
+    const v = await ask({
+      title: t.newWorktree,
+      explain: explain.worktree,
+      fields: [
+        ...(existing ? [] : [{ key: 'branch', label: t.branchName, type: 'text' as const }]),
+        { key: 'path', label: t.worktreePath, type: 'text', value: `${path}-${existing ? start.replace(/[\\/]/g, '-') : 'worktree'}` },
+      ],
+    })
+    if (!v) return
+    const dir = v.path as string
+    if (await exec({ op: 'worktree_add', path: dir, start, new_branch: existing ? null : (v.branch as string) })) onopen(dir)
+  }
+
+  async function removeWorktree(w: api.Worktree) {
+    const v = await ask({
+      title: t.wtRemoveTitle(w.path.split(/[\\/]/).filter(Boolean).pop() ?? w.path),
+      message: explain.worktree.undo,
+      warning: w.changes ? t.wtRemoveWarning(w.changes) : undefined,
+      danger: true,
+    })
+    if (v) exec({ op: 'worktree_remove', path: w.path, force: w.changes > 0 })
+  }
+
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
 
   function activate(kind: Kind, name: string) {
-    if (kind === 'branch') exec({ op: 'checkout', target: short(name) })
+    if (kind === 'branch') switchTo(short(name))
     else if (kind === 'tag') explained('checkout_commit', short(name), { op: 'checkout', target: short(name) })
     else if (kind === 'remote') explained('track', short(name), { op: 'track', remote_branch: short(name) })
     else exec({ op: 'stash_apply', name, pop: false })
@@ -272,6 +355,7 @@
       if (kind === 'branch') {
         items.push(
           { label: t.pushBranch, hint: explain.push.short, action: () => push(s) },
+          ...(current ? [] : [{ label: t.openInWorktree, hint: explain.worktree.short, action: () => addWorktree(s, true) }]),
           {
             label: t.rename,
             hint: '只改本地分支的名字',
@@ -390,12 +474,14 @@
       {refs}
       {stashes}
       {worktrees}
+      {tracks}
       {view}
       changes={entries.length}
       onview={(v) => (view = v)}
       onjump={jump}
       onactivate={activate}
       onmenu={(e, kind, name) => refMenu(e, kind, name)}
+      onworktree={onopen}
     />
     <div class="content">
       <div class="pane" class:hidden={view !== 'history'}>
@@ -419,6 +505,11 @@
       <div class="pane" class:hidden={view !== 'changes'}>
         <WorkingCopy {tab} {entries} reload={loadStatus} oncommitted={refresh} />
       </div>
+      {#if view === 'worktrees'}
+        <div class="pane">
+          <Worktrees {worktrees} {onopen} onremove={removeWorktree} onnew={() => addWorktree('HEAD', false)} />
+        </div>
+      {/if}
     </div>
   </main>
   {#if showLog}

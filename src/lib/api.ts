@@ -43,6 +43,8 @@ export type Op =
   | { op: 'stash_push'; message: string; include_untracked: boolean }
   | { op: 'stash_apply'; name: string; pop: boolean }
   | { op: 'stash_drop'; name: string }
+  | { op: 'worktree_add'; path: string; start: string; new_branch: string | null }
+  | { op: 'worktree_remove'; path: string; force: boolean }
   | { op: 'fetch' }
   | { op: 'pull' }
   | { op: 'push'; remote: string; branch: string; remote_branch: string; force: boolean; set_upstream: boolean }
@@ -59,6 +61,17 @@ export interface Worktree {
   path: string
   head: string
   branch: string | null
+  current: boolean
+  changes: number
+  ahead_behind: [number, number] | null
+  subject: string
+  time: number
+}
+export interface Track {
+  name: string
+  ahead: number
+  behind: number
+  gone: boolean
 }
 export interface FileChange {
   status: string
@@ -123,3 +136,4 @@ export const applyLines = (tab: number, path: string, staged: boolean, hunk: num
   invoke<void>('apply_lines', { tab, path, staged, hunk, header, lines })
 export const op = (tab: number, op: Op) => invoke<Log>('op', { tab, op })
 export const remotes = (tab: number) => invoke<string[]>('remotes', { tab })
+export const tracking = (tab: number) => invoke<Track[]>('tracking', { tab })

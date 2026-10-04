@@ -6,7 +6,7 @@ use engine::diff::{self, Diff};
 use engine::status::{self, Entry};
 use engine::graph::{Graph, Row};
 use engine::ops::{self, Log, Op};
-use engine::refs::{self, Refs, Stash, Worktree};
+use engine::refs::{self, Refs, Stash, Track, Worktree};
 use engine::{Repo, Result};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -150,13 +150,18 @@ fn remotes(state: State, tab: u32) -> Result<Vec<String>> {
     refs::remotes(&session(&state, tab)?.repo)
 }
 
+#[tauri::command(async)]
+fn tracking(state: State, tab: u32) -> Result<Vec<Track>> {
+    refs::tracking(&session(&state, tab)?.repo)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Tabs::default())
         .invoke_handler(tauri::generate_handler![
             initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
-            commit, last_message, diff_worktree, diff_commit, apply_lines, op, remotes
+            commit, last_message, diff_worktree, diff_commit, apply_lines, op, remotes, tracking
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

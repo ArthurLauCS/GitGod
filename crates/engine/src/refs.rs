@@ -1,7 +1,8 @@
-use crate::{err, Repo, Result};
+use crate::{err, git_at, Repo, Result};
 use gix::ObjectId;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::Path;
 
 #[derive(Serialize)]
 pub struct Ref {
@@ -38,6 +39,26 @@ pub struct Worktree {
     pub head: String,
     /// 完整引用名；游离 HEAD 或裸仓库时为 None
     pub branch: Option<String>,
+    /// 是不是当前打开的这个工作树
+    pub current: bool,
+    /// 有改动的文件数
+    pub changes: usize,
+    /// 相对上游的 (领先, 落后)；没有上游时为 None
+    pub ahead_behind: Option<(u32, u32)>,
+    /// 最后一次提交的标题和时间
+    pub subject: String,
+    pub time: i64,
+}
+
+/// 本地分支相对各自上游的同步状态
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Track {
+    /// 完整引用名
+    pub name: String,
+    pub ahead: u32,
+    pub behind: u32,
+    /// 上游分支在远程已经被删除
+    pub gone: bool,
 }
 
 fn commits(gix: &gix::Repository) -> Result<Vec<(String, ObjectId)>> {
@@ -126,5 +147,44 @@ pub fn worktrees(repo: &Repo) -> Result<Vec<Worktree>> {
             _ => {}
         }
     }
+    // 每个工作树要跑三条 git 命令，各开一个线程并行
+    let here = std::fs::canonicalize(&repo.path).ok();
+    std::thread::scope(|s| {
+        for w in &mut list {
+            let here = &here;
+            s.spawn(move || {
+                let dir = Path::new(&w.path);
+                let run = |args: &[&str]| git_at(dir, args, &[]).map(|o| String::from_utf8_lossy(&o).into_owned());
+                w.current = here.is_some() && std::fs::canonicalize(dir).ok() == *here;
+                w.changes = run(&["status", "--porcelain=v2", "-z"]).map_or(0, |o| crate::status::parse(&o).len());
+                w.ahead_behind = run(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).ok().and_then(|o| {
+                    let mut n = o.split_whitespace().map(|n| n.parse().ok());
+                    Some((n.next()??, n.next()??))
+                });
+                if let Some((subject, time)) = run(&["log", "-1", "--format=%s%x00%ct"]).ok().as_deref().and_then(|o| o.trim().split_once('\0')) {
+                    w.subject = subject.to_owned();
+                    w.time = time.parse().unwrap_or(0);
+                }
+            });
+        }
+    });
     Ok(list)
+}
+
+/// 所有有上游的本地分支的同步状态。分支多时要算一两秒（内核仓库 1000 个分支 1.5 秒），界面应当异步取。
+pub fn tracking(repo: &Repo) -> Result<Vec<Track>> {
+    let out = repo.git(&["for-each-ref", "--format=%(refname)%00%(upstream)%00%(upstream:track,nobracket)", "refs/heads"])?;
+    Ok(String::from_utf8_lossy(&out)
+        .lines()
+        .filter_map(|l| {
+            let mut f = l.split('\0');
+            let (name, upstream, track) = (f.next()?, f.next()?, f.next()?);
+            if upstream.is_empty() {
+                return None;
+            }
+            // track 形如 "ahead 1, behind 2" / "behind 2" / "gone" / 空
+            let count = |key: &str| track.split(", ").find_map(|p| p.strip_prefix(key)?.trim().parse().ok()).unwrap_or(0);
+            Some(Track { name: name.to_owned(), ahead: count("ahead"), behind: count("behind"), gone: track == "gone" })
+        })
+        .collect())
 }

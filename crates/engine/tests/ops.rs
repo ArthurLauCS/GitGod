@@ -134,6 +134,14 @@ fn remote_fetch_push_pull_and_upstream() {
     commit_file(&dir, 3, "c.txt", "c\n");
     assert_eq!(refs::list(&repo).unwrap().ahead_behind, Some((1, 0)));
 
+    assert_eq!(
+        refs::tracking(&repo).unwrap(),
+        [
+            refs::Track { name: "refs/heads/feat".into(), ahead: 1, behind: 0, gone: false },
+            refs::Track { name: "refs/heads/main".into(), ahead: 0, behind: 0, gone: false },
+        ]
+    );
+
     // 远程前进后：fetch 看到落后，pull 跟上
     ok(&repo, Op::Checkout { target: "main".into() });
     commit_file(&origin, 4, "d.txt", "d\n");
@@ -150,4 +158,36 @@ fn remote_fetch_push_pull_and_upstream() {
 
     std::fs::remove_dir_all(&dir).unwrap();
     std::fs::remove_dir_all(&origin).unwrap();
+}
+
+#[test]
+fn worktree_add_overview_remove() {
+    let dir = init("ops-wt");
+    commit_file(&dir, 1, "a.txt", "a\n");
+    let repo = Repo::open(&dir).unwrap();
+    let other = std::env::temp_dir().join(format!("gitgod-test-ops-wt-other-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&other);
+    let path = other.to_str().unwrap().to_owned();
+
+    ok(&repo, Op::WorktreeAdd { path: path.clone(), start: "main".into(), new_branch: Some("side".into()) });
+    std::fs::write(other.join("new.txt"), "n\n").unwrap();
+    std::fs::write(other.join("a.txt"), "changed\n").unwrap();
+
+    let list = refs::worktrees(&repo).unwrap();
+    assert_eq!(list.len(), 2);
+    let brief: Vec<_> = list.iter().map(|w| (w.branch.as_deref(), w.current, w.changes, w.subject.as_str())).collect();
+    assert_eq!(brief, [(Some("refs/heads/main"), true, 0, "a.txt"), (Some("refs/heads/side"), false, 2, "a.txt")]);
+    assert_eq!(list[1].time, 1_700_000_001);
+    // 从另一个工作树打开时，current 跟着变
+    let from_other = refs::worktrees(&Repo::open(&other).unwrap()).unwrap();
+    assert_eq!(from_other.iter().map(|w| w.current).collect::<Vec<_>>(), [false, true]);
+
+    // 分支已在别的工作树检出：git 拒绝，日志里是失败
+    assert!(!ops::run(&repo, Op::Checkout { target: "side".into() }).unwrap().ok);
+    // 有改动的工作树不强制就删不掉
+    assert!(!ops::run(&repo, Op::WorktreeRemove { path: path.clone(), force: false }).unwrap().ok);
+    ok(&repo, Op::WorktreeRemove { path, force: true });
+    assert_eq!(refs::worktrees(&repo).unwrap().len(), 1);
+
+    std::fs::remove_dir_all(&dir).unwrap();
 }

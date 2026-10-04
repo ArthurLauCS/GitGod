@@ -98,7 +98,7 @@
 
 <div class="body">
   {#each tabs as tab (tab.id)}
-    <RepoView tab={tab.id} initialCount={tab.count} active={tab.id === active} />
+    <RepoView tab={tab.id} path={tab.path} initialCount={tab.count} active={tab.id === active} onopen={openRepo} />
   {/each}
 
   {#if active === null}
