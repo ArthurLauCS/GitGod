@@ -4,6 +4,8 @@ export const t = {
   openRepo: '打开仓库',
   openRepoHint: '选择一个 Git 仓库的文件夹开始',
   recent: '最近打开',
+  newTab: '打开仓库（新页签）',
+  closeTab: '关闭页签',
   loadingHistory: '正在加载完整历史…',
   commits: (n: number) => `${n.toLocaleString('zh-CN')} 个提交`,
   filter: '筛选分支、标签…',

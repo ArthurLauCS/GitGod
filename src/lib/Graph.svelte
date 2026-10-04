@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { rows as fetchRows, type Ref, type Row } from './api'
+  import type { Ref, Row } from './api'
   import { fmtTime, t } from './zh'
 
   const ROW_H = 26
@@ -13,6 +13,7 @@
   const COLORS = ['#5c9dff', '#5fc27e', '#e0b252', '#c58af9', '#ef6b73', '#4fc4cf', '#f08d49', '#9aa5b8']
 
   let {
+    fetchRows,
     count,
     version,
     badges,
@@ -20,6 +21,7 @@
     selectedRow,
     onselect,
   }: {
+    fetchRows: (start: number, count: number) => Promise<Row[]>
     count: number
     /** 提交图每次重新加载后加一，用来作废已缓存的行 */
     version: number

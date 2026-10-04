@@ -1,70 +1,44 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
   import * as api from './lib/api'
-  import Detail from './lib/Detail.svelte'
-  import Graph from './lib/Graph.svelte'
-  import Sidebar from './lib/Sidebar.svelte'
+  import RepoView from './lib/RepoView.svelte'
   import { t } from './lib/zh'
 
-  let recent = $state<string[]>(JSON.parse(localStorage.getItem('recent') ?? '[]'))
-  let repoPath = $state<string | null>(null)
-  let count = $state(0)
-  let version = $state(0)
-  let loadingAll = $state(false)
+  interface Tab {
+    id: number
+    path: string
+    count: number
+  }
+
+  const load = (key: string): string[] => JSON.parse(localStorage.getItem(key) ?? '[]')
+
+  let recent = $state(load('recent'))
+  let tabs = $state<Tab[]>([])
+  /** 当前页签 id；null 时显示打开仓库页 */
+  let active = $state<number | null>(null)
   let error = $state('')
-  let refs = $state.raw<api.Refs>({ head: null, head_id: null, refs: [] })
-  let stashes = $state.raw<api.Stash[]>([])
-  let worktrees = $state.raw<api.Worktree[]>([])
-  let selectedRow = $state<number | null>(null)
-  let detail = $state.raw<api.Detail | null>(null)
-  let graph = $state<Graph>()
-  let pendingJump: string | null = null
 
-  const badges = $derived.by(() => {
-    const map = new Map<string, api.Ref[]>()
-    for (const r of refs.refs) map.set(r.id, [...(map.get(r.id) ?? []), r])
-    return map
-  })
-  const repoName = $derived(repoPath?.split(/[\\/]/).filter(Boolean).pop() ?? '')
-  const headLabel = $derived(refs.head?.startsWith('refs/heads/') ? refs.head.slice(11) : t.detached)
-
-  async function guard<T>(p: Promise<T>): Promise<T | undefined> {
-    try {
-      return await p
-    } catch (e) {
-      error = String(e)
-    }
-  }
-
-  async function loadSidebar() {
-    const r = await guard(Promise.all([api.refs(), api.stashes(), api.worktrees()]))
-    if (r) [refs, stashes, worktrees] = r
-  }
-
-  async function loadAll() {
-    loadingAll = true
-    const n = await guard(api.loadGraph(true))
-    loadingAll = false
-    if (n === undefined) return
-    count = n
-    version++
-    if (pendingJump) jump(pendingJump)
-    pendingJump = null
-  }
+  const name = (path: string) => path.split(/[\/]/).filter(Boolean).pop() ?? path
+  const save = () => localStorage.setItem('tabs', JSON.stringify(tabs.map((x) => x.path)))
 
   async function openRepo(path: string) {
     error = ''
-    const r = await guard(api.openRepo(path))
-    if (!r) return
-    ;[repoPath, count] = r
-    version++
-    selectedRow = null
-    detail = null
-    recent = [repoPath, ...recent.filter((p) => p !== repoPath)].slice(0, 10)
-    localStorage.setItem('recent', JSON.stringify(recent))
-    await loadSidebar()
-    if (refs.head_id) jump(refs.head_id)
-    await loadAll()
+    try {
+      const [id, real, count] = await api.openRepo(path)
+      const existing = tabs.find((x) => x.path === real)
+      if (existing) {
+        api.closeRepo(id)
+        active = existing.id
+        return
+      }
+      tabs.push({ id, path: real, count })
+      active = id
+      save()
+      recent = [real, ...recent.filter((p) => p !== real)].slice(0, 10)
+      localStorage.setItem('recent', JSON.stringify(recent))
+    } catch (e) {
+      error = String(e)
+    }
   }
 
   async function pick() {
@@ -72,142 +46,161 @@
     if (dir) openRepo(dir)
   }
 
-  async function select(row: number, id: string) {
-    selectedRow = row
-    const d = await guard(api.detail(id))
-    if (d && selectedRow === row) detail = d
+  function close(id: number) {
+    const i = tabs.findIndex((x) => x.id === id)
+    tabs.splice(i, 1)
+    api.closeRepo(id)
+    if (active === id) active = (tabs[i] ?? tabs[i - 1])?.id ?? null
+    save()
   }
 
-  async function jump(id: string) {
-    const row = await guard(api.rowOf(id))
-    if (row == null) {
-      // 完整历史还没加载完，目标提交不在首批里：等加载完再跳
-      if (loadingAll) pendingJump = id
-      return
+  function onkeydown(e: KeyboardEvent) {
+    if (!e.ctrlKey) return
+    if (e.key === 'Tab' && tabs.length) {
+      e.preventDefault()
+      const i = tabs.findIndex((x) => x.id === active)
+      active = tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length].id
+    } else if (e.key === 'w' && active !== null) {
+      e.preventDefault()
+      close(active)
+    } else if (e.key === 't') {
+      e.preventDefault()
+      active = null
     }
-    graph?.scrollToRow(row, true)
-    select(row, id)
   }
 
-  api.initialRepo().then((p) => {
-    if (p) openRepo(p)
-  })
-
-  // 回到窗口时，引用有变化才重新加载提交图
-  async function onfocus() {
-    if (!repoPath || loadingAll) return
-    const before = JSON.stringify(refs)
-    await loadSidebar()
-    if (JSON.stringify(refs) === before) return
-    selectedRow = null
-    detail = null
-    await loadAll()
-  }
+  // 恢复上次的页签，再打开命令行传入的仓库
+  ;(async () => {
+    for (const path of [...load('tabs'), ...(await api.initialRepos())]) await openRepo(path)
+  })()
 </script>
 
-<svelte:window {onfocus} />
+<svelte:window {onkeydown} />
 
-{#if repoPath}
-  <header>
-    <strong>{repoName}</strong>
-    <span class="branch">{headLabel}</span>
-    <span class="muted">{loadingAll ? t.loadingHistory : t.commits(count)}</span>
-    <span class="spacer"></span>
-    <button onclick={pick}>{t.openRepo}</button>
-  </header>
-  {#if error}<p class="error">{error}</p>{/if}
-  <main>
-    <Sidebar {refs} {stashes} {worktrees} onjump={jump} />
-    <div class="center">
-      {#if count}
-        <Graph bind:this={graph} {count} {version} {badges} headId={refs.head_id} {selectedRow} onselect={select} />
-      {:else}
-        <p class="none">{t.noCommits}</p>
-      {/if}
-      <Detail {detail} onjump={jump} />
-    </div>
-  </main>
-{:else}
-  <div class="welcome">
-    <h1>{t.appName}</h1>
-    <p class="muted">{t.openRepoHint}</p>
-    <button class="primary" onclick={pick}>{t.openRepo}</button>
-    {#if error}<p class="error">{error}</p>{/if}
-    {#if recent.length}
-      <h2>{t.recent}</h2>
-      {#each recent as path (path)}
-        <button class="recent" onclick={() => openRepo(path)}>{path}</button>
-      {/each}
-    {/if}
-  </div>
+{#if tabs.length}
+  <nav>
+    {#each tabs as tab (tab.id)}
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div
+        class="tab"
+        class:active={tab.id === active}
+        title={tab.path}
+        onclick={() => (active = tab.id)}
+        onauxclick={(e) => e.button === 1 && close(tab.id)}
+      >
+        <span>{name(tab.path)}</span>
+        <button title={t.closeTab} onclick={(e) => (e.stopPropagation(), close(tab.id))}>×</button>
+      </div>
+    {/each}
+    <button class="add" class:active={active === null} title={t.newTab} onclick={() => (active = null)}>+</button>
+  </nav>
 {/if}
+
+<div class="body">
+  {#each tabs as tab (tab.id)}
+    <RepoView tab={tab.id} initialCount={tab.count} active={tab.id === active} />
+  {/each}
+
+  {#if active === null}
+    <div class="welcome">
+      <h1>{t.appName}</h1>
+      <p class="muted">{t.openRepoHint}</p>
+      <button class="primary" onclick={pick}>{t.openRepo}</button>
+      {#if error}<p class="error">{error}</p>{/if}
+      {#if recent.length}
+        <h2>{t.recent}</h2>
+        {#each recent as path (path)}
+          <button class="recent" onclick={() => openRepo(path)}>{path}</button>
+        {/each}
+      {/if}
+    </div>
+  {/if}
+</div>
 
 <style>
   :global(#app) {
     display: flex;
     flex-direction: column;
   }
-  header {
+  nav {
     flex: none;
     display: flex;
-    align-items: center;
-    gap: 12px;
-    height: 44px;
-    padding: 0 14px;
-    background: var(--panel);
+    align-items: flex-end;
+    height: 38px;
+    padding: 0 8px;
+    gap: 2px;
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
   }
-  strong {
-    font-size: 14px;
-  }
-  .branch {
-    padding: 1px 8px;
-    border-radius: 4px;
-    color: var(--accent);
-    background: var(--accent-soft);
-    font-size: 12px;
-  }
-  .spacer {
-    flex: 1;
-  }
-  .muted {
-    color: var(--muted);
-    font-size: 12px;
-  }
-  button {
-    padding: 5px 12px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--raised);
-    cursor: pointer;
-  }
-  button:hover {
-    border-color: var(--muted);
-  }
-  main {
+  .body {
     flex: 1;
     min-height: 0;
-    display: flex;
-  }
-  .center {
-    flex: 1;
-    min-width: 0;
+    position: relative;
     display: flex;
     flex-direction: column;
   }
-  .none {
-    flex: 1;
-    display: grid;
-    place-items: center;
-    margin: 0;
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 31px;
+    min-width: 0;
+    max-width: 220px;
+    padding: 0 6px 0 14px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: 7px 7px 0 0;
     color: var(--muted);
+    cursor: default;
+    margin-bottom: -1px;
   }
-  .error {
-    margin: 0;
-    padding: 6px 14px;
-    color: var(--red);
-    background: color-mix(in srgb, var(--red) 12%, transparent);
-    user-select: text;
+  .tab:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .tab.active {
+    background: var(--panel);
+    border-color: var(--border);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tab button,
+  .add {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .tab button {
+    visibility: hidden;
+  }
+  .tab:hover button,
+  .tab.active button {
+    visibility: visible;
+  }
+  .tab button:hover,
+  .add:hover,
+  .add.active {
+    background: var(--raised);
+    color: var(--text);
+  }
+  .add {
+    width: 28px;
+    height: 28px;
+    margin: 0 0 3px 4px;
+    font-size: 18px;
   }
   .welcome {
     margin: auto;
@@ -229,24 +222,27 @@
     font-weight: 600;
     color: var(--muted);
   }
-  .welcome .muted {
+  .muted {
     margin: 0 0 12px;
-    font-size: 13px;
+    color: var(--muted);
+  }
+  .primary,
+  .recent {
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
   }
   .primary {
     padding: 8px 20px;
-    border-color: var(--accent);
     background: var(--accent);
     color: #fff;
   }
   .primary:hover {
-    border-color: var(--accent);
     filter: brightness(1.1);
   }
   .recent {
     width: 100%;
     padding: 6px 10px;
-    border-color: transparent;
     background: none;
     text-align: left;
     overflow: hidden;
@@ -254,7 +250,11 @@
     white-space: nowrap;
   }
   .recent:hover {
-    border-color: transparent;
     background: var(--hover);
+  }
+  .error {
+    margin: 0;
+    color: var(--red);
+    user-select: text;
   }
 </style>
