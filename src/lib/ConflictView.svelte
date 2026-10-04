@@ -4,10 +4,12 @@
 
   let {
     conflict,
+    rebasing,
     onresolve,
     ontake,
   }: {
     conflict: Conflict | null
+    rebasing: boolean
     /** 每个冲突块选了哪一边，按出现顺序 */
     onresolve: (choices: Side[]) => void
     /** 整个文件取一边 */
@@ -32,7 +34,7 @@
     <p class="note">{t.pickFile}</p>
   {:else}
     <header>
-      <span>{conflict.binary ? t.conflictBinary : t.conflictHint(choices.length)}</span>
+      <span>{conflict.binary ? t.conflictBinary : t.conflictHint(choices.length)}{rebasing ? ' ' + t.rebaseConflictHint : ''}</span>
       <button class="btn small" onclick={() => ontake(false)}>{t.takeOurs}</button>
       <button class="btn small" onclick={() => ontake(true)}>{t.takeTheirs}</button>
       {#if !conflict.binary}

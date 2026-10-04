@@ -322,6 +322,18 @@
     }
   }
 
+  async function pull() {
+    const upstream = refs.refs.find((r) => r.name === refs.head)?.upstream
+    const v = await ask({
+      title: t.pull,
+      explain: explain.pull,
+      message: t.pullFrom(upstream ? short(upstream) : t.noUpstream),
+      confirm: t.pull,
+      fields: [{ key: 'rebase', label: t.pullRebase, type: 'checkbox', value: true }],
+    })
+    if (v) exec({ op: 'pull', rebase: v.rebase as boolean })
+  }
+
   async function reset(target: string) {
     const v = await ask({
       title: t.resetTitle(head ?? 'HEAD'),
@@ -548,7 +560,7 @@
       <button class="btn quiet" disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}>
         <Icon name="fetch" /><span>{t.fetch}</span>
       </button>
-      <button class="btn quiet" disabled={busy} title={explain.pull.short} onclick={() => explained('pull', t.pull, { op: 'pull' })}>
+      <button class="btn quiet" disabled={busy || !!refs.in_progress} title={explain.pull.short} onclick={pull}>
         <Icon name="pull" /><span>{t.pull}</span>
       </button>
       <button class="btn quiet" disabled={busy} title={explain.push.short} onclick={() => push(head)}>
@@ -623,7 +635,7 @@
         <Detail {detail} onjump={jump} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
-        <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} reload={refresh} oncommitted={committed} {discard} {discardLines} />
+        <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} rebasing={refs.in_progress === 'rebase'} reload={refresh} oncommitted={committed} {discard} {discardLines} />
       </div>
       {#if view === 'worktrees'}
         <div class="pane">

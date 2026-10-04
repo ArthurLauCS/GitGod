@@ -53,7 +53,7 @@ pub enum Op {
     WorktreeAdd { path: String, start: String, new_branch: Option<String> },
     WorktreeRemove { path: String, force: bool },
     Fetch,
-    Pull,
+    Pull { rebase: bool },
     Push { remote: String, branch: String, remote_branch: String, force: bool, set_upstream: bool },
     CreateTag { name: String, target: String, message: String },
     DeleteTag { name: String },
@@ -125,7 +125,10 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
         }
         // 多个远程并行获取
         Op::Fetch => args.extend(["fetch", "--all", "--prune", "--jobs=8"]),
-        Op::Pull => args.push("pull"),
+        Op::Pull { rebase } => {
+            // A pull must not rewrite other local branches or hide uncommitted work.
+            args.extend(["-c", "rebase.updateRefs=false", "pull", if *rebase { "--rebase" } else { "--no-rebase" }, "--no-autostash", "--no-edit"]);
+        }
         Op::Push { remote, branch, remote_branch, force, set_upstream } => {
             args.push("push");
             if *force {
