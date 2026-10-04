@@ -29,6 +29,7 @@ pub struct Row {
     /// 从本提交向下连到各个父提交的泳道
     pub out: Vec<u32>,
     pub author: String,
+    pub author_email: String,
     pub time: i64,
     pub subject: String,
 }
@@ -121,7 +122,9 @@ impl Graph {
                 step(&mut active, r as u32, self.parents_of(r), Some(&mut row));
                 let commit = gix.find_commit(self.ids[r]).map_err(err)?;
                 let c = commit.decode().map_err(err)?;
-                row.author = c.author().map_err(err)?.name.to_string();
+                let author = c.author().map_err(err)?;
+                row.author = author.name.to_string();
+                row.author_email = author.email.to_string();
                 row.time = c.committer().map_err(err)?.seconds();
                 row.subject = c.message().title.to_string().trim_end().to_owned();
                 Ok(row)

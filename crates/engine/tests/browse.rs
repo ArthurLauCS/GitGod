@@ -35,6 +35,7 @@ fn graph_rows_refs_and_detail() {
     assert_eq!(rows[1].through, [1]);
     assert_eq!(rows[3].incoming, [0, 1]);
     assert_eq!(rows[0].author, "t");
+    assert_eq!(rows[0].author_email, "t@t");
     assert_eq!(rows[0].time, 1_700_000_004);
     // 窗口从中间开始时泳道状态与从头算一致
     let tail = graph.rows(&repo, 2, 100).unwrap();

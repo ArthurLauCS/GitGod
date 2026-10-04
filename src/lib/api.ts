@@ -7,6 +7,7 @@ export interface Row {
   through: number[]
   out: number[]
   author: string
+  author_email: string
   time: number
   subject: string
 }

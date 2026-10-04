@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { Ref, Row } from './api'
-  import { authorColor } from './author'
+  import { authorColor, authorKey } from './author'
+  import Dialog from './Dialog.svelte'
   import { layout } from './layout.svelte'
-  import { prefs, savePrefs } from './prefs.svelte'
+  import { prefs, setAuthorStyle } from './prefs.svelte'
   import Splitter from './Splitter.svelte'
   import { theme } from './theme.svelte'
   import { fmtTime, t } from './zh'
@@ -41,9 +42,22 @@
   let viewport: HTMLDivElement
   let canvas = $state<HTMLCanvasElement>()
   /** 只高亮这个作者的提交，其余变淡 */
-  let focusAuthor = $state<string | null>(null)
-  /** 作者列的显示方式菜单是否展开 */
-  let authorMenu = $state(false)
+  let focusAuthor = $state<{ key: string; name: string } | null>(null)
+  let authorDialog = $state<Dialog>()
+
+  async function styleAuthor(row: Row) {
+    const key = authorKey(row)
+    const style = prefs.authorStyles[key]
+    const values = await authorDialog?.ask({
+      title: t.authorStyle(row.author),
+      message: row.author_email,
+      fields: [
+        { key: 'border', label: t.authorBorder, type: 'checkbox', value: style?.border ?? false },
+        { key: 'fill', label: t.authorFill, type: 'checkbox', value: style?.fill ?? false },
+      ],
+    })
+    if (values) setAuthorStyle(key, { border: values.border as boolean, fill: values.fill as boolean })
+  }
   const cols = $derived(`minmax(0, 1fr) min(${layout.author}px, 18vw) min(${layout.date}px, 13vw) 72px`)
   let scrollTop = $state(0)
   let height = $state(0)
@@ -164,25 +178,18 @@
   const short = (name: string) => name.replace(/^refs\/(heads|tags|remotes)\//, '')
 </script>
 
-<svelte:window onmousedown={() => (authorMenu = false)} />
+<Dialog bind:this={authorDialog} />
 
 <div class="head" style:padding-left="{graphW}px" style:grid-template-columns={cols}>
   <span>
     {t.colSubject}
     {#if focusAuthor}
-      <button class="chip" style:color={authorColor(focusAuthor)} onclick={() => (focusAuthor = null)}>{t.onlyAuthor(focusAuthor)} ×</button>
+      <button class="chip" style:color={authorColor(focusAuthor.name)} onclick={() => (focusAuthor = null)}>{t.onlyAuthor(focusAuthor.name)} ×</button>
     {/if}
   </span>
   <span class="cell">
     <span class="grip" title={t.dragHint}><Splitter key="author" min={80} max={360} invert /></span>
-    <button class="colbtn" title={t.authorStyle} onclick={() => (authorMenu = !authorMenu)}>{t.colAuthor} ▾</button>
-    {#if authorMenu}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="popover" onmousedown={(e) => e.stopPropagation()}>
-        <label><input type="checkbox" bind:checked={prefs.authorBorder} onchange={savePrefs} />{t.authorBorder}</label>
-        <label><input type="checkbox" bind:checked={prefs.authorFill} onchange={savePrefs} />{t.authorFill}</label>
-      </div>
-    {/if}
+    <span title={t.authorHint}>{t.colAuthor}</span>
   </span>
   <span class="cell"><span class="grip" title={t.dragHint}><Splitter key="date" min={96} max={220} invert /></span>{t.colDate}</span>
   <span>{t.colCommit}</span>
@@ -197,7 +204,7 @@
         <div
           class="row"
           class:selected={first + i === selectedRow}
-          class:dim={focusAuthor !== null && row?.author !== focusAuthor}
+          class:dim={focusAuthor !== null && (!row || authorKey(row) !== focusAuthor.key)}
           style:padding-left="{graphW}px"
           style:grid-template-columns={cols}
           role="row"
@@ -218,11 +225,19 @@
             </span>
             <button
               class="author"
-              class:boxed={prefs.authorBorder}
-              class:filled={prefs.authorFill}
+              class:boxed={prefs.authorStyles[authorKey(row)]?.border}
+              class:filled={prefs.authorStyles[authorKey(row)]?.fill}
               style:color={authorColor(row.author)}
               title={t.authorHint}
-              onclick={(e) => (e.stopPropagation(), (focusAuthor = focusAuthor === row.author ? null : row.author))}
+              onclick={(e) => (e.stopPropagation(), (focusAuthor = focusAuthor?.key === authorKey(row) ? null : { key: authorKey(row), name: row.author }))}
+              oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); styleAuthor(row) }}
+              onkeydown={(e) => {
+                if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  styleAuthor(row)
+                }
+              }}
             >
               {row.author}
             </button>
@@ -336,39 +351,6 @@
   }
   .author.filled {
     background: color-mix(in srgb, currentColor 18%, transparent);
-  }
-  .colbtn {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font-size: inherit;
-    cursor: pointer;
-  }
-  .colbtn:hover {
-    color: var(--text);
-  }
-  .popover {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 5;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-md);
-    background: var(--raised);
-    box-shadow: var(--shadow-pop);
-    color: var(--text);
-    animation: pop var(--t-pop);
-  }
-  .popover label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
   }
   .muted {
     color: var(--muted);

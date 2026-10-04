@@ -1,14 +1,22 @@
 // 界面偏好，存 localStorage。
 
-const DEFAULTS = {
-  /** 作者名加边框 */
-  authorBorder: false,
-  /** 作者名加底色 */
-  authorFill: false,
+export interface AuthorStyle {
+  border: boolean
+  fill: boolean
 }
 
-export const prefs = $state({ ...DEFAULTS, ...JSON.parse(localStorage.getItem('prefs') ?? '{}') } as typeof DEFAULTS)
+let authorStyles: Record<string, AuthorStyle> = {}
+try {
+  // 旧版全局开关无法确定要标记谁，不迁移到任何作者。
+  authorStyles = JSON.parse(localStorage.getItem('prefs') ?? '{}')?.authorStyles ?? {}
+} catch {
+  // 损坏的本地偏好不应阻止打开仓库。
+}
 
-export function savePrefs() {
+export const prefs = $state({ authorStyles })
+
+export function setAuthorStyle(key: string, style: AuthorStyle) {
+  if (style.border || style.fill) prefs.authorStyles[key] = style
+  else delete prefs.authorStyles[key]
   localStorage.setItem('prefs', JSON.stringify(prefs))
 }
