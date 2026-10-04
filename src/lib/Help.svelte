@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { explain } from './explain'
+  import { explain } from './i18n.svelte'
   import Explainer from './Explainer.svelte'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   let dialog: HTMLDialogElement
   let reset = $state(false)

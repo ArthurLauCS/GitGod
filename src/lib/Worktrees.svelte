@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Worktree } from './api'
-  import { explain } from './explain'
-  import { fmtTime, t } from './zh'
+  import { explain } from './i18n.svelte'
+  import { fmtTime, t } from './i18n.svelte'
 
   let {
     worktrees,

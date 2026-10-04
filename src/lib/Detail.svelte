@@ -4,7 +4,7 @@
   import { authorColor } from './author'
   import { layout } from './layout.svelte'
   import Splitter from './Splitter.svelte'
-  import { fmtTime, t } from './zh'
+  import { fmtTime, t } from './i18n.svelte'
 
   let {
     detail,

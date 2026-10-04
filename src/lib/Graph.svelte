@@ -6,7 +6,7 @@
   import { prefs, setAuthorStyle } from './prefs.svelte'
   import Splitter from './Splitter.svelte'
   import { theme } from './theme.svelte'
-  import { fmtTime, t } from './zh'
+  import { fmtTime, t } from './i18n.svelte'
 
   const ROW_H = 28
   const LANE_W = 14

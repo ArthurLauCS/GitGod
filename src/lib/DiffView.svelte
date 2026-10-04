@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Diff } from './api'
-  import { t } from './zh'
+  import { t } from './i18n.svelte'
 
   // ponytail: 超过这么多行就截断显示；需要时换成虚拟滚动
   const MAX_LINES = 5000

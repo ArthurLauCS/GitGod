@@ -37,7 +37,7 @@ pub fn set(repo: &Repo, name: &str, email: &str) -> Result<Identity> {
         || name.chars().any(|c| c.is_control() || c == '<' || c == '>')
         || email.chars().any(|c| c.is_whitespace() || c.is_control() || c == '<' || c == '>')
     {
-        return Err("请输入非空的提交姓名和邮箱，不能包含换行或尖括号，邮箱不能包含空格".into());
+        return Err("PR_INVALID_IDENTITY".into());
     }
     repo.git(&["config", "--local", "--replace-all", "--", "user.name", name])?;
     repo.git(&["config", "--local", "--replace-all", "--", "user.email", email])?;

@@ -4,7 +4,7 @@
   import Icon from './lib/Icon.svelte'
   import RepoView from './lib/RepoView.svelte'
   import { theme, toggleTheme } from './lib/theme.svelte'
-  import { t } from './lib/zh'
+  import { t, locale, setLocale, errorText, type Locale } from './lib/i18n.svelte'
 
   interface Tab {
     id: number
@@ -44,7 +44,7 @@
   }
 
   async function pick() {
-    const dir = await open({ directory: true })
+    const dir = await open({ directory: true, title: t.openRepo })
     if (dir) openRepo(dir)
   }
 
@@ -79,7 +79,6 @@
 
 <svelte:window {onkeydown} />
 
-{#if tabs.length}
   <nav>
     {#each tabs as tab (tab.id)}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -96,11 +95,14 @@
     {/each}
     <button class="btn quiet icon" class:on={active === null} title={t.newTab} onclick={() => (active = null)}><Icon name="plus" /></button>
     <span class="spacer"></span>
+    <select class="field language" aria-label={t.language} title={t.language} value={locale.current} onchange={(e) => setLocale(e.currentTarget.value as Locale)}>
+      <option value="en">English</option>
+      <option value="zh-CN">简体中文</option>
+    </select>
     <button class="btn quiet icon" title={theme.current === 'dark' ? t.themeToLight : t.themeToDark} onclick={toggleTheme}>
       <Icon name={theme.current === 'dark' ? 'sun' : 'moon'} />
     </button>
   </nav>
-{/if}
 
 <div class="body">
   {#each tabs as tab (tab.id)}
@@ -113,7 +115,7 @@
       <p class="lead">{t.welcomeLead}</p>
       <p class="muted">{t.openRepoHint}</p>
       <button class="btn primary" onclick={pick}>{t.openRepo}</button>
-      {#if error}<p class="error">{error}</p>{/if}
+      {#if error}<p class="error">{errorText(error)}</p>{/if}
       {#if recent.length}
         <h2>{t.recent}</h2>
         {#each recent as path (path)}
@@ -141,6 +143,12 @@
   }
   nav > .btn {
     margin-bottom: 4px;
+  }
+  .language {
+    width: auto;
+    height: 28px;
+    margin: 0 8px 4px;
+    padding: 0 6px;
   }
   .spacer {
     flex: 1;

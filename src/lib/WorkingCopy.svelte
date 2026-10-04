@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte'
   import { layout } from './layout.svelte'
   import Splitter from './Splitter.svelte'
-  import { t } from './zh'
+  import { t, errorText } from './i18n.svelte'
 
   let {
     tab,
@@ -144,7 +144,7 @@
     {@render list(t.unstaged, t.unstagedHint, unstaged, false)}
     {@render list(t.staged, t.stagedHint, staged, true)}
     <div class="commit">
-      {#if error}<p class="error">{error}</p>{/if}
+      {#if error}<p class="error">{errorText(error)}</p>{/if}
       <div class="identity">
         <span title={(amend ? identity?.committer : identity?.author) ?? t.identityMissing}>
           <small>{amend ? t.committer : t.commitIdentity}</small>

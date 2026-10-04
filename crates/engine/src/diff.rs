@@ -150,7 +150,7 @@ pub fn discard_lines(repo: &Repo, path: &str, hunk: usize, header: &str, lines: 
     // stash create 只生成备份提交，不动工作区；store 把它挂进贮藏列表
     let backup = String::from_utf8_lossy(&repo.git(&["stash", "create"])?).trim().to_owned();
     if !backup.is_empty() {
-        repo.git(&["stash", "store", "-m", &format!("丢弃前的备份：{path}"), &backup])?;
+        repo.git(&["stash", "store", "-m", &format!("PushRight: backup before discard: {path}"), &backup])?;
     }
     repo.git_in(&["apply", "--reverse", "--recount", "--whitespace=nowarn"], &out).map(drop)
 }
@@ -160,11 +160,11 @@ pub fn discard_lines(repo: &Repo, path: &str, hunk: usize, header: &str, lines: 
 fn partial(repo: &Repo, path: &str, staged: bool, reverse: bool, hunk: usize, header: &str, lines: &[usize]) -> Result<Vec<u8>> {
     let patch = patch(repo, path, staged)?;
     if patch.len() > MAX_PATCH {
-        return Err("改动超过 4 MiB，请按整个文件操作".into());
+        return Err("PR_DIFF_TOO_LARGE".into());
     }
     let raw = split(&patch);
     let (raw_header, raw_lines) =
-        raw.hunks.get(hunk).filter(|h| decode(h.0) == header).ok_or("文件已经变化，请刷新后重试")?;
+        raw.hunks.get(hunk).filter(|h| decode(h.0) == header).ok_or("PR_FILE_CHANGED")?;
 
     // 正向应用时目标是补丁的旧侧：没选中的删除行在目标里还在，当上下文；没选中的新增行不存在，丢掉。
     // 反向应用时目标是新侧，两者对调。
