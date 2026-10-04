@@ -20,7 +20,7 @@
   let active = $state<number | null>(null)
   let error = $state('')
 
-  const name = (path: string) => path.split(/[\/]/).filter(Boolean).pop() ?? path
+  const name = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path
   const save = () => localStorage.setItem('tabs', JSON.stringify(tabs.map((x) => x.path)))
 
   async function openRepo(path: string) {
