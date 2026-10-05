@@ -1,11 +1,24 @@
+import { basename } from 'node:path'
 import * as vscode from 'vscode'
-import { engine, onPrefsChange, onRepoChange, repos, store, stored } from './core'
-import { openPanel } from './panel'
+import type { Detail } from '../../src/lib/api'
+import { engine, onPrefsChange, onRepoChange, repos, revUri, store, stored } from './core'
 import { setupWebview } from './webview'
 
 /** 原生历史图仍需要 proposed API；使用稳定的 WebviewView 放在相同的 SCM 容器内。 */
 export function registerGraphView(context: vscode.ExtensionContext) {
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider('pushright.graph', {
+  const openFile = async (args: { tab: number; id: string; path: string; preview?: boolean }) => {
+    const repo = repos.find((r) => r.tab === args?.tab)
+    if (!repo || typeof args.id !== 'string' || typeof args.path !== 'string') throw new Error('Unsupported graph request')
+    // 只打开这个提交实际改动的文件；父版本和重命名路径以引擎结果为准，不接受 Webview 指定的任意版本/路径。
+    const detail = await engine.call<Detail>('detail', { tab: repo.tab, id: args.id })
+    const file = detail.files.find((f) => f.path === args.path)
+    if (!file) throw new Error('Unsupported graph request')
+    const parent = detail.parents[0]
+    const left = revUri(repo, file.old_path ?? file.path, parent ?? detail.id, !parent || file.status === 'A')
+    const right = revUri(repo, file.path, detail.id, file.status === 'D')
+    await vscode.commands.executeCommand('vscode.diff', left, right, `${basename(file.path)} (${detail.id.slice(0, 7)})`, { preview: args.preview !== false, preserveFocus: args.preview !== false })
+  }
+  context.subscriptions.push(vscode.commands.registerCommand('pushright.graph.openFile', openFile), vscode.window.registerWebviewViewProvider('pushright.graph', {
     resolveWebviewView(view) {
       const { webview } = view
       const changed = () => { if (view.visible) webview.postMessage({ refresh: true }) }
@@ -24,8 +37,10 @@ export function registerGraphView(context: vscode.ExtensionContext) {
             } else {
               const repo = repos.find((r) => r.tab === m.args?.tab)
               if (!repo) throw new Error('PR_TAB_CLOSED')
-              if (m.cmd === 'reveal_commit' && typeof m.args.id === 'string') {
-                openPanel(context, { id: m.args.id, root: repo.root })
+              if (m.cmd === 'detail' && typeof m.args.id === 'string') {
+                value = await engine.call<Detail>('detail', { tab: repo.tab, id: m.args.id })
+              } else if (m.cmd === 'open_commit_file') {
+                await openFile(m.args)
               } else if (m.cmd === 'load_graph' && typeof m.args.full === 'boolean') {
                 value = await engine.call(m.cmd, { tab: repo.tab, full: m.args.full })
               } else if (m.cmd === 'rows' && Number.isInteger(m.args.start) && m.args.start >= 0 && Number.isInteger(m.args.count) && m.args.count > 0 && m.args.count <= 128) {

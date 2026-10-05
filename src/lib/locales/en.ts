@@ -223,6 +223,9 @@ export const messages = {
   vscode: {
     graphRepository: 'Repository for the commit graph',
     graphRetry: 'Reload graph',
+    graphLoadingFiles: 'Loading changed files…',
+    graphNoFiles: 'No changed files',
+    graphRetryFiles: 'Retry',
     noRepo: 'No Git repository is open in this window',
     unsupported: 'PushRight could not find its Git engine for this platform. This preview supports Windows x64 only.',
     upstreamMismatch: 'Upstream name differs',

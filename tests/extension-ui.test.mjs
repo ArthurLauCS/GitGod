@@ -25,23 +25,40 @@ const uri = (fsPath) => ({ fsPath, scheme: 'file', with: (other) => ({ ...uri(fs
 test('SCM graph routes only bounded reads to workspace repositories and disposes listeners', async () => {
   let provider
   const messages = new Event(), changed = new Event(), prefs = new Event(), visibility = new Event(), closed = new Event()
-  const posted = [], calls = [], revealed = []
+  const posted = [], calls = [], diffs = []
   const repos = [0, 1].map((tab) => ({ tab, root: `/repo${tab}`, name: `repo${tab}`, refs: { refs: [] } }))
   const view = { visible: true, webview: { postMessage: (m) => posted.push(m), onDidReceiveMessage: messages.event }, onDidChangeVisibility: visibility.event, onDidDispose: closed.event }
-  const core = { repos, onRepoChange: changed, onPrefsChange: prefs, engine: { call: async (...args) => { calls.push(args); return [] } } }
-  const vscode = { window: { registerWebviewViewProvider: (id, p) => { assert.equal(id, 'pushright.graph'); provider = p } } }
-  load('graph-view', { vscode, './core': core, './panel': { openPanel: (_, r) => revealed.push(r) }, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [] })
+  const detail = { id: 'commit', parents: ['parent', 'second-parent'], files: [{ status: 'R', path: 'new.txt', old_path: 'old.txt' }] }
+  const core = { repos, onRepoChange: changed, onPrefsChange: prefs, revUri: (repo, path, rev, empty) => ({ root: repo.root, path, rev, empty }), engine: { call: async (...args) => { calls.push(args); return args[0] === 'detail' ? detail : [] } } }
+  const vscode = { window: { registerWebviewViewProvider: (id, p) => { assert.equal(id, 'pushright.graph'); provider = p } }, commands: { registerCommand: () => ({ dispose() {} }), executeCommand: (...args) => diffs.push(args) } }
+  load('graph-view', { vscode, './core': core, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [] })
   provider.resolveWebviewView(view)
   const send = async (cmd, args = {}) => { await Promise.all(messages.fire({ id: 1, cmd, args })); return posted.at(-1) }
   assert.deepEqual((await send('graph_repos')).value, repos)
   await send('rows', { tab: 1, start: 0, count: 128 })
   assert.deepEqual(calls, [['rows', { tab: 1, start: 0, count: 128 }]])
-  await send('reveal_commit', { tab: 1, id: 'abc' })
-  assert.deepEqual(revealed, [{ id: 'abc', root: '/repo1' }])
+  assert.equal((await send('reveal_commit', { tab: 1, id: 'abc' })).ok, false)
   assert.equal((await send('rows', { tab: 9, start: 0, count: 128 })).ok, false)
   assert.equal((await send('rows', { tab: 1, start: 0, count: 100000 })).ok, false)
   assert.equal((await send('op', { tab: 1, op: { op: 'reset', mode: 'hard' } })).ok, false)
   assert.equal(calls.length, 1)
+  assert.equal((await send('detail', { tab: 1, id: 'commit' })).value, detail)
+  assert.deepEqual(diffs, [], 'expanding a commit never opens an editor')
+  await send('open_commit_file', { tab: 1, id: 'commit', path: 'new.txt' })
+  assert.deepEqual(diffs[0], ['vscode.diff', { root: '/repo1', path: 'old.txt', rev: 'parent', empty: false }, { root: '/repo1', path: 'new.txt', rev: 'commit', empty: false }, 'new.txt (commit)', { preview: true, preserveFocus: true }])
+  for (const status of ['A', 'D']) {
+    detail.files = [{ status, path: 'file.txt', old_path: null }]
+    await send('open_commit_file', { tab: 0, id: 'commit', path: 'file.txt', preview: false })
+    assert.equal(diffs.at(-1)[1].empty, status === 'A')
+    assert.equal(diffs.at(-1)[2].empty, status === 'D')
+    assert.deepEqual(diffs.at(-1)[4], { preview: false, preserveFocus: false })
+  }
+  detail.parents = []
+  detail.files = [{ status: 'A', path: 'root.txt', old_path: null }]
+  await send('open_commit_file', { tab: 0, id: 'commit', path: 'root.txt' })
+  assert.equal(diffs.at(-1)[1].empty, true)
+  assert.equal((await send('open_commit_file', { tab: 0, id: 'commit', path: '../../secret' })).ok, false)
+  assert.equal(diffs.length, 4, 'paths absent from the commit cannot open')
   changed.fire(repos[0]); assert.deepEqual(posted.at(-1), { refresh: true })
   view.visible = false
   const n = posted.length

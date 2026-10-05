@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Ref, Row } from './api'
+  import type { FileChange, Ref, Row } from './api'
+  import { expansionRanges, graphIndex, graphPosition } from './graph-rows'
   import { authorColor, authorKey } from './author'
   import Dialog from './Dialog.svelte'
   import { layout } from './layout.svelte'
@@ -25,6 +26,8 @@
     onselect,
     onmenu,
     compact = false,
+    fetchFiles,
+    onfile,
   }: {
     fetchRows: (start: number, count: number) => Promise<Row[]>
     count: number
@@ -36,6 +39,8 @@
     onselect: (row: number, id: string) => void
     onmenu: (e: MouseEvent, id: string) => void
     compact?: boolean
+    fetchFiles?: (id: string) => Promise<FileChange[]>
+    onfile?: (id: string, file: FileChange, preview: boolean) => void
   } = $props()
 
   const ROW_H = $derived(compact ? 22 : 28)
@@ -73,8 +78,13 @@
   const pending = new Set<number>()
   let gen = 0
   let seenVersion = -1
+  type Expansion = { id: string; files: FileChange[] | null; error: string }
+  let expanded = $state.raw(new Map<number, Expansion>())
+  let selectedFile = $state<{ row: number; child: number } | null>(null)
+  const ranges = $derived(expansionRanges(Array.from(expanded, ([row, e]) => [row, Math.max(1, e.files?.length ?? 0)])))
+  const displayCount = $derived(count + (ranges.length ? ranges.at(-1)!.offset + ranges.at(-1)!.size : 0))
 
-  const total = $derived(count * ROW_H)
+  const total = $derived(displayCount * ROW_H)
   const virt = $derived(Math.min(total, MAX_H))
   const scale = $derived(virt > height ? (total - height) / (virt - height) : 1)
   const top = $derived(scrollTop * scale)
@@ -85,13 +95,16 @@
 
   const windowRows = $derived.by(() => {
     loaded
-    const out: (Row | undefined)[] = []
-    for (let r = first; r < Math.min(first + visible, count); r++) out.push(rowAt(r))
+    const out: { commit: number; child: number; row: Row | undefined }[] = []
+    for (let r = first; r < Math.min(first + visible, displayCount); r++) {
+      const position = graphPosition(r, ranges)
+      out.push({ commit: position.row, child: position.child, row: rowAt(position.row) })
+    }
     return out
   })
 
   const lanes = $derived(
-    Math.min(MAX_LANES, 1 + Math.max(0, ...windowRows.map((r) => (r ? Math.max(r.lane, ...r.through, ...r.out, ...r.incoming) : 0)))),
+    Math.min(MAX_LANES, 1 + Math.max(0, ...windowRows.map(({ row: r }) => (r ? Math.max(r.lane, ...r.through, ...r.out, ...r.incoming) : 0)))),
   )
   const graphW = $derived(PAD * 2 + lanes * LANE_W)
 
@@ -101,9 +114,12 @@
       gen++
       chunks.clear()
       pending.clear()
+      expanded = new Map()
+      selectedFile = null
     }
     const g = gen
-    for (let c = Math.floor(first / CHUNK); c * CHUNK < Math.min(first + visible, count); c++) {
+    const needed = new Set(windowRows.map(({ commit }) => Math.floor(commit / CHUNK)))
+    for (const c of needed) {
       if (chunks.has(c) || pending.has(c)) continue
       pending.add(c)
       fetchRows(c * CHUNK, CHUNK).then((rows) => {
@@ -138,9 +154,13 @@
       ctx.bezierCurveTo(x0, (y0 + y1) / 2, x1, (y0 + y1) / 2, x1, y1)
       ctx.stroke()
     }
-    windowRows.forEach((row, i) => {
+    windowRows.forEach(({ row, child }, i) => {
       if (!row) return
       const y = i * ROW_H
+      if (child >= 0) {
+        for (const l of [...row.through, ...row.out]) if (l < MAX_LANES) link(l, x(l), y, x(l), y + ROW_H)
+        return
+      }
       const cy = y + ROW_H / 2
       const cx = x(row.lane)
       for (const l of row.through) if (l < MAX_LANES) link(l, x(l), y, x(l), y + ROW_H)
@@ -160,21 +180,74 @@
   })
 
   export function scrollToRow(row: number, center = false) {
-    const y = row * ROW_H
+    scrollToIndex(graphIndex(row, ranges), center)
+  }
+
+  function scrollToIndex(index: number, center = false) {
+    const y = index * ROW_H
     if (center) viewport.scrollTop = (y - height / 2 + ROW_H / 2) / scale
     else if (y < top) viewport.scrollTop = y / scale
     else if (y + ROW_H > top + height) viewport.scrollTop = (y + ROW_H - height) / scale
   }
 
+  async function expand(index: number, id: string, retry = false) {
+    if (!fetchFiles) return
+    if (expanded.has(index) && !retry) {
+      const next = new Map(expanded)
+      next.delete(index)
+      expanded = next
+      return
+    }
+    const entry: Expansion = { id, files: null, error: '' }
+    expanded = new Map(expanded).set(index, entry)
+    try {
+      const files = await fetchFiles(id)
+      if (expanded.get(index) === entry) expanded = new Map(expanded).set(index, { ...entry, files })
+    } catch (e) {
+      if (expanded.get(index) === entry) expanded = new Map(expanded).set(index, { ...entry, error: String(e) })
+    }
+  }
+
+  function select(index: number, child = -1, open = true, preview = true) {
+    const row = rowAt(index)
+    if (!row) return
+    viewport.focus({ preventScroll: true })
+    onselect(index, row.id)
+    selectedFile = child < 0 ? null : { row: index, child }
+    if (!open) return
+    if (child < 0) void expand(index, row.id)
+    else {
+      const entry = expanded.get(index)
+      const file = entry?.files?.[child]
+      if (file) onfile?.(row.id, file, preview)
+      else if (entry?.error) void expand(index, row.id, true)
+    }
+  }
+
   function onkeydown(e: KeyboardEvent) {
+    if (e.target instanceof HTMLButtonElement) return
+    if (fetchFiles && selectedRow !== null) {
+      const entry = expanded.get(selectedRow)
+      if (['Enter', ' ', 'ArrowRight', 'ArrowLeft'].includes(e.key)) {
+        e.preventDefault()
+        if (e.key === 'ArrowLeft') {
+          if (selectedFile) select(selectedRow, -1, false)
+          else if (entry) void expand(selectedRow, entry.id)
+        } else if (e.key === 'ArrowRight' && entry) {
+          if (!selectedFile && entry.files?.length) select(selectedRow, 0, false)
+        } else select(selectedRow, selectedFile?.child ?? -1)
+        scrollToIndex(graphIndex(selectedRow, ranges) + (selectedFile ? selectedFile.child + 1 : 0))
+        return
+      }
+    }
     const step = { ArrowDown: 1, ArrowUp: -1, PageDown: visible - 2, PageUp: 2 - visible }[e.key]
     if (!step || (!compact && selectedRow === null)) return
     e.preventDefault()
-    const next = Math.max(0, Math.min(count - 1, (selectedRow ?? -1) + step))
-    const row = rowAt(next)
-    if (!row) return
-    onselect(next, row.id)
-    scrollToRow(next)
+    const current = selectedRow === null ? -1 : graphIndex(selectedRow, ranges) + (selectedFile ? selectedFile.child + 1 : 0)
+    const next = Math.max(0, Math.min(displayCount - 1, current + step))
+    const position = graphPosition(next, ranges)
+    select(position.row, position.child, !fetchFiles)
+    scrollToIndex(next)
   }
 
   const kind = (name: string) => (name.startsWith('refs/heads/') ? 'branch' : name.startsWith('refs/tags/') ? 'tag' : 'remote')
@@ -200,26 +273,49 @@
 </div>
 {/if}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="viewport" class:compact style:--row="{ROW_H}px" bind:this={viewport} bind:clientHeight={height} bind:clientWidth={width} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role="grid">
+<div class="viewport" class:compact style:--row="{ROW_H}px" bind:this={viewport} bind:clientHeight={height} bind:clientWidth={width} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role={fetchFiles ? 'treegrid' : 'grid'} aria-rowcount={displayCount} aria-activedescendant={selectedRow === null ? undefined : `graph-${selectedRow}-${selectedFile?.child ?? -1}`}>
   <div style:height="{virt}px">
     <div class="window" style:transform="translateY({scrollTop - (top % ROW_H)}px)">
       <canvas bind:this={canvas} style:width="{graphW}px" style:height="{windowRows.length * ROW_H}px"></canvas>
-      {#each windowRows as row, i (first + i)}
+      {#each windowRows as { row, commit, child }, i (first + i)}
+        {@const entry = expanded.get(commit)}
+        {@const file = child >= 0 ? entry?.files?.[child] : undefined}
+        {@const selected = commit === selectedRow && child === (selectedFile?.child ?? -1)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
           class="row"
-          class:selected={first + i === selectedRow}
+          class:selected
+          class:file-row={child >= 0}
           class:dim={focusAuthor !== null && (!row || authorKey(row) !== focusAuthor.key)}
           style:padding-left="{graphW}px"
           style:grid-template-columns={cols}
           role="row"
+          id="graph-{commit}-{child}"
+          aria-rowindex={first + i + 1}
+          aria-level={fetchFiles ? (child < 0 ? 1 : 2) : undefined}
+          aria-expanded={fetchFiles && child < 0 ? !!entry : undefined}
+          aria-selected={selected}
           tabindex="-1"
-          title={compact && row ? `${row.subject}\n${row.author} · ${fmtTime(row.time)} · ${row.id.slice(0, 7)}` : undefined}
-          onclick={() => row && onselect(first + i, row.id)}
-          oncontextmenu={(e) => row && (onselect(first + i, row.id), onmenu(e, row.id))}
+          title={file ? `${file.old_path ? `${file.old_path} → ` : ''}${file.path}\n${t.status[file.status] ?? file.status}` : compact && row ? `${row.subject}\n${row.author} · ${fmtTime(row.time)} · ${row.id.slice(0, 7)}` : undefined}
+          onclick={() => select(commit, child)}
+          ondblclick={() => child >= 0 && select(commit, child, true, false)}
+          oncontextmenu={(e) => row && (select(commit, child, false), onmenu(e, row.id))}
         >
-          {#if row}
+          {#if child >= 0}
+            <span class="file-content" role="gridcell">
+              {#if file}
+                <span class="file-status" class:added={file.status === 'A'} class:deleted={file.status === 'D'} aria-hidden="true">{file.status}</span>
+                <span class="file-name">{file.path.split('/').at(-1)}</span>
+                <span class="file-path">{file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''}</span>
+              {:else if entry?.error}
+                <span role="alert">{entry.error}</span><button onclick={(e) => { e.stopPropagation(); if (row) void expand(commit, row.id, true) }}>{t.vscode.graphRetryFiles}</button>
+              {:else}
+                <span class="muted" role="status">{entry?.files ? t.vscode.graphNoFiles : t.vscode.graphLoadingFiles}</span>
+              {/if}
+            </span>
+          {:else if row}
             <span class="subject">
+              {#if fetchFiles}<span class="twistie" aria-hidden="true">{entry ? '⌄' : '›'}</span>{/if}
               {#if badges.has(row.id)}
                 <span class="badges">
                   {#each badges.get(row.id) ?? [] as ref (ref.name)}
@@ -420,4 +516,13 @@
     border-radius: 3px;
     font-weight: 500;
   }
+  .twistie { flex: none; width: 10px; text-align: center; color: var(--muted); }
+  .file-content { display: flex; align-items: center; gap: 5px; min-width: 0; padding-left: 14px; }
+  .file-name { flex: 0 1 auto; }
+  .file-path { flex: 1; min-width: 0; color: var(--muted); font-size: var(--fs-sm); }
+  .file-status { flex: none; width: 12px; color: var(--yellow); font-size: var(--fs-sm); text-align: center; }
+  .file-status.added { color: var(--green); }
+  .file-status.deleted { color: var(--red); }
+  .file-content button { flex: none; color: var(--text); background: var(--hover); border: 1px solid var(--border-strong); font: inherit; cursor: pointer; }
+  .viewport:focus-visible .row.selected { outline: 1px solid var(--accent); outline-offset: -1px; }
 </style>
