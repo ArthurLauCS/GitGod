@@ -1,7 +1,7 @@
 // 由 tests/vscode-smoke.mjs 启动，在 VS Code 扩展主机里执行。
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
-const { writeFileSync } = require('node:fs')
+const { mkdirSync, writeFileSync } = require('node:fs')
 const { join } = require('node:path')
 const vscode = require('vscode')
 
@@ -99,6 +99,7 @@ exports.run = async () => {
     await vscode.commands.executeCommand('pushright.commitAmend')
     assert.equal(git('status', '--porcelain'), '')
     assert.equal(git('log', '--format=%s', '-1'), 'local commit')
+    await until('amended HEAD refresh', () => api.repos[0].refs.head_id === git('rev-parse', 'HEAD'))
     step('stages, unstages and amends through the source control commands')
 
     await vscode.commands.executeCommand('pushright.previousRevision')
@@ -139,6 +140,21 @@ exports.run = async () => {
     await vscode.window.tabGroups.close(graphTab)
     await until('graph session closed', () => api.engine.call('refs', { tab: 1 }).then(() => false, (e) => String(e).includes('PR_TAB_CLOSED')))
     step('closing the commit graph releases its engine session')
+
+    mkdirSync(join(root, '新增 目录', 'nested'), { recursive: true })
+    const newPaths = ['新增 目录/a.txt', '新增 目录/nested/b.txt']
+    for (const path of newPaths) writeFileSync(join(root, path), `${path}\n`)
+    await vscode.commands.executeCommand('pushright.refresh')
+    const repo = api.repos[0]
+    await until('new files status refresh', () => repo.status.length === newPaths.length)
+    assert.deepEqual(repo.status.map((e) => e.path), newPaths)
+    for (const entry of repo.status) {
+      const diff = await api.engine.call('diff_worktree', { tab: repo.tab, path: entry.path, staged: false, untracked: true })
+      assert.equal(diff.hunks[0].lines[0].text, entry.path)
+      await vscode.commands.executeCommand('pushright.openChange', { repo, entry, staged: false, resourceUri: vscode.Uri.file(join(root, entry.path)) })
+      await until('untracked file opens', () => vscode.window.activeTextEditor?.document.getText() === `${entry.path}\n`)
+    }
+    step('new folders list and preview every untracked file without directory access errors')
   } catch (e) {
     error = e.stack ?? String(e)
   }
