@@ -93,7 +93,8 @@ async function discover(extra: string[]) {
 export async function discoverForFile(uri: vscode.Uri) {
   if (uri.scheme !== 'file') return
   const known = repoOf(uri)
-  for (let dir = dirname(uri.fsPath); dir !== dirname(dir) && fold(dir) !== fold(known?.root ?? ''); dir = dirname(dir)) {
+  const start = await stat(uri.fsPath).then((s) => s.isDirectory() ? uri.fsPath : dirname(uri.fsPath), () => dirname(uri.fsPath))
+  for (let dir = start; dir !== dirname(dir) && fold(dir) !== fold(known?.root ?? ''); dir = dirname(dir)) {
     if (await stat(join(dir, '.git')).then(() => true, () => false)) { await discoverRepositories([dir]); break }
   }
 }
