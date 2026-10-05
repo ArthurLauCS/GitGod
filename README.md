@@ -96,9 +96,27 @@ Measurements on a local Linux repository with 1.48 million commits and a 128 MiB
 
 App text, tooltips, explanations and app-generated errors are translated. Repository content, commit messages, branch names and raw Git/OS output stay verbatim. Native OS dialogs use the system language.
 
+## VS Code extension (preview)
+
+The same engine and interface run inside VS Code. The extension is not on the Marketplace yet; build it from source (Windows x64 only):
+
+```sh
+npm ci
+npm run ext:package
+code --install-extension extension/pushright-win32-x64-0.2.0.vsix
+```
+
+- **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.
+- **Push and pull checks**: Pull asks every time with **Rebase instead of merge** checked. Push recommends the same-name remote branch when the upstream has a different name, and the status bar warns about the mismatch. Force push uses `--force-with-lease` and asks twice.
+- **Authors in the editor**: author, date and subject at the end of the current line, with a hover card; whole-file blame (`Alt+B`) colored by author or by age; CodeLens above files, classes and functions; a status bar item. Author styles set in the commit graph also apply here, and "Highlight Only This Line's Author" marks that author's lines in the file and scrollbar.
+- **History**: file history that follows the active editor, line history for a selection, previous / next revision (`Alt+,` / `Alt+.`), compare with any branch, tag or commit, and commit search by message, author, file, changed text or ID.
+- **Commit graph**: "PushRight: Open Commit Graph" opens the desktop interface in an editor tab.
+
+Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration, an interactive rebase editor, and automatic fetch. Repositories are detected from workspace folders; nested repositories are not.
+
 ## Current limits
 
-- Desktop preview. VS Code extension, line-level blame, PR / Issue and hosting-provider collaboration are not delivered yet.
+- Desktop preview. The VS Code extension is an unpublished preview built from source (see below). PR / Issue and hosting-provider collaboration are not delivered yet.
 - Visible rows are virtualized, but complete history is still read in the background.
 - Patches over 4 MiB are not displayed in full. The limit bounds retained app data; Git may still consume time and memory before producing output.
 - The graph has at most 24 lanes, reduced by available width. Highly parallel histories can omit connections.
@@ -121,6 +139,8 @@ npm run check
 npm test
 cargo test -p engine
 npm run desktop:build
+npm run ext:build   # VS Code extension: engine sidecar, panel and host
+npm run ext:smoke   # runs the extension inside a throwaway VS Code profile
 ```
 
 The installer is written to `target/release/bundle/nsis/`. The first build may download dependencies and NSIS tools. See [Tauri Windows installers](https://v2.tauri.app/distribute/windows-installer/).
@@ -130,6 +150,8 @@ The installer is written to `target/release/bundle/nsis/`. The first build may d
 | `src/` | Svelte UI, graph and operation workflows |
 | `src/lib/locales/` | English and Simplified Chinese packs |
 | `crates/engine/` | Rust Git engine: gix reads and Git CLI operations |
+| `crates/sidecar/` | The engine as a child process for the VS Code extension |
+| `extension/` | VS Code extension: source control, blame, history and the commit graph panel |
 | `src-tauri/` | Desktop window, command bridge and installer |
 | `tests/` | Frontend regression checks |
 

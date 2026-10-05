@@ -10,6 +10,7 @@
   import { graphKey } from './graph-key'
   import Help from './Help.svelte'
   import Icon from './Icon.svelte'
+  import { splitUpstream } from './push-target'
   import Splitter from './Splitter.svelte'
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
@@ -115,6 +116,13 @@
     graph?.scrollToRow(row, true)
     select(row, id)
   }
+
+  // VS Code 扩展从编辑器跳到某个提交
+  $effect(() => {
+    const reveal = (e: Event) => active && jump((e as CustomEvent<string>).detail)
+    addEventListener('pushright:reveal', reveal)
+    return () => removeEventListener('pushright:reveal', reveal)
+  })
 
   // 回到窗口、切回本页签或执行完操作后：引用指向有变化才重新加载提交图
   async function refresh() {
@@ -269,9 +277,7 @@
     const remotes = (await guard(api.remotes(tab))) ?? []
     if (!remotes.length) return void (error = t.noRemote)
     const upstream = refs.refs.find((r) => r.name === `refs/heads/${branch}`)?.upstream
-    // 远程名可以带斜杠，用已知的远程列表来拆 refs/remotes/<远程>/<分支>
-    const remote = remotes.find((r) => upstream?.startsWith(`refs/remotes/${r}/`))
-    const upBranch = remote && upstream!.slice(`refs/remotes/${remote}/`.length)
+    const { remote, branch: upBranch } = splitUpstream(upstream, remotes) ?? { remote: undefined, branch: undefined }
     const force = { key: 'force', label: t.forcePush, type: 'checkbox' as const }
 
     if (remote && upBranch === branch) {

@@ -15,6 +15,11 @@ try {
 
 export const prefs = $state({ authorStyles })
 
+// 另一个窗口（或 VS Code 扩展主机）改了作者样式时跟着更新
+globalThis.addEventListener?.('storage', (e) => {
+  if (e.key === 'prefs' && e.newValue) prefs.authorStyles = JSON.parse(e.newValue).authorStyles ?? {}
+})
+
 export function setAuthorStyle(key: string, style: AuthorStyle) {
   if (style.border || style.fill) prefs.authorStyles[key] = style
   else delete prefs.authorStyles[key]

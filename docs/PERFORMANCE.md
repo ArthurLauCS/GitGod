@@ -69,6 +69,31 @@ git -C C:\bench\repo add large.txt
 ./scripts/measure-diff.ps1 -Before C:\bench\before.exe -After C:\bench\after.exe -Repo C:\bench\repo -File large.txt -Mode staged
 ```
 
+## VS Code 扩展（2026-10-05）
+
+同一台机器、同一个 Linux 仓库。以下是单次计时，没有重复取中位数，只用来定方案。
+
+### 作者标注（blame）
+
+| 文件 | 整文件 `--porcelain` | 整文件 `--incremental` | 流式输出的前 200 行 |
+| --- | ---: | ---: | ---: |
+| `kernel/sched/core.c`（11,351 行） | 3974 ms | 3184 ms | 140 ms |
+| `MAINTAINERS`（30,205 行） | 54831 ms | 39713 ms | 未测 |
+
+只查一行（`-L n,n`）在 `core.c` 上是 187–1801 ms，在 `MAINTAINERS` 上是 5557 ms，取决于那一行有多老，所以不能靠缩小范围来保证响应。
+
+采用的方案：扩展主机直接读 `git blame --incremental` 的输出，每 50 毫秒最多刷新一次界面；文件一改或关闭就终止进程；结果按文档版本缓存，HEAD 变化时作废。这部分不经过引擎子进程，因为它需要流式输出和中途取消。gix 的 blame 不支持未保存的内容和流式输出，没有纳入对比。
+
+### 引擎子进程往返
+
+| 项目 | 每次耗时 |
+| --- | ---: |
+| 空往返（未知命令） | 0.088 ms |
+| 取 60 行提交 | 1.475 ms |
+| 工作区状态 | 118.7 ms |
+
+各取 200 次的平均（状态取 10 次）。每个请求一个线程，往返本身不是瓶颈。状态刷新由文件监听触发，300 毫秒内的连续变化合并成一次；子进程设置 `GIT_OPTIONAL_LOCKS=0`，只读命令不改写索引，避免刷新自己触发下一次刷新。
+
 ## 保留的边界
 
 - 完整历史仍在后台一次性构建，引用起点确实改变时仍需重建。
