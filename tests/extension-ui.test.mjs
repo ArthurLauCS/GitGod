@@ -22,6 +22,34 @@ class Event {
 const deferred = () => { let resolve; const promise = new Promise((r) => resolve = r); return { promise, resolve } }
 const uri = (fsPath) => ({ fsPath, scheme: 'file', with: (other) => ({ ...uri(fsPath), ...other }) })
 
+test('SCM graph routes only bounded reads to workspace repositories and disposes listeners', async () => {
+  let provider
+  const messages = new Event(), changed = new Event(), prefs = new Event(), visibility = new Event(), closed = new Event()
+  const posted = [], calls = [], revealed = []
+  const repos = [0, 1].map((tab) => ({ tab, root: `/repo${tab}`, name: `repo${tab}`, refs: { refs: [] } }))
+  const view = { visible: true, webview: { postMessage: (m) => posted.push(m), onDidReceiveMessage: messages.event }, onDidChangeVisibility: visibility.event, onDidDispose: closed.event }
+  const core = { repos, onRepoChange: changed, onPrefsChange: prefs, engine: { call: async (...args) => { calls.push(args); return [] } } }
+  const vscode = { window: { registerWebviewViewProvider: (id, p) => { assert.equal(id, 'pushright.graph'); provider = p } } }
+  load('graph-view', { vscode, './core': core, './panel': { openPanel: (_, r) => revealed.push(r) }, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [] })
+  provider.resolveWebviewView(view)
+  const send = async (cmd, args = {}) => { await Promise.all(messages.fire({ id: 1, cmd, args })); return posted.at(-1) }
+  assert.deepEqual((await send('graph_repos')).value, repos)
+  await send('rows', { tab: 1, start: 0, count: 128 })
+  assert.deepEqual(calls, [['rows', { tab: 1, start: 0, count: 128 }]])
+  await send('reveal_commit', { tab: 1, id: 'abc' })
+  assert.deepEqual(revealed, [{ id: 'abc', root: '/repo1' }])
+  assert.equal((await send('rows', { tab: 9, start: 0, count: 128 })).ok, false)
+  assert.equal((await send('rows', { tab: 1, start: 0, count: 100000 })).ok, false)
+  assert.equal((await send('op', { tab: 1, op: { op: 'reset', mode: 'hard' } })).ok, false)
+  assert.equal(calls.length, 1)
+  changed.fire(repos[0]); assert.deepEqual(posted.at(-1), { refresh: true })
+  view.visible = false
+  const n = posted.length
+  changed.fire(repos[0]); assert.equal(posted.length, n)
+  closed.fire()
+  assert.equal(changed.listeners.length + prefs.listeners.length + messages.listeners.length + visibility.listeners.length, 0)
+})
+
 test('graph keeps its document on theme changes and releases both loaded and late sessions', async () => {
   const messages = new Event(), closed = new Event(), theme = new Event()
   const posted = [], calls = []
@@ -33,9 +61,14 @@ test('graph keeps its document on theme changes and releases both loaded and lat
     window: { createWebviewPanel: () => panel, activeColorTheme: { kind: 2 }, onDidChangeActiveColorTheme: theme.event },
   }
   const core = { engine: { call: async (cmd, args) => { calls.push([cmd, args]); return cmd === 'open_repo' ? args.path === 'late' ? late.promise : [7, 'repo', 2] : null } }, panel: {}, stored: () => ({}), repos: [], locale: 'en' }
-  load('panel', { vscode, './core': core }).openPanel({ extensionUri: uri('/extension') })
+  const webviews = load('webview', { vscode, './core': core })
+  load('panel', { vscode, './core': core, './webview': webviews }).openPanel({ extensionUri: uri('/extension') }, { id: 'older', root: 'repo' })
   const html = webview.html
   await Promise.all(messages.fire({ id: 1, cmd: 'open_repo', args: { path: 'repo' } }))
+  await Promise.all(messages.fire({ id: 3, cmd: 'refs', args: { tab: 7 } }))
+  assert.equal(posted.some((m) => m.reveal), false)
+  await Promise.all(messages.fire({ id: 4, cmd: 'load_graph', args: { tab: 7, full: true } }))
+  assert.deepEqual(posted.at(-1), { reveal: { id: 'older', root: 'repo' } })
   theme.fire({ kind: 1 })
   assert.equal(webview.html, html)
   assert.deepEqual(posted.at(-1), { store: 'theme', value: 'light' })

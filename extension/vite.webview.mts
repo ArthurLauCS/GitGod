@@ -14,6 +14,9 @@ export default defineConfig({
     emptyOutDir: true,
     cssCodeSplit: false,
     // 文件名不带哈希，扩展主机按固定名字引用
-    rollupOptions: { output: { entryFileNames: 'index.js', chunkFileNames: '[name].js', assetFileNames: '[name][extname]' } },
+    rollupOptions: {
+      input: { index: 'index.html', sidebar: 'extension/webview/sidebar.ts' },
+      output: { entryFileNames: '[name].js', chunkFileNames: '[name].js', assetFileNames: '[name][extname]' },
+    },
   },
 })

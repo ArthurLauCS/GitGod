@@ -43,6 +43,7 @@
   "command.item.openFile": "打开这个版本的文件",
   "description": "面向多分支日常工作的 Git：推送到同名分支、拉取默认变基、每一行都能看到作者。",
   "view.fileHistory": "文件历史",
+  "view.graph": "PushRight 提交图",
   "view.lineHistory": "行历史",
   "view.search": "搜索结果",
   "welcome.search": "按提交说明、作者、文件、改动内容或提交号查找提交。\n[搜索提交](command:pushright.searchCommits)\n[打开提交图](command:pushright.openGraph)",

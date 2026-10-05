@@ -4,6 +4,7 @@ import * as vscode from 'vscode'
 import { registerBlame } from './blame'
 import { activeRepo, engine, log, onPrefsChange, onRepoChange, openRepos, repos, v } from './core'
 import { registerHistory } from './history'
+import { registerGraphView } from './graph-view'
 import { openPanel } from './panel'
 import { offerTakeover, registerScm, repoArg } from './scm'
 import { checkout, fetch, inProgress, pull, push } from './sync'
@@ -34,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext) {
     command('showLog', () => log.show()),
   )
   registerScm(context)
+  registerGraphView(context)
   registerBlame(context)
   registerHistory(context)
   if (repos.length) offerTakeover(context)

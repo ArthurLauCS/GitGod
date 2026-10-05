@@ -23,7 +23,8 @@ Pull asks every time, with **Rebase instead of merge** checked. Keep it checked 
 - Review staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend.
 - Inspect current-line blame, author hover cards, CodeLens and whole-file blame (`Alt+B`). Apply backgrounds and borders to individual authors.
 - Browse file and selected-line history; compare revisions (`Alt+,` / `Alt+.`); search by message, author, file, changed text or commit ID.
-- Run **PushRight: Open Commit Graph** to browse branches, commits and file differences in an editor tab.
+- **PushRight Graph** appears below changes in the **Source Control** sidebar, including when built-in Git is disabled. It shows all branches with commit lanes and branch/tag labels. Choose a repository from its dropdown; click a commit to open its details in the full graph.
+- Run **PushRight: Open Commit Graph**, or use the sidebar graph's title button, to browse branches, commits and file differences in an editor tab. If the sidebar graph was hidden, enable **PushRight Graph** in Source Control's **Views** menu.
 - Change the commit name and email for the current repository.
 
 On first use, PushRight offers to turn off built-in Git, so push and pull go through its checks. This is optional. Extensions that depend on built-in Git may stop working when it is disabled. If you keep GitLens enabled, turn off duplicate blame annotations in one extension.
@@ -38,10 +39,10 @@ On first use, PushRight offers to turn off built-in Git, so push and pull go thr
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.0), then use **Extensions: Install from VSIX** in VS Code, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.1), then use **Extensions: Install from VSIX** in VS Code, or:
 
 ```sh
-code --install-extension pushright-win32-x64-0.2.0.vsix
+code --install-extension pushright-win32-x64-0.2.1.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.

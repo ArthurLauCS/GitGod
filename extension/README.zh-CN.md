@@ -23,7 +23,8 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 - 查看暂存、未暂存和冲突文件；按文件或选中行暂存、取消暂存、丢弃；提交和 Amend。
 - 当前行 Blame、作者悬浮信息、CodeLens、整文件 Blame（`Alt+B`）；给单个作者设置底色和边框。
 - 文件历史、选中行历史、前后版本对比（`Alt+,` / `Alt+.`），按消息、作者、文件、改动内容或提交 ID 搜索。
-- 运行 **PushRight: 打开提交图**，在编辑器页签中浏览分支、提交和差异。
+- **源代码管理**侧栏的改动列表下方显示 **PushRight 提交图**，关闭原生 Git 后仍可使用。显示全部分支的提交连线及分支／标签标记；下拉框可切换仓库，点击提交可打开完整提交图中的对应详情。
+- 运行 **PushRight: 打开提交图** 或点击侧栏提交图标题栏按钮，在编辑器页签中浏览分支、提交和差异。如果曾隐藏侧栏图，可在源代码管理的“视图”菜单中重新勾选 **PushRight 提交图**。
 - 快速修改当前仓库的提交名和邮箱。
 
 首次启用会说明关闭 VS Code 内置 Git 的影响，由你决定是否让推送和拉取统一经过 PushRight。依赖内置 Git 的扩展可能因此停止工作。与 GitLens 同时启用时，可关闭其中一个的 Blame 注释以免重复。
@@ -38,10 +39,10 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.0) 下载 Windows x64 VSIX，然后执行 VS Code 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.1) 下载 Windows x64 VSIX，然后执行 VS Code 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-0.2.0.vsix
+code --install-extension pushright-win32-x64-0.2.1.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。
