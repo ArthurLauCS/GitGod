@@ -93,7 +93,7 @@ PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败
 
 ## VS Code 扩展（预览）
 
-同一套引擎和界面可以在 VS Code 里运行。扩展尚未上架，需要从源码构建（目前只支持 Windows x64）：
+同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 预览版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.0) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
 
 ```sh
 npm ci
@@ -111,7 +111,7 @@ code --install-extension extension/pushright-win32-x64-0.2.0.vsix
 
 ## 当前边界
 
-- 这是桌面预览版。VS Code 扩展是尚未上架的预览，需要从源码构建（见下）。PR / Issue 和托管平台协作集成尚未交付。
+- 桌面版和 VS Code 扩展均为预览版。PR / Issue 和托管平台协作集成尚未交付。
 - 提交列表只渲染可见行，但完整历史仍会在后台读取；超大仓库的时间和内存开销需要进一步实测优化。
 - 超过 4 MiB 的补丁不显示完整差异。读取限制约束的是应用保留的数据，Git 子进程在输出补丁前仍可能消耗较多时间和内存。
 - 提交图最多显示 24 条轨道，实际数量随面板宽度变化；高度并行的复杂历史可能无法显示所有连线。

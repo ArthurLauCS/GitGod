@@ -146,7 +146,7 @@ export const fileUri = (repo: Repo, path: string) => vscode.Uri.file(join(repo.r
 
 export const REV = 'pushright-rev'
 /** 文件在某个版本的内容；`rev` 为空表示暂存区 */
-export const revUri = (repo: Repo, path: string, rev: string) => fileUri(repo, path).with({ scheme: REV, query: JSON.stringify({ rev }) })
+export const revUri = (repo: Repo, path: string, rev: string, empty?: boolean) => fileUri(repo, path).with({ scheme: REV, query: JSON.stringify({ rev, empty }) })
 export const revOf = (uri: vscode.Uri): string | undefined => (uri.scheme === REV ? JSON.parse(uri.query).rev : undefined)
 
 /** 当前分支的短名；游离 HEAD 时为 null */

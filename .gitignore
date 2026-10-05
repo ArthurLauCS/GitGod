@@ -7,3 +7,5 @@ extension/out/
 extension/media/
 extension/bin/
 *.vsix
+extension/icon.png
+extension/THIRD_PARTY_NOTICES.txt

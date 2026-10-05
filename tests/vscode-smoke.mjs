@@ -1,5 +1,5 @@
 // 在真实的 VS Code 里跑一遍扩展：npm run ext:smoke（先 npm run ext:build）。
-// 用临时的用户目录和扩展目录，不碰本机 VS Code 的设置。可选参数：截图保存路径。
+// 用临时的用户目录和扩展目录，不碰本机 VS Code 的设置。可指定 PUSHRIGHT_SMOKE_EXTENSION 测试解包后的 VSIX。
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -49,14 +49,15 @@ const code = process.platform === 'win32' ? join(dirname(dirname(where)), 'Code.
 if (!existsSync(code)) throw new Error('VS Code not found on PATH')
 
 const result = join(base, 'result.json')
+const extension = process.env.PUSHRIGHT_SMOKE_EXTENSION ?? join(import.meta.dirname, '../extension')
 const run = spawnSync(code, [
   work,
-  `--extensionDevelopmentPath=${join(import.meta.dirname, '../extension')}`,
+  `--extensionDevelopmentPath=${extension}`,
   `--extensionTestsPath=${join(import.meta.dirname, 'vscode-smoke-host.cjs')}`,
   `--user-data-dir=${user}`,
   `--extensions-dir=${join(base, 'extensions')}`,
   '--disable-extensions', '--disable-updates', '--skip-welcome', '--skip-release-notes', '--new-window',
-], { env: { ...process.env, PUSHRIGHT_SMOKE_RESULT: result, PUSHRIGHT_SMOKE_SHOT: process.argv[2] ?? '' }, stdio: 'inherit' })
+], { env: { ...process.env, PUSHRIGHT_SMOKE_RESULT: result, PUSHRIGHT_SMOKE_ID: JSON.parse(readFileSync(join(extension, 'package.json'), 'utf8')).publisher + '.pushright' }, stdio: 'inherit' })
 
 const report = existsSync(result) ? JSON.parse(readFileSync(result, 'utf8')) : { error: `VS Code exited with ${run.status} before reporting` }
 for (const step of report.passed ?? []) console.log(`ok  ${step}`)

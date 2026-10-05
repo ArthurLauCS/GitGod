@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import type { Diff, Entry, Identity } from '../../src/lib/api'
 import {
-  activeRepo, attempt, engine, fileUri, help, onRepoChange, refresh, rel, repoOf, repos, REV, revOf, revUri, run, t, v, write, type Repo,
+  activeRepo, attempt, engine, errorText, fileUri, help, onRepoChange, refresh, rel, repoOf, repos, REV, revOf, revUri, run, t, v, write, type Repo,
 } from './core'
 import { statusCommands } from './sync'
 
@@ -48,7 +48,7 @@ async function openChange({ repo, entry, staged, resourceUri }: Resource) {
   // 冲突文件直接打开，VS Code 自带的冲突标记工具可以逐块选择
   if (entry.conflicted || entry.unstaged === '?') return void vscode.window.showTextDocument(resourceUri)
   const left = staged ? revUri(repo, entry.old_path ?? entry.path, 'HEAD') : revUri(repo, entry.path, '')
-  const right = staged ? revUri(repo, entry.path, '') : resourceUri
+  const right = !staged && entry.unstaged === 'D' ? revUri(repo, entry.path, '', true) : staged ? revUri(repo, entry.path, '') : resourceUri
   vscode.commands.executeCommand('vscode.diff', left, right, `${basename(entry.path)} (${staged ? t.staged : t.unstaged})`)
 }
 
@@ -76,7 +76,7 @@ async function editIdentity(repo: Repo) {
 }
 
 async function discard(repo: Repo, paths: string[]) {
-  const detail = `${help.discard.what}\n\n${help.discard.undo}`
+  const detail = `${repo.root}\n\n${help.discard.what}\n\n${help.discard.undo}`
   if (await vscode.window.showWarningMessage(t.discardTitle(paths.length), { modal: true, detail }, t.discardConfirm)) await run(repo, { op: 'discard', paths })
 }
 
@@ -88,10 +88,11 @@ async function applySelection(mode: 'stage' | 'unstage' | 'discard') {
   const staged = mode === 'unstage'
   if (staged ? revOf(editor.document.uri) !== '' : editor.document.uri.scheme !== 'file') return void vscode.window.showWarningMessage(v.selectionSide)
   if (mode === 'discard' && !(await vscode.window.showWarningMessage(t.discardLinesTitle, { modal: true, detail: help.discard.undo }, t.discardConfirm))) return
+  // 保存可能失败，也可能经格式化改变选区；以保存成功后的行号为准。
+  if (editor.document.isDirty && !(await editor.document.save())) return
   // 选区在行首结束时，最后那一行其实没被选中
   const ranges = editor.selections.map((s) => [s.start.line + 1, s.end.line + (s.end.character === 0 && s.end.line > s.start.line ? 0 : 1)])
   const selected = (line: number) => ranges.some(([from, to]) => line >= from && line <= to)
-  if (editor.document.isDirty) await editor.document.save()
 
   const path = rel(repo, editor.document.uri)
   const diff = await attempt(engine.call<Diff>('diff_worktree', { tab: repo.tab, path, staged, untracked: false }))
@@ -149,7 +150,7 @@ export function registerScm(context: vscode.ExtensionContext) {
       // 暂存区里没有这个文件（未跟踪、被忽略）时不显示行号旁的改动标记
       provideOriginalResource: (uri) =>
         uri.scheme === 'file' && repoOf(uri) === repo
-          ? engine.call('show', { tab: repo.tab, rev: '', path: rel(repo, uri) }).then(() => revUri(repo, rel(repo, uri), ''), () => undefined)
+          ? engine.call('show', { tab: repo.tab, rev: '', path: rel(repo, uri) }).then((content) => content === null ? undefined : revUri(repo, rel(repo, uri), ''), () => undefined)
           : undefined,
     }
     const group = (id: string, label: string, hide: boolean) => {
@@ -191,6 +192,9 @@ export function registerScm(context: vscode.ExtensionContext) {
   const watcher = vscode.workspace.createFileSystemWatcher('**')
   const command = (id: string, fn: (...args: any[]) => unknown) => vscode.commands.registerCommand(`pushright.${id}`, fn)
   const paths = (states: Resource[]) => states.map((s) => s.entry.path)
+  const eachRepo = async (states: Resource[], action: (repo: Repo, paths: string[]) => unknown) => {
+    for (const repo of new Set(states.map((s) => s.repo))) await action(repo, paths(states.filter((s) => s.repo === repo)))
+  }
   /** 命令作用的仓库：分组右键菜单传来的是分组对象，其余见 repoArg；都不是就取当前文件所在的仓库 */
   const target = (arg: unknown) =>
     repos.find((r) => Object.values(groups.get(r)!).includes(arg as vscode.SourceControlResourceGroup)) ?? repoArg(arg) ?? activeRepo()
@@ -205,7 +209,9 @@ export function registerScm(context: vscode.ExtensionContext) {
       provideTextDocumentContent: (uri) => {
         const repo = repoOf(uri)
         // 这个版本里没有该文件时显示为空，对比视图里就是整份新增或删除
-        return repo ? engine.call<string>('show', { tab: repo.tab, rev: revOf(uri), path: rel(repo, uri) }).catch(() => '') : ''
+        if (!repo || JSON.parse(uri.query).empty) return ''
+        return engine.call<string | null>('show', { tab: repo.tab, rev: revOf(uri), path: rel(repo, uri) })
+          .then((content) => content ?? '', (error) => { throw new Error(errorText(error)) })
       },
     }),
     vscode.window.registerFileDecorationProvider({
@@ -222,9 +228,9 @@ export function registerScm(context: vscode.ExtensionContext) {
     }),
     command('openChange', openChange),
     command('openFile', (state: Resource) => vscode.window.showTextDocument(state.resourceUri)),
-    command('stage', (...states: Resource[]) => write(states[0].repo, 'stage', { paths: paths(states) })),
-    command('unstage', (...states: Resource[]) => write(states[0].repo, 'unstage', { paths: paths(states) })),
-    command('discard', (...states: Resource[]) => discard(states[0].repo, paths(states))),
+    command('stage', (...states: Resource[]) => eachRepo(states, (repo, paths) => write(repo, 'stage', { paths }))),
+    command('unstage', (...states: Resource[]) => eachRepo(states, (repo, paths) => write(repo, 'unstage', { paths }))),
+    command('discard', (...states: Resource[]) => eachRepo(states, discard)),
     command('takeOurs', (state: Resource) => write(state.repo, 'conflict_take', { path: state.entry.path, theirs: false })),
     command('takeTheirs', (state: Resource) => write(state.repo, 'conflict_take', { path: state.entry.path, theirs: true })),
     command('stageAll', (arg) => {

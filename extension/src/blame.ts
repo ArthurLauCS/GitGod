@@ -29,12 +29,12 @@ function lineText(c: BlameCommit): string {
 function hover(root: string, c: BlameCommit): vscode.MarkdownString | undefined {
   if (isUncommitted(c)) return
   const md = new vscode.MarkdownString(undefined, true)
-  md.isTrusted = true
+  md.isTrusted = { enabledCommands: ['pushright.openCommitFile', 'pushright.revealCommit', 'pushright.copyId', 'pushright.authorStyle'] }
   md.appendMarkdown(`$(person) **${c.author.replace(/[\\`*_{}[\]<>]/g, '\\$&')}** · ${ago(c.time)} · ${date(c.time)}\n\n`)
   md.appendText(c.subject)
   md.appendMarkdown(
     `\n\n\`${c.id.slice(0, 8)}\` · [${v.openChanges}](${link('openCommitFile', root, c.id, c.path, c.previous)})` +
-      ` · [${v.showInGraph}](${link('revealCommit', c.id)}) · [${t.copyId}](${link('copyId', c.id)})` +
+      ` · [${v.showInGraph}](${link('revealCommit', c.id, root)}) · [${t.copyId}](${link('copyId', c.id)})` +
       ` · [${t.authorStyle(c.author.replace(/[[\]]/g, ''))}](${link('authorStyle', authorKey(c), c.author)})`,
   )
   return md
@@ -103,7 +103,7 @@ export function registerBlame(context: vscode.ExtensionContext) {
       if (commit && cfg<boolean>('blame.statusBar.enabled')) {
         status.text = `$(person) ${isUncommitted(commit) ? v.uncommitted : `${commit.author}, ${ago(commit.time)}`}`
         status.tooltip = commit.subject
-        status.command = isUncommitted(commit) ? undefined : { command: 'pushright.revealCommit', title: '', arguments: [commit.id] }
+        status.command = isUncommitted(commit) ? undefined : { command: 'pushright.revealCommit', title: '', arguments: [commit.id, root] }
         status.show()
       } else status.hide()
     }
@@ -131,9 +131,14 @@ export function registerBlame(context: vscode.ExtensionContext) {
     const gutter: vscode.DecorationOptions[] = []
     if (blame && fileBlame.has(key)) {
       const byAge = cfg<string>('blame.file.colors') === 'age'
-      const times = blame.lines.flatMap((c) => (c && !isUncommitted(c) ? [c.time] : []))
-      const oldest = Math.min(...times)
-      const span = Math.max(...times) - oldest || 1
+      let oldest = Infinity, newest = -Infinity
+      if (byAge) for (const c of blame.lines) {
+        if (!c || isUncommitted(c)) continue
+        oldest = Math.min(oldest, c.time)
+        newest = Math.max(newest, c.time)
+      }
+      if (oldest === Infinity) oldest = newest = 0
+      const span = newest - oldest || 1
       for (let i = 0; i < doc.lineCount; i++) {
         const c = blame.lines[i]
         if (!c) continue

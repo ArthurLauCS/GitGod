@@ -65,6 +65,16 @@ test('blame can be cancelled and reports nothing for untracked files', async () 
   assert.equal(calls, 0)
 })
 
+test('blame preserves Unicode paths for opening historical files', async () => {
+  const dir = fixture()
+  const git = (...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args])
+  git('mv', 'b.txt', '新文件.txt')
+  writeFileSync(join(dir, '新文件.txt'), 'ONE\ntwo\nTHREE\n')
+  git('commit', '-q', '-am', 'Unicode path')
+  const result = await blame(dir, '新文件.txt')
+  assert.equal(result.lines[0].path, '新文件.txt')
+})
+
 const exe = join(import.meta.dirname, '../target/release/pushright-engine.exe')
 
 test('sidecar answers the same commands as the desktop backend, plus history', { skip: !existsSync(exe) && 'run `cargo build --release -p sidecar` first' }, async () => {

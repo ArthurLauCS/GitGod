@@ -1,6 +1,6 @@
 PushRight - Third-party notices
 
-These notices cover desktop dependencies (including build dependencies) and bundled fonts. They do not license GitGod itself. Identical license texts are included once and referenced below.
+These notices cover desktop and extension dependencies (including build dependencies) and bundled fonts. They do not license PushRight itself. Identical license texts are included once and referenced below.
 
 adler2 2.0.1
 https://github.com/oyvindln/adler2

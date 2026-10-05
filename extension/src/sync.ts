@@ -18,7 +18,7 @@ export async function pull(repo = activeRepo()) {
   const picked = await vscode.window.showQuickPick([{ label: t.pullRebase, detail: help.pull.what, picked: true }], {
     canPickMany: true,
     ignoreFocusOut: true,
-    title: `${t.pull} · ${short(upstream)}`,
+    title: `${repo.name} · ${t.pull} · ${short(upstream)}`,
     placeHolder: t.pullFrom(short(upstream)),
   })
   if (!picked) return
@@ -31,7 +31,7 @@ export async function push(repo = activeRepo()) {
   if (!branch) return void vscode.window.showWarningMessage(t.noBranch)
   if (!repo.remotes.length) return void vscode.window.showWarningMessage(t.noRemote)
   const up = splitUpstream(upstreamOf(repo), repo.remotes)
-  const title = t.pushTitle(branch)
+  const title = `${repo.name} · ${t.pushTitle(branch)}`
 
   let target: { remote: string; remote_branch: string; set_upstream: boolean }
   if (up?.branch === branch) {

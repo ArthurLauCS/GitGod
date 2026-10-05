@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import * as vscode from 'vscode'
-import { activeRepo, ago, attempt, date, engine, fileUri, onRepoChange, rel, repoOf, revOf, revUri, short, v, type Repo } from './core'
+import { activeRepo, ago, attempt, date, engine, fileUri, onRepoChange, rel, repoOf, revOf, revUri, short, t, v, type Repo } from './core'
 
 /** 与 crates/engine/src/history.rs 的 Commit 对应 */
 interface Commit {
@@ -54,11 +54,17 @@ export function registerHistory(context: vscode.ExtensionContext) {
   const lines = new CommitList('pushright.lineHistory', 'pushright.item.openChanges')
   const found = new CommitList('pushright.search', 'pushright.item.reveal')
   lines.view.message = v.lineHistoryHint
+  let fileRequest = 0
+  let fileHead: string | null = null
 
   /** 让文件历史列表对应这个文件；已经是它就不重取。 */
-  async function loadFile(repo: Repo, path: string, force = false) {
-    if (!force && files.repo === repo && files.path === path) return
+  async function loadFile(repo: Repo, path: string) {
+    const request = ++fileRequest
+    const head = repo.refs.head_id
+    if (files.repo === repo && files.path === path && fileHead === head) return
     const items = (await attempt(engine.call<Commit[]>('file_history', { tab: repo.tab, path, limit: LIMIT }))) ?? []
+    if (request !== fileRequest) return
+    fileHead = head
     files.set(repo, path, items, basename(path))
   }
 
@@ -70,8 +76,8 @@ export function registerHistory(context: vscode.ExtensionContext) {
   }
 
   /** 这个提交对该文件做了什么：与它的上一版对比。 */
-  function openChanges(c: Commit, list: CommitList) {
-    if (!list.repo) return
+  function openChanges(c: Commit, list = [files, lines].find((l) => l.items.includes(c))) {
+    if (!list?.repo) return
     const older = list.items[list.items.indexOf(c) + 1]
     // 行历史的相邻两条不一定是文件的相邻两版，所以左边固定取父提交；路径取更早那条的，重命名时才对得上
     const left = revUri(list.repo, list === files && older ? older.path : c.path, `${c.id}^`)
@@ -80,13 +86,13 @@ export function registerHistory(context: vscode.ExtensionContext) {
 
   /** 在当前文件的历次版本间移动：-1 是工作区对比最近一版，往后每一步是更早的一个提交。 */
   async function step(delta: number) {
-    const uri = vscode.window.activeTextEditor?.document.uri
+    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input
+    const uri = input instanceof vscode.TabInputTextDiff ? input.modified : vscode.window.activeTextEditor?.document.uri
     const repo = repoOf(uri)
     if (!uri || !repo) return
     if (uri.scheme === 'file') await loadFile(repo, rel(repo, uri))
     if (files.repo !== repo || !files.items.length) return void vscode.window.showInformationMessage(v.noHistory)
     const rev = revOf(uri)
-    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input
     // 对比视图里按右侧的版本定位；右侧是工作区文件、左侧是最近一版时为 -1；普通编辑器算还没开始（-2）
     const found = rev === undefined ? -1 : files.items.findIndex((c) => c.id === rev)
     const at = found >= 0 ? found : input instanceof vscode.TabInputTextDiff && revOf(input.original) === files.items[0].id && rev === undefined ? -1 : -2
@@ -103,6 +109,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
     uri ??= editor?.document.uri
     const repo = uri?.scheme === 'file' ? repoOf(uri) : undefined
     if (!uri || !repo) return
+    if (editor?.document.uri.toString() === uri.toString() && editor.document.isDirty) return void vscode.window.showWarningMessage(t.errors.PR_LINE_HISTORY_CHANGED)
     start ??= editor!.selection.start.line + 1
     end ??= editor!.selection.end.line + 1
     const path = rel(repo, uri)
@@ -161,7 +168,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
     vscode.window.onDidChangeActiveTextEditor(follow),
     files.view.onDidChangeVisibility(follow),
     // 有了新提交后文件历史要重取
-    onRepoChange.event((repo) => files.repo === repo && files.view.visible && loadFile(repo, files.path, true)),
+    onRepoChange.event((repo) => files.repo === repo && files.view.visible && loadFile(repo, files.path)),
     command('fileHistory', async () => {
       await vscode.commands.executeCommand('pushright.fileHistory.focus')
       follow()
@@ -173,7 +180,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
     command('openAtRevision', openAtRevision),
     command('searchCommits', search),
     command('item.openChanges', openChanges),
-    command('item.reveal', (c: Commit) => vscode.commands.executeCommand('pushright.revealCommit', c.id)),
+    command('item.reveal', (c: Commit) => vscode.commands.executeCommand('pushright.revealCommit', c.id, [files, lines, found].find((l) => l.items.includes(c))?.repo?.root)),
     command('item.openFile', (c: Commit) => {
       const list = [files, lines].find((l) => l.items.includes(c))
       return list?.repo && vscode.window.showTextDocument(revUri(list.repo, c.path, c.id))

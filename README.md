@@ -98,7 +98,7 @@ App text, tooltips, explanations and app-generated errors are translated. Reposi
 
 ## VS Code extension (preview)
 
-The same engine and interface run inside VS Code. The extension is not on the Marketplace yet; build it from source (Windows x64 only):
+The same engine and interface run inside VS Code. Install the Windows x64 preview from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.0). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
@@ -116,7 +116,7 @@ Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integra
 
 ## Current limits
 
-- Desktop preview. The VS Code extension is an unpublished preview built from source (see below). PR / Issue and hosting-provider collaboration are not delivered yet.
+- Desktop and VS Code extension previews. PR / Issue and hosting-provider collaboration are not delivered yet.
 - Visible rows are virtualized, but complete history is still read in the background.
 - Patches over 4 MiB are not displayed in full. The limit bounds retained app data; Git may still consume time and memory before producing output.
 - The graph has at most 24 lanes, reduced by available width. Highly parallel histories can omit connections.

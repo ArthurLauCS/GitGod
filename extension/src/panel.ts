@@ -9,7 +9,7 @@ const WRITES = new Set(['op', 'stage', 'unstage', 'commit', 'apply_lines', 'disc
 let current: vscode.WebviewPanel | undefined
 
 /** 打开提交图面板（界面就是桌面版的 src/）；给了 `reveal` 就跳到那个提交。 */
-export function openPanel(context: vscode.ExtensionContext, reveal?: string) {
+export function openPanel(context: vscode.ExtensionContext, reveal?: { id: string; root?: string }) {
   if (current) {
     current.reveal()
     if (reveal) current.webview.postMessage({ reveal })
@@ -22,6 +22,9 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: string) {
     localResourceRoots: [media],
   })
   const { webview } = current
+  const tabs = new Map<number, string>()
+  let disposed = false
+  const close = (tab: number) => engine.call('close_repo', { tab }).catch(() => {})
   hook.post = (message) => void webview.postMessage(message)
 
   const render = () => {
@@ -48,7 +51,10 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: string) {
 </html>`
   }
   render()
-  const theme = vscode.window.onDidChangeActiveColorTheme(render)
+  const theme = vscode.window.onDidChangeActiveColorTheme(({ kind }) => {
+    const dark = kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast
+    webview.postMessage({ store: 'theme', value: dark ? 'dark' : 'light' })
+  })
 
   webview.onDidReceiveMessage(async (m) => {
     if ('store' in m) {
@@ -60,9 +66,14 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: string) {
         m.cmd === 'initial_repos' ? repos.map((r) => r.root)
         : m.cmd === 'pick_folder' ? ((await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, title: m.args.title }))?.[0].fsPath ?? null)
         : await engine.call(m.cmd, m.args)
+      if (m.cmd === 'open_repo') {
+        const [tab, path] = value as [number, string, number]
+        if (disposed) return void close(tab)
+        tabs.set(tab, path)
+      } else if (m.cmd === 'close_repo') tabs.delete(m.args.tab)
       webview.postMessage({ id: m.id, ok: true, value })
       // 界面读完引用说明已经起来了，这时再让它跳到指定提交
-      if (reveal && m.cmd === 'refs') {
+      if (reveal && m.cmd === 'refs' && (!reveal.root || vscode.Uri.file(tabs.get(m.args.tab) ?? '').fsPath.toLowerCase() === reveal.root.toLowerCase())) {
         webview.postMessage({ reveal })
         reveal = undefined
       }
@@ -73,6 +84,8 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: string) {
     if (WRITES.has(m.cmd)) for (const repo of repos) refresh(repo)
   })
   current.onDidDispose(() => {
+    disposed = true
+    for (const tab of tabs.keys()) void close(tab)
     theme.dispose()
     current = undefined
     hook.post = undefined

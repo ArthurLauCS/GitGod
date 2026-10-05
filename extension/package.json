@@ -3,8 +3,15 @@
   "displayName": "PushRight",
   "description": "%description%",
   "version": "0.2.0",
-  "publisher": "pushright",
+  "publisher": "AthurLau",
   "private": true,
+  "icon": "icon.png",
+  "license": "UNLICENSED",
+  "repository": { "type": "git", "url": "https://github.com/ArthurLauCS/PushRight.git" },
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": false },
+    "virtualWorkspaces": false
+  },
   "engines": {
     "vscode": "^1.90.0"
   },

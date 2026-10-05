@@ -63,7 +63,7 @@ export function blameParser(blame: Blame) {
  */
 export function runBlame(root: string, path: string, contents: string | undefined, onProgress: (blame: Blame) => void): () => void {
   const blame: Blame = { lines: [], done: false }
-  const args = ['-C', root, 'blame', '--incremental']
+  const args = ['-C', root, '-c', 'core.quotepath=false', 'blame', '--incremental']
   if (contents !== undefined) args.push('--contents', '-')
   const proc = spawn('git', [...args, '--', path], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
   proc.on('error', () => {})
@@ -71,7 +71,7 @@ export function runBlame(root: string, path: string, contents: string | undefine
   proc.stdin.end(contents ?? '')
   const feed = blameParser(blame)
   let timer: ReturnType<typeof setTimeout> | undefined
-  createInterface(proc.stdout).on('line', (line) => {
+  const reader = createInterface(proc.stdout).on('line', (line) => {
     feed(line)
     // 合并成每 50 毫秒最多刷新一次界面
     timer ??= setTimeout(() => ((timer = undefined), onProgress(blame)), 50)
@@ -83,6 +83,8 @@ export function runBlame(root: string, path: string, contents: string | undefine
     onProgress(blame)
   })
   return () => {
+    reader.removeAllListeners('line')
+    reader.close()
     clearTimeout(timer)
     proc.removeAllListeners('close')
     proc.kill()
