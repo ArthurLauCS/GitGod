@@ -13,9 +13,9 @@ pub struct Entry {
     pub conflicted: bool,
 }
 
-// ponytail: 未跟踪的目录折叠成一条（git 默认行为）；需要逐文件列出时加 --untracked-files=all，大目录会变慢
+// 差异预览和暂存都以文件为单位，不能让 Git 把未跟踪目录折叠成文件条目。
 pub fn status(repo: &Repo) -> Result<Vec<Entry>> {
-    Ok(parse(&String::from_utf8_lossy(&repo.git(&["status", "--porcelain=v2", "-z"])?)))
+    Ok(parse(&String::from_utf8_lossy(&repo.git(&["status", "--porcelain=v2", "--untracked-files=all", "-z"])?)))
 }
 
 /// porcelain v2 的记录以 NUL 分隔；重命名记录后面多跟一个来源路径字段。
