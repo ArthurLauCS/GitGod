@@ -80,6 +80,36 @@ fn stage_lines_commit_and_amend() {
 }
 
 #[test]
+fn untracked_directories_list_preview_and_stage_individual_files() {
+    let dir = init("untracked-directory");
+    std::fs::write(dir.join(".gitignore"), "*.ignored\n").unwrap();
+    git(&dir, 0, &["add", ".gitignore"]);
+    git(&dir, 1, &["commit", "-q", "-m", "base"]);
+    std::fs::create_dir_all(dir.join("新增 目录/nested")).unwrap();
+    let paths = ["新增 目录/a.txt", "新增 目录/nested/b.txt"];
+    for path in paths {
+        std::fs::write(dir.join(path), format!("{path}\n")).unwrap();
+    }
+    std::fs::write(dir.join("新增 目录/skip.ignored"), "ignored\n").unwrap();
+    let repo = Repo::open(&dir).unwrap();
+    let expected: Vec<_> = paths.iter().map(|p| ((*p).into(), None, Some('?'))).collect();
+    assert_eq!(brief(&repo), expected);
+    // 用户配置隐藏未跟踪文件时，仍按文件列出。
+    git(&dir, 0, &["config", "status.showUntrackedFiles", "no"]);
+    assert_eq!(brief(&repo), expected);
+    for path in paths {
+        let shown = diff::worktree(&repo, path, false, true).unwrap();
+        assert_eq!(shown.hunks[0].lines[0].text, path);
+    }
+    status::stage(&repo, &[paths[0].into()]).unwrap();
+    assert_eq!(brief(&repo), [(paths[0].into(), Some('A'), None), (paths[1].into(), None, Some('?'))]);
+    assert_eq!(diff::worktree(&repo, paths[0], true, false).unwrap().hunks[0].lines[0].text, paths[0]);
+    status::unstage(&repo, &[paths[0].into()]).unwrap();
+    assert_eq!(brief(&repo), expected);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn unstage_before_first_commit_and_binary() {
     let dir = init("unborn");
     let repo = Repo::open(&dir).unwrap();
