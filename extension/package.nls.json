@@ -43,6 +43,7 @@
   "command.item.openFile": "Open File at This Revision",
   "description": "Git for multi-branch work: push to the same-name branch, pull with rebase by default, and see who wrote every line.",
   "view.fileHistory": "File History",
+  "view.graph": "PushRight Graph",
   "view.lineHistory": "Line History",
   "view.search": "Search Results",
   "welcome.search": "Find commits by message, author, file, changed text or ID.\n[Search Commits](command:pushright.searchCommits)\n[Open Commit Graph](command:pushright.openGraph)",

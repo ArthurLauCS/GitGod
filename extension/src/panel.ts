@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto'
 import * as vscode from 'vscode'
-import { engine, locale, panel as hook, refresh, repos, store, stored } from './core'
+import { engine, panel as hook, refresh, repos, store } from './core'
+import { setupWebview } from './webview'
 
 /** 每个窗口各自决定的键，不跨窗口保存：页签来自工作区，主题和语言跟随 VS Code */
 const SESSION = new Set(['tabs', 'recent', 'theme', 'locale'])
@@ -27,34 +27,7 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: { id: strin
   const close = (tab: number) => engine.call('close_repo', { tab }).catch(() => {})
   hook.post = (message) => void webview.postMessage(message)
 
-  const render = () => {
-    const nonce = randomUUID().replaceAll('-', '')
-    const asset = (file: string) => webview.asWebviewUri(vscode.Uri.joinPath(media, file))
-    const kind = vscode.window.activeColorTheme.kind
-    const dark = kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast
-    const seed = JSON.stringify({ ...stored(), theme: dark ? 'dark' : 'light', locale }).replace(/</g, '\\u003c')
-    webview.html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource};" />
-    <link rel="stylesheet" href="${asset('style.css')}" />
-  </head>
-  <body style="padding: 0">
-    <div id="app"></div>
-    <script nonce="${nonce}">
-      localStorage.clear()
-      for (const [key, value] of Object.entries(${seed})) localStorage.setItem(key, value)
-    </script>
-    <script type="module" nonce="${nonce}" src="${asset('index.js')}"></script>
-  </body>
-</html>`
-  }
-  render()
-  const theme = vscode.window.onDidChangeActiveColorTheme(({ kind }) => {
-    const dark = kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast
-    webview.postMessage({ store: 'theme', value: dark ? 'dark' : 'light' })
-  })
+  const theme = setupWebview(context, webview)
 
   webview.onDidReceiveMessage(async (m) => {
     if ('store' in m) {
@@ -72,8 +45,8 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: { id: strin
         tabs.set(tab, path)
       } else if (m.cmd === 'close_repo') tabs.delete(m.args.tab)
       webview.postMessage({ id: m.id, ok: true, value })
-      // 界面读完引用说明已经起来了，这时再让它跳到指定提交
-      if (reveal && m.cmd === 'refs' && (!reveal.root || vscode.Uri.file(tabs.get(m.args.tab) ?? '').fsPath.toLowerCase() === reveal.root.toLowerCase())) {
+      // 完整图加载后再定位，避免初始化选择 HEAD 覆盖外部指定的提交。
+      if (reveal && m.cmd === 'load_graph' && m.args.full && (!reveal.root || vscode.Uri.file(tabs.get(m.args.tab) ?? '').fsPath.toLowerCase() === reveal.root.toLowerCase())) {
         webview.postMessage({ reveal })
         reveal = undefined
       }

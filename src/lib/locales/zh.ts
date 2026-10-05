@@ -233,6 +233,8 @@ export const messages = {
   noCommits: '这个仓库还没有提交',
   status: { A: '新增', M: '修改', D: '删除', R: '重命名', C: '复制', T: '类型变更', '?': '未跟踪', U: '冲突' } as Record<string, string>,
   vscode: {
+    graphRepository: '提交图仓库',
+    graphRetry: '重新加载提交图',
     noRepo: '这个窗口没有打开 Git 仓库',
     unsupported: 'PushRight 找不到适用于当前平台的 Git 引擎。预览版目前只支持 Windows x64。',
     upstreamMismatch: '上游名字不一致',

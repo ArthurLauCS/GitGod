@@ -221,6 +221,8 @@ export const messages = {
   noCommits: 'This repository has no commits yet',
   status: { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed', C: 'Copied', T: 'Type changed', '?': 'Untracked', U: 'Conflicted' } as Record<string, string>,
   vscode: {
+    graphRepository: 'Repository for the commit graph',
+    graphRetry: 'Reload graph',
     noRepo: 'No Git repository is open in this window',
     unsupported: 'PushRight could not find its Git engine for this platform. This preview supports Windows x64 only.',
     upstreamMismatch: 'Upstream name differs',

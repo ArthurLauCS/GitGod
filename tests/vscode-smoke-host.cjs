@@ -88,6 +88,23 @@ exports.run = async () => {
     await until('diff of an older commit', () => diffOf() instanceof vscode.TabInputTextDiff && ![latest, undefined].includes(JSON.parse(diffOf().modified.query || '{}').rev))
     step('steps back through the revisions of a file')
 
+    // 关闭原生 Git 后，SCM 侧栏图仍会自动读取仓库中的提交行。
+    const graphCalls = []
+    const call = api.engine.call.bind(api.engine)
+    api.engine.call = async (cmd, args) => {
+      const result = await call(cmd, args)
+      graphCalls.push({ cmd, args, result })
+      return result
+    }
+    await vscode.commands.executeCommand('pushright.graph.focus')
+    await until('source control sidebar graph rows', () => graphCalls.some((c) => c.cmd === 'rows' && c.args.tab === 0 && c.result.some((r) => r.subject === 'local commit')))
+    step('source control sidebar graph renders history with built-in Git disabled')
+    git('-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', 'sidebar refresh')
+    await vscode.commands.executeCommand('pushright.refresh')
+    await until('sidebar graph refresh', () => graphCalls.some((c) => c.cmd === 'rows' && c.args.tab === 0 && c.result.some((r) => r.subject === 'sidebar refresh')))
+    step('source control sidebar graph refreshes after a new commit')
+    api.engine.call = call
+
     // 面板里的界面起来后会自己在引擎里打开仓库，会话号紧接主机的 0
     await vscode.commands.executeCommand('pushright.openGraph')
     await until('commit graph panel', () => api.engine.call('refs', { tab: 1 }).then(() => true, () => false))

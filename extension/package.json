@@ -2,7 +2,7 @@
   "name": "pushright",
   "displayName": "PushRight",
   "description": "%description%",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "AthurLau",
   "private": true,
   "icon": "icon.png",
@@ -521,7 +521,7 @@
         },
         {
           "command": "pushright.openGraph",
-          "when": "view == pushright.fileHistory",
+          "when": "view == pushright.fileHistory || view == pushright.graph",
           "group": "navigation"
         }
       ],
@@ -575,6 +575,15 @@
       ]
     },
     "views": {
+      "scm": [
+        {
+          "id": "pushright.graph",
+          "name": "%view.graph%",
+          "type": "webview",
+          "when": "pushright.hasRepo",
+          "contextualTitle": "PushRight"
+        }
+      ],
       "pushright": [
         {
           "id": "pushright.fileHistory",

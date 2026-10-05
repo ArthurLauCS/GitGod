@@ -27,6 +27,7 @@
     selectedRow,
     onselect,
     onmenu,
+    compact = false,
   }: {
     fetchRows: (start: number, count: number) => Promise<Row[]>
     count: number
@@ -37,6 +38,7 @@
     selectedRow: number | null
     onselect: (row: number, id: string) => void
     onmenu: (e: MouseEvent, id: string) => void
+    compact?: boolean
   } = $props()
 
   let viewport: HTMLDivElement
@@ -58,7 +60,7 @@
     })
     if (values) setAuthorStyle(key, { border: values.border as boolean, fill: values.fill as boolean })
   }
-  const cols = $derived(`minmax(0, 1fr) min(${layout.author}px, 18vw) min(${layout.date}px, 13vw) 72px`)
+  const cols = $derived(compact ? 'minmax(0, 1fr)' : `minmax(0, 1fr) min(${layout.author}px, 18vw) min(${layout.date}px, 13vw) 72px`)
   let scrollTop = $state(0)
   let height = $state(0)
   let width = $state(0)
@@ -165,9 +167,9 @@
 
   function onkeydown(e: KeyboardEvent) {
     const step = { ArrowDown: 1, ArrowUp: -1, PageDown: visible - 2, PageUp: 2 - visible }[e.key]
-    if (!step || selectedRow === null) return
+    if (!step || (!compact && selectedRow === null)) return
     e.preventDefault()
-    const next = Math.max(0, Math.min(count - 1, selectedRow + step))
+    const next = Math.max(0, Math.min(count - 1, (selectedRow ?? -1) + step))
     const row = rowAt(next)
     if (!row) return
     onselect(next, row.id)
@@ -180,6 +182,7 @@
 
 <Dialog bind:this={authorDialog} />
 
+{#if !compact}
 <div class="head" style:padding-left="{graphW}px" style:grid-template-columns={cols}>
   <span>
     {t.colSubject}
@@ -194,6 +197,7 @@
   <span class="cell"><span class="grip" title={t.dragHint}><Splitter key="date" min={96} max={220} invert /></span>{t.colDate}</span>
   <span>{t.colCommit}</span>
 </div>
+{/if}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="viewport" bind:this={viewport} bind:clientHeight={height} bind:clientWidth={width} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role="grid">
   <div style:height="{virt}px">
@@ -209,6 +213,7 @@
           style:grid-template-columns={cols}
           role="row"
           tabindex="-1"
+          title={compact && row ? `${row.subject}\n${row.author} · ${fmtTime(row.time)} · ${row.id.slice(0, 7)}` : undefined}
           onclick={() => row && onselect(first + i, row.id)}
           oncontextmenu={(e) => row && (onselect(first + i, row.id), onmenu(e, row.id))}
         >
@@ -223,7 +228,7 @@
               {/if}
               <span>{row.subject}</span>
             </span>
-            <button
+            {#if !compact}<button
               class="author"
               class:boxed={prefs.authorStyles[authorKey(row)]?.border}
               class:filled={prefs.authorStyles[authorKey(row)]?.fill}
@@ -243,6 +248,7 @@
             </button>
             <span class="muted">{fmtTime(row.time)}</span>
             <span class="muted mono">{row.id.slice(0, 7)}</span>
+            {/if}
           {/if}
         </div>
       {/each}
