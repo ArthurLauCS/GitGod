@@ -40,7 +40,7 @@ export function registerLocalFiles(context: vscode.ExtensionContext) {
   }
   const view = vscode.window.createTreeView('pushright.localFiles', { treeDataProvider: provider })
   const command = (id: string, action: 'local' | 'shared' | 'track' | 'untrack') => vscode.commands.registerCommand(`pushright.${id}`, async (arg?: vscode.Uri | Item | { resourceUri: vscode.Uri }) => {
-    const uri = arg && 'repo' in arg ? fileUri(arg.repo, arg.path) : arg && 'resourceUri' in arg ? arg.resourceUri : arg as vscode.Uri | undefined ?? vscode.window.activeTextEditor?.document.uri
+    const uri = arg && 'resourceUri' in arg ? arg.resourceUri : arg && 'repo' in arg ? fileUri(arg.repo, arg.path) : arg as vscode.Uri | undefined ?? vscode.window.activeTextEditor?.document.uri
     if (!uri || uri.scheme !== 'file') return
     await discoverForFile(uri)
     const repo = repoOf(uri)

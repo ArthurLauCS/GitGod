@@ -297,5 +297,7 @@ test('local files expand lazily and tracking commands distinguish local rules, s
   assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: false }])
   await commands.get('pushright.trackFile')(file)
   assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: true }])
+  await commands.get('pushright.untrackFile')({ repo, entry: { path: 'skills/a.md' }, resourceUri: file })
+  assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: false }], 'SCM resource arguments use their URI, not the local-tree node shape')
   assert.ok(discoveries.every((p) => p === file.fsPath))
 })
