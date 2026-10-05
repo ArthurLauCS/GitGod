@@ -119,9 +119,10 @@ exports.run = async () => {
       graphCalls.push({ cmd, args, result })
       return result
     }
-    await vscode.commands.executeCommand('pushright.graph.focus')
+    // 只打开 SCM 容器，不执行图的展开命令；首次启用后提交图应已自动展开。
+    await vscode.commands.executeCommand('workbench.view.scm')
     await until('source control sidebar graph rows', () => graphCalls.some((c) => c.cmd === 'rows' && c.args.tab === 0 && c.result.some((r) => r.subject === 'local commit')))
-    step('source control sidebar graph renders history with built-in Git disabled')
+    step('source control sidebar graph opens by default with built-in Git disabled')
     git('-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-m', 'sidebar refresh')
     await vscode.commands.executeCommand('pushright.refresh')
     await until('sidebar graph refresh', () => graphCalls.some((c) => c.cmd === 'rows' && c.args.tab === 0 && c.result.some((r) => r.subject === 'sidebar refresh')))

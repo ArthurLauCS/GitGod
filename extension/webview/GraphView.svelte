@@ -105,13 +105,18 @@
     --hover: var(--vscode-list-hoverBackground);
     --accent: var(--vscode-focusBorder);
     --accent-soft: var(--vscode-list-inactiveSelectionBackground);
+    --ref-branch: var(--vscode-textLink-foreground);
+    --border-strong: var(--vscode-contrastBorder, var(--vscode-widget-border, var(--vscode-descriptionForeground)));
+    --fs-md: 12px;
+    --fs-sm: 11px;
     --font: var(--vscode-font-family);
     background: var(--bg);
     color: var(--text);
     font-family: var(--font);
+    font-size: var(--fs-md);
   }
-  .toolbar { display: flex; gap: 8px; align-items: center; padding: 4px 8px; }
-  select { min-width: 0; flex: 1; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); }
-  .toolbar span { max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+  .toolbar { display: flex; gap: 4px; align-items: center; padding: 2px 4px; }
+  select { min-width: 0; flex: 1; height: 22px; padding: 0 2px; font: inherit; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); }
+  .toolbar span { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--muted); }
   p { margin: 8px; font-size: 12px; }
 </style>

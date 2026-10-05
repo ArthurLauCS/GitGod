@@ -8,9 +8,6 @@
   import { theme } from './theme.svelte'
   import { fmtTime, t } from './i18n.svelte'
 
-  const ROW_H = 28
-  const LANE_W = 14
-  const PAD = 12
   const CHUNK = 128
   // ponytail: 超过 MAX_LANES 的泳道不画（内核图宽 572）；需要时给图列加横向滚动
   const LANE_CAP = 24
@@ -40,6 +37,10 @@
     onmenu: (e: MouseEvent, id: string) => void
     compact?: boolean
   } = $props()
+
+  const ROW_H = $derived(compact ? 22 : 28)
+  const LANE_W = $derived(compact ? 12 : 14)
+  const PAD = $derived(compact ? 6 : 12)
 
   let viewport: HTMLDivElement
   let canvas = $state<HTMLCanvasElement>()
@@ -148,7 +149,7 @@
       if (row.lane >= MAX_LANES) return
       const color = COLORS[row.lane % COLORS.length]
       ctx.beginPath()
-      ctx.arc(cx, cy, 4, 0, Math.PI * 2)
+      ctx.arc(cx, cy, compact ? 3 : 4, 0, Math.PI * 2)
       ctx.fillStyle = row.id === headId ? css.getPropertyValue('--bg') : color
       ctx.fill()
       ctx.strokeStyle = color
@@ -199,7 +200,7 @@
 </div>
 {/if}
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="viewport" bind:this={viewport} bind:clientHeight={height} bind:clientWidth={width} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role="grid">
+<div class="viewport" class:compact style:--row="{ROW_H}px" bind:this={viewport} bind:clientHeight={height} bind:clientWidth={width} onscroll={() => (scrollTop = viewport.scrollTop)} {onkeydown} tabindex="0" role="grid">
   <div style:height="{virt}px">
     <div class="window" style:transform="translateY({scrollTop - (top % ROW_H)}px)">
       <canvas bind:this={canvas} style:width="{graphW}px" style:height="{windowRows.length * ROW_H}px"></canvas>
@@ -222,7 +223,7 @@
               {#if badges.has(row.id)}
                 <span class="badges">
                   {#each badges.get(row.id) ?? [] as ref (ref.name)}
-                    <span class="badge {kind(ref.name)}">{short(ref.name)}</span>
+                    <span class="badge {kind(ref.name)}" title={short(ref.name)}>{short(ref.name)}</span>
                   {/each}
                 </span>
               {/if}
@@ -387,17 +388,36 @@
     border: 1px solid;
   }
   .badge.branch {
-    color: var(--accent);
+    color: var(--text);
     background: var(--accent-soft);
-    border-color: transparent;
+    border-color: var(--border-strong);
+    border-left: 3px solid var(--ref-branch, var(--accent));
   }
   .badge.remote {
-    color: var(--muted);
+    color: var(--text);
     border-color: var(--border-strong);
     font-weight: 400;
   }
   .badge.tag {
-    color: var(--yellow);
+    color: var(--text);
     border-color: color-mix(in srgb, var(--yellow) 45%, transparent);
+  }
+  .compact .row {
+    gap: 4px;
+    padding-right: 4px;
+  }
+  .compact .subject { gap: 4px; }
+  .compact .badges {
+    display: flex;
+    gap: 4px;
+    min-width: 0;
+  }
+  .compact .badge {
+    min-width: 0;
+    margin: 0;
+    padding: 0 4px;
+    line-height: 16px;
+    border-radius: 3px;
+    font-weight: 500;
   }
 </style>
