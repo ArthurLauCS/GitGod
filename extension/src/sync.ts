@@ -25,7 +25,7 @@ export async function pull(repo = activeRepo()) {
   if (!(await run(repo, { op: 'pull', rebase: picked.length > 0 })) && repo.refs.in_progress) inProgress(repo)
 }
 
-export async function push(repo = activeRepo()) {
+export async function push(repo = activeRepo(), sameNameOnly = false) {
   if (!repo) return
   const branch = headBranch(repo)
   if (!branch) return void vscode.window.showWarningMessage(t.noBranch)
@@ -36,6 +36,8 @@ export async function push(repo = activeRepo()) {
   let target: { remote: string; remote_branch: string; set_upstream: boolean }
   if (up?.branch === branch) {
     target = { remote: up.remote, remote_branch: branch, set_upstream: false }
+  } else if (up && sameNameOnly) {
+    target = { remote: up.remote, remote_branch: branch, set_upstream: true }
   } else if (up) {
     // 上游与本地分支不同名：先推荐同名分支，仍需明确选一个目标
     const pick = await vscode.window.showQuickPick(

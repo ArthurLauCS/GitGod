@@ -86,6 +86,48 @@ pub(crate) fn tips(gix: &gix::Repository) -> Result<Vec<ObjectId>> {
     Ok(tips)
 }
 
+/// Auto 包含 HEAD、上游和基准远程分支；筛选改变遍历起点，不改变检出的分支。
+pub(crate) fn graph_tips(repo: &Repo, scope: &str) -> Result<Vec<ObjectId>> {
+    if scope == "all" { return tips(&repo.gix()); }
+    let refs = list(repo)?;
+    if scope != "auto" {
+        let r = refs.refs.iter().find(|r| r.name == scope).ok_or("PR_GRAPH_REF_GONE")?;
+        return Ok(vec![ObjectId::from_hex(r.id.as_bytes()).map_err(err)?]);
+    }
+    let mut ids = refs.head_id.into_iter().collect::<Vec<_>>();
+    if let Some(head) = refs.head.as_deref() {
+        let upstream = refs.refs.iter().find(|r| r.name == head).and_then(|r| r.upstream.as_deref());
+        ids.extend(refs.refs.iter().filter(|r| Some(r.name.as_str()) == upstream).map(|r| r.id.clone()));
+        let branch = head.trim_start_matches("refs/heads/");
+        let configured = repo.git(&["config", "--get", &format!("branch.{branch}.vscode-merge-base")]).ok()
+            .map(|b| format!("refs/remotes/{}", String::from_utf8_lossy(&b).trim()));
+        // 与原生 Git 一样，优先找创建分支时的来源；只接受仍存在的远程分支。
+        let from_reflog = repo.git(&["reflog", "show", "--format=%gs", "--max-count=2", "--grep-reflog=^branch: Created from ", head]).ok()
+            .and_then(|out| {
+                let text = String::from_utf8_lossy(&out);
+                let mut lines = text.lines();
+                let source = lines.next()?.strip_prefix("branch: Created from ")?;
+                if lines.next().is_some() { return None; }
+                if source != "HEAD" { return Some(source.to_owned()); }
+                let out = repo.git(&["reflog", "show", "--format=%gs", "--fixed-strings", &format!("--grep-reflog= to {branch}"), "HEAD"]).ok()?;
+                String::from_utf8_lossy(&out).lines().filter_map(|line| line.strip_prefix("checkout: moving from ")?.strip_suffix(&format!(" to {branch}"))).last().map(str::to_owned)
+            });
+        let from_reflog = from_reflog.as_ref().and_then(|name| refs.refs.iter().find(|r| r.name == *name || r.name == format!("refs/heads/{name}") || r.name == format!("refs/remotes/{name}")))
+            .and_then(|r| if r.name.starts_with("refs/remotes/") { Some(r) } else { refs.refs.iter().find(|up| Some(&up.name) == r.upstream.as_ref()) });
+        let remotes = remotes(repo)?;
+        let remote = remotes.iter().filter(|r| upstream.is_some_and(|u| u.starts_with(&format!("refs/remotes/{r}/"))))
+            .max_by_key(|r| r.len()).or_else(|| remotes.iter().find(|r| *r == "origin")).or_else(|| remotes.first());
+        let base = configured.as_ref().and_then(|name| refs.refs.iter().find(|r| &r.name == name))
+            .or(from_reflog)
+            .or_else(|| remote.and_then(|remote| ["HEAD", "main", "master"].into_iter()
+                .find_map(|name| refs.refs.iter().find(|r| r.name == format!("refs/remotes/{remote}/{name}")))));
+        ids.extend(base.map(|r| r.id.clone()));
+    }
+    ids.sort();
+    ids.dedup();
+    ids.iter().map(|id| ObjectId::from_hex(id.as_bytes()).map_err(err)).collect()
+}
+
 pub fn list(repo: &Repo) -> Result<Refs> {
     let gix = repo.gix();
     // 上游信息走 CLI：gix 的配置是打开仓库时的快照，push -u 之后不会更新

@@ -128,6 +128,17 @@ exports.run = async () => {
     await vscode.commands.executeCommand('pushright.refresh')
     await until('sidebar graph refresh', () => graphCalls.some((c) => c.cmd === 'rows' && c.args.tab === 0 && c.result.some((r) => r.subject === 'sidebar refresh')))
     step('source control sidebar graph refreshes after a new commit')
+    git('branch', 'graph-scope-old', 'HEAD~1')
+    await vscode.commands.executeCommand('pushright.refresh')
+    await until('new reference loaded', () => api.repos[0].refs.refs.some((r) => r.name === 'refs/heads/graph-scope-old'))
+    graphCalls.length = 0
+    git('checkout', '-q', 'graph-scope-old')
+    await vscode.commands.executeCommand('pushright.refresh')
+    await until('Auto follows checkout with unchanged all-ref tips', () => graphCalls.some((c) => c.cmd === 'rows' && c.result.length && c.result.every((r) => r.subject !== 'sidebar refresh')))
+    assert.ok(graphCalls.some((c) => c.cmd === 'load_graph' && c.args.scope === 'auto'))
+    git('checkout', '-q', 'feature/x')
+    await vscode.commands.executeCommand('pushright.refresh')
+    step('Auto rebuilds its ancestry when the checked-out branch changes')
     api.engine.call = call
 
     // 面板里的界面起来后会自己在引擎里打开仓库，会话号紧接主机的 0
@@ -178,6 +189,25 @@ exports.run = async () => {
     await checkCommitFile(revision, newPaths[0], '', `${newPaths[0]}\n`)
     assert.ok(!vscode.window.tabGroups.all.some((g) => g.tabs.some((tab) => tab.input instanceof vscode.TabInputWebview)))
     step('commit files open native diffs for root, renamed, deleted and added files without a graph editor')
+
+    // 实际子模块使用 .git 文件，嵌套仓库使用 .git 目录；刷新后两者都应独立提供 SCM。
+    git('-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', join(root, '..', 'origin.git'), 'modules/shared')
+    const nested = join(root, 'tools/private-repo')
+    mkdirSync(nested, { recursive: true })
+    execFileSync('git', ['-C', nested, 'init', '-q', '-b', 'main'])
+    execFileSync('git', ['-C', nested, '-c', 'user.name=test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', 'nested root'])
+    await vscode.commands.executeCommand('pushright.refresh')
+    assert.equal(api.repos.length, 3)
+    const sub = api.repos.find((r) => r.root === join(root, 'modules/shared'))
+    assert.ok(sub)
+    assert.match(sub.name, /modules\/shared$/)
+    assert.ok(api.repos.some((r) => r.root === nested))
+    writeFileSync(join(sub.root, 'private-skill.md'), 'private skill\n')
+    await api.engine.call('ignore_file', { tab: sub.tab, path: 'private-skill.md', shared: false })
+    assert.deepEqual(await api.engine.call('ignored', { tab: sub.tab, path: '' }), ['private-skill.md'])
+    assert.ok(!git('status', '--porcelain', '--untracked-files=all').includes('private-skill.md'))
+    await vscode.commands.executeCommand('pushright.localFiles.focus')
+    step('discovers submodules and nested repositories and keeps local ignore rules in the selected repository')
   } catch (e) {
     error = e.stack ?? String(e)
   }

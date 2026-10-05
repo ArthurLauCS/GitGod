@@ -1,4 +1,9 @@
 {
+  "view.localFiles": "PushRight Local Files",
+  "command.ignoreLocal": "Ignore Locally",
+  "command.ignoreShared": "Add to .gitignore",
+  "command.trackFile": "Track File (Stage)",
+  "command.untrackFile": "Stop Tracking and Keep Locally",
   "command.openGraph": "Open Commit Graph",
   "command.pull": "Pull…",
   "command.push": "Push…",

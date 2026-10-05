@@ -1,4 +1,5 @@
-import { basename, join, relative, sep } from 'node:path'
+import { basename, dirname, join, relative, sep } from 'node:path'
+import { readdir, stat } from 'node:fs/promises'
 import * as vscode from 'vscode'
 import type { Entry, Identity, Log, Op, Refs } from '../../src/lib/api'
 import { explanations as enHelp, messages as en } from '../../src/lib/locales/en'
@@ -40,27 +41,60 @@ let context: vscode.ExtensionContext
 /** 提交图面板打开时由它填上，用来通知面板 */
 export const panel: { post?: (message: object) => void } = {}
 
-// ponytail: 只认工作区文件夹（及其上级）所在的仓库；子目录里的嵌套仓库、中途增减工作区文件夹需要重新加载窗口
 export async function openRepos(ctx: vscode.ExtensionContext, exe: string) {
   context = ctx
   engine = startEngine(exe)
-  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+  await discoverRepositories()
+}
+
+let discovering: Promise<void> | undefined
+export function discoverRepositories(extra: string[] = []): Promise<void> {
+  if (discovering) return discovering.then(() => extra.length ? discoverRepositories(extra) : undefined)
+  discovering = discover(extra).finally(() => discovering = undefined)
+  return discovering
+}
+
+async function discover(extra: string[]) {
+  const queue = [...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath), ...repos.map((r) => r.root), ...extra]
+  const seen = new Set<string>()
+  for (const path of queue) {
+    if (seen.has(fold(path))) continue
+    seen.add(fold(path))
     try {
-      const [tab, path] = await engine.call<[number, string, number]>('open_repo', { path: folder.uri.fsPath })
-      const root = vscode.Uri.file(path).fsPath
-      if (repos.some((r) => r.root === root)) {
-        engine.call('close_repo', { tab })
-        continue
+      let repo = repos.find((r) => fold(r.root) === fold(path))
+      if (!repo) {
+        const [tab, actual] = await engine.call<[number, string, number]>('open_repo', { path })
+        const root = vscode.Uri.file(actual).fsPath
+        repo = repos.find((r) => fold(r.root) === fold(root))
+        if (repo) await engine.call('close_repo', { tab })
+        else {
+          const parent = repos.filter((r) => fold(root).startsWith(fold(r.root) + sep)).sort((a, b) => b.root.length - a.root.length)[0]
+          repo = {
+            tab, root, name: parent ? `${parent.name}/${relative(parent.root, root).split(sep).join('/')}` : basename(root), status: [], identity: null, remotes: [],
+            refs: { head: null, head_id: null, ahead_behind: null, in_progress: null, refs: [] },
+          }
+          repos.push(repo)
+          await refresh(repo)
+        }
       }
-      const repo: Repo = {
-        tab, root, name: basename(root), status: [], identity: null, remotes: [],
-        refs: { head: null, head_id: null, ahead_behind: null, in_progress: null, refs: [] },
-      }
-      repos.push(repo)
-      await refresh(repo)
+      queue.push(...await engine.call<string[]>('repositories', { tab: repo.tab }))
     } catch {
-      // 不在 Git 仓库里的文件夹
+      // 工作区本身可能是装着多个仓库的容器；只扫描它的直接子目录。
+      if (vscode.workspace.workspaceFolders?.some((f) => fold(f.uri.fsPath) === fold(path))) {
+        const dirs = await readdir(path, { withFileTypes: true }).catch(() => [])
+        queue.push(...dirs.filter((d) => d.isDirectory() && !d.name.startsWith('.')).map((d) => join(path, d.name)))
+      }
     }
+  }
+  await vscode.commands.executeCommand('setContext', 'pushright.hasRepo', repos.length > 0)
+}
+
+/** 打开被父仓库忽略的嵌套仓库文件时，也要按最近的 .git 归属，不能在父仓库执行操作。 */
+export async function discoverForFile(uri: vscode.Uri) {
+  if (uri.scheme !== 'file') return
+  const known = repoOf(uri)
+  for (let dir = dirname(uri.fsPath); dir !== dirname(dir) && fold(dir) !== fold(known?.root ?? ''); dir = dirname(dir)) {
+    if (await stat(join(dir, '.git')).then(() => true, () => false)) { await discoverRepositories([dir]); break }
   }
 }
 

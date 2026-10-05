@@ -31,10 +31,11 @@ test('SCM graph routes only bounded reads to workspace repositories and disposes
   const detail = { id: 'commit', parents: ['parent', 'second-parent'], files: [{ status: 'R', path: 'new.txt', old_path: 'old.txt' }] }
   const core = { repos, onRepoChange: changed, onPrefsChange: prefs, revUri: (repo, path, rev, empty) => ({ root: repo.root, path, rev, empty }), engine: { call: async (...args) => { calls.push(args); return args[0] === 'detail' ? detail : [] } } }
   const vscode = { window: { registerWebviewViewProvider: (id, p) => { assert.equal(id, 'pushright.graph'); provider = p } }, commands: { registerCommand: () => ({ dispose() {} }), executeCommand: (...args) => diffs.push(args) } }
-  load('graph-view', { vscode, './core': core, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [] })
+  const syncs = [], saved = {}
+  load('graph-view', { vscode, './core': core, './sync': { fetch: (r) => syncs.push(['fetch', r.tab]), pull: (r) => syncs.push(['pull', r.tab]), push: (r, same) => syncs.push(['push', r.tab, same]) }, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [], workspaceState: { get: (_, fallback) => fallback, update: (key, value) => saved[key] = value } })
   provider.resolveWebviewView(view)
   const send = async (cmd, args = {}) => { await Promise.all(messages.fire({ id: 1, cmd, args })); return posted.at(-1) }
-  assert.deepEqual((await send('graph_repos')).value, repos)
+  assert.deepEqual((await send('graph_repos')).value, repos.map((r) => ({ ...r, scope: 'auto' })))
   await send('rows', { tab: 1, start: 0, count: 128 })
   assert.deepEqual(calls, [['rows', { tab: 1, start: 0, count: 128 }]])
   assert.equal((await send('reveal_commit', { tab: 1, id: 'abc' })).ok, false)
@@ -59,6 +60,14 @@ test('SCM graph routes only bounded reads to workspace repositories and disposes
   assert.equal(diffs.at(-1)[1].empty, true)
   assert.equal((await send('open_commit_file', { tab: 0, id: 'commit', path: '../../secret' })).ok, false)
   assert.equal(diffs.length, 4, 'paths absent from the commit cannot open')
+  await send('graph_scope', { tab: 1, scope: 'all' })
+  await send('load_graph', { tab: 1, full: false })
+  assert.deepEqual(calls.at(-1), ['load_graph', { tab: 1, full: false, scope: 'all' }])
+  assert.equal(saved.graphScopes['/repo1'], 'all')
+  assert.equal((await send('graph_scope', { tab: 0, scope: '--all' })).ok, false)
+  for (const action of ['fetch', 'pull', 'push']) await send('graph_sync', { tab: 1, action })
+  assert.deepEqual(syncs, [['fetch', 1], ['pull', 1], ['push', 1, true]])
+  assert.equal((await send('graph_sync', { tab: 1, action: 'reset' })).ok, false)
   changed.fire(repos[0]); assert.deepEqual(posted.at(-1), { refresh: true })
   view.visible = false
   const n = posted.length
@@ -203,6 +212,9 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
   vscode.window.showQuickPick = async () => undefined
   await push(repo)
   assert.equal(sent.length, 1)
+  await push(repo, true)
+  assert.equal(sent.length, 2)
+  assert.equal(sent[1].remote_branch, 'feature/x', 'graph push cannot choose the mismatched upstream')
 })
 
 test('SCM separates repositories, stops on failed saves and uses selections after formatting', async () => {
@@ -242,4 +254,48 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
   assert.equal(await content({ query: '{}' }), '')
   core.engine.call = async () => { throw new Error('PR_FILE_TOO_LARGE') }
   await assert.rejects(content({ query: '{}' }), /PR_FILE_TOO_LARGE/)
+})
+
+test('local files expand lazily and tracking commands distinguish local rules, shared rules and deletion', async () => {
+  let provider, tracked = false, accept = true
+  const commands = new Map(), writes = [], reads = [], prompts = [], discoveries = []
+  const repo = { tab: 2, root: '/parent/child', name: 'parent/child', status: [{ path: 'skills/a.md', unstaged: '?' }, { path: 'skills/deep/b.md', unstaged: '?' }] }
+  const vscode = {
+    EventEmitter: Event, commands: { registerCommand: (id, fn) => commands.set(id, fn) },
+    window: { createTreeView: (_, { treeDataProvider }) => { provider = treeDataProvider; return { visible: true, onDidChangeVisibility: new Event().event } },
+      showInformationMessage: async (...args) => { prompts.push(args); return accept ? args[2] : undefined }, showWarningMessage: (message) => prompts.push(message) },
+  }
+  const core = { repos: [repo], onRepoChange: new Event(), attempt: (p) => p, rel: () => 'skills/a.md', repoOf: () => repo,
+    discoverForFile: (uri) => discoveries.push(uri.fsPath), fileUri: (_, p) => uri(`${repo.root}/${p}`),
+    engine: { call: async (cmd, args) => { reads.push([cmd, args]); return cmd === 'is_tracked' ? tracked : ['cache/'] } },
+    write: async (...args) => writes.push(args),
+    v: { ignoreLocal: 'local', ignoreShared: 'shared', trackFile: 'track', untrackFile: 'untrack', untrackHint: 'stages deletion for the team', ignoreLocalHint: 'clone only', ignoreSharedHint: 'shared rule', trackHint: 'stage contents', ignoreTracked: 'tracked warning' },
+  }
+  load('local-files', { vscode, './core': core }).registerLocalFiles({ subscriptions: [] })
+  const [root] = await provider.getChildren()
+  const [untracked, ignored] = await provider.getChildren(root)
+  assert.equal(reads.length, 0)
+  const [folder] = await provider.getChildren(untracked)
+  assert.equal(folder.path, 'skills')
+  assert.deepEqual((await provider.getChildren(folder)).map((f) => [f.path, f.directory]), [['skills/deep', true], ['skills/a.md', false]])
+  await provider.getChildren(ignored)
+  assert.deepEqual(reads.pop(), ['ignored', { tab: 2, path: '' }])
+  const file = uri('/parent/child/skills/a.md')
+  await commands.get('pushright.ignoreLocal')(file)
+  await commands.get('pushright.ignoreShared')(file)
+  assert.deepEqual(writes.map(([, cmd, args]) => [cmd, args]), [['ignore_file', { path: 'skills/a.md', shared: false }], ['ignore_file', { path: 'skills/a.md', shared: true }]])
+  tracked = true
+  await commands.get('pushright.ignoreShared')(file)
+  assert.equal(writes.length, 2)
+  assert.equal(prompts.at(-1), 'tracked warning')
+  accept = false
+  await commands.get('pushright.untrackFile')(file)
+  assert.equal(writes.length, 2)
+  assert.match(prompts.at(-1)[1].detail, /stages deletion for the team/)
+  accept = true
+  await commands.get('pushright.untrackFile')(file)
+  assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: false }])
+  await commands.get('pushright.trackFile')(file)
+  assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: true }])
+  assert.ok(discoveries.every((p) => p === file.fsPath))
 })
