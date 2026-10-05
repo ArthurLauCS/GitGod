@@ -91,9 +91,27 @@ PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败
 - Worktree 管理、冲突块处理、进行中操作的继续与中止。
 - 中英语言切换、深浅主题、可调面板、独立作者样式、操作说明和命令日志。
 
+## VS Code 扩展（预览）
+
+同一套引擎和界面可以在 VS Code 里运行。扩展尚未上架，需要从源码构建（目前只支持 Windows x64）：
+
+```sh
+npm ci
+npm run ext:package
+code --install-extension extension/pushright-win32-x64-0.2.0.vsix
+```
+
+- **源代码管理面板**：已暂存、未暂存和冲突的文件；按文件或按选中的行暂存、取消暂存、丢弃；提交和修补上次提交；行号旁的改动标记和资源管理器角标。首次使用时 PushRight 会说明关闭 VS Code 自带 Git 的后果，由你决定是否关闭。
+- **推拉检查**：拉取每次都询问，并默认勾选 **变基而非合并**。上游与本地分支不同名时，推送优先推荐同名远程分支，状态栏同时给出警告。强制推送使用 `--force-with-lease`，需要确认两次。
+- **编辑器里的作者**：当前行末尾显示作者、时间和提交说明，悬停可看详情；整文件作者标注（`Alt+B`）可按作者或按新旧上色；文件、类和函数上方的 CodeLens；状态栏显示当前行作者。在提交图里设置的作者样式在这里同样生效；「只高亮这一行的作者」会在文件和滚动条上标出该作者写的所有行。
+- **历史**：跟随当前文件的文件历史、选中行的行历史、上一版 / 下一版对比（`Alt+,` / `Alt+.`）、与任意分支、标签或提交对比，以及按提交说明、作者、文件、改动内容或提交号搜索提交。
+- **提交图**：执行「PushRight: 打开提交图」，桌面版的界面会在编辑器页签里打开。
+
+尚未包含：macOS、Linux 和远程开发（WSL / SSH）版本，PR / Issue 集成，交互式变基编辑器，自动定时获取。仓库按工作区文件夹识别，子目录里的嵌套仓库不会被识别。
+
 ## 当前边界
 
-- 这是桌面预览版。VS Code 扩展、行级 Blame、PR / Issue 和托管平台协作集成尚未交付。
+- 这是桌面预览版。VS Code 扩展是尚未上架的预览，需要从源码构建（见下）。PR / Issue 和托管平台协作集成尚未交付。
 - 提交列表只渲染可见行，但完整历史仍会在后台读取；超大仓库的时间和内存开销需要进一步实测优化。
 - 超过 4 MiB 的补丁不显示完整差异。读取限制约束的是应用保留的数据，Git 子进程在输出补丁前仍可能消耗较多时间和内存。
 - 提交图最多显示 24 条轨道，实际数量随面板宽度变化；高度并行的复杂历史可能无法显示所有连线。
@@ -118,6 +136,8 @@ npm run check
 npm test
 cargo test -p engine
 npm run desktop:build
+npm run ext:build   # VS Code 扩展：引擎子进程、面板和扩展主机
+npm run ext:smoke   # 在临时的 VS Code 配置里跑一遍扩展
 ```
 
 Windows 安装包输出到 `target/release/bundle/nsis/`。首次构建可能需要联网下载 Rust 依赖及 NSIS 打包工具。安装包构建方式见 [Tauri Windows Installer 文档](https://v2.tauri.app/distribute/windows-installer/)。
@@ -129,6 +149,8 @@ Windows 安装包输出到 `target/release/bundle/nsis/`。首次构建可能需
 | `src/` | Svelte 界面、提交图、操作交互 |
 | `src/lib/locales/` | 完整英文和简体中文语言包 |
 | `crates/engine/` | Rust Git 引擎：gix 读取、Git CLI 操作 |
+| `crates/sidecar/` | 把引擎包成子进程，供 VS Code 扩展调用 |
+| `extension/` | VS Code 扩展：源代码管理、作者标注、历史和提交图面板 |
 | `src-tauri/` | 桌面窗口、命令接口和安装包配置 |
 | `tests/` | 前端回归检查 |
 

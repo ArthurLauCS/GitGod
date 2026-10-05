@@ -1,0 +1,627 @@
+{
+  "name": "pushright",
+  "displayName": "PushRight",
+  "description": "%description%",
+  "version": "0.2.0",
+  "publisher": "pushright",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "SCM Providers"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "type": "module",
+  "main": "./out/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "pushright.openGraph",
+        "title": "%command.openGraph%",
+        "category": "PushRight",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "pushright.pull",
+        "title": "%command.pull%",
+        "category": "PushRight",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "pushright.push",
+        "title": "%command.push%",
+        "category": "PushRight",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "pushright.fetch",
+        "title": "%command.fetch%",
+        "category": "PushRight",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "pushright.checkout",
+        "title": "%command.checkout%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.inProgress",
+        "title": "%command.inProgress%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.showLog",
+        "title": "%command.showLog%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.refresh",
+        "title": "%command.refresh%",
+        "category": "PushRight",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pushright.commit",
+        "title": "%command.commit%",
+        "category": "PushRight",
+        "icon": "$(check)"
+      },
+      {
+        "command": "pushright.commitAmend",
+        "title": "%command.commitAmend%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.editIdentity",
+        "title": "%command.editIdentity%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.stageAll",
+        "title": "%command.stageAll%",
+        "category": "PushRight",
+        "icon": "$(add)"
+      },
+      {
+        "command": "pushright.unstageAll",
+        "title": "%command.unstageAll%",
+        "category": "PushRight",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "pushright.discardAll",
+        "title": "%command.discardAll%",
+        "category": "PushRight",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "pushright.stage",
+        "title": "%command.stage%",
+        "category": "PushRight",
+        "icon": "$(add)"
+      },
+      {
+        "command": "pushright.unstage",
+        "title": "%command.unstage%",
+        "category": "PushRight",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "pushright.discard",
+        "title": "%command.discard%",
+        "category": "PushRight",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "pushright.openFile",
+        "title": "%command.openFile%",
+        "category": "PushRight",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "pushright.openChange",
+        "title": "%command.openChange%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.takeOurs",
+        "title": "%command.takeOurs%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.takeTheirs",
+        "title": "%command.takeTheirs%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.stageSelection",
+        "title": "%command.stageSelection%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.unstageSelection",
+        "title": "%command.unstageSelection%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.discardSelection",
+        "title": "%command.discardSelection%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.takeover",
+        "title": "%command.takeover%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.toggleFileBlame",
+        "title": "%command.toggleFileBlame%",
+        "category": "PushRight",
+        "icon": "$(person)"
+      },
+      {
+        "command": "pushright.toggleLineBlame",
+        "title": "%command.toggleLineBlame%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.focusAuthor",
+        "title": "%command.focusAuthor%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.authorStyle",
+        "title": "%command.authorStyle%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.openCommitFile",
+        "title": "%command.openCommitFile%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.revealCommit",
+        "title": "%command.revealCommit%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.copyId",
+        "title": "%command.copyId%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.fileHistory",
+        "title": "%command.fileHistory%",
+        "category": "PushRight",
+        "icon": "$(history)"
+      },
+      {
+        "command": "pushright.lineHistory",
+        "title": "%command.lineHistory%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.previousRevision",
+        "title": "%command.previousRevision%",
+        "category": "PushRight",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "pushright.nextRevision",
+        "title": "%command.nextRevision%",
+        "category": "PushRight",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "pushright.compareWith",
+        "title": "%command.compareWith%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.openAtRevision",
+        "title": "%command.openAtRevision%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.searchCommits",
+        "title": "%command.searchCommits%",
+        "category": "PushRight",
+        "icon": "$(search)"
+      },
+      {
+        "command": "pushright.item.openChanges",
+        "title": "%command.item.openChanges%",
+        "category": "PushRight"
+      },
+      {
+        "command": "pushright.item.reveal",
+        "title": "%command.item.reveal%",
+        "category": "PushRight",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "pushright.item.openFile",
+        "title": "%command.item.openFile%",
+        "category": "PushRight"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pushright.stage",
+          "when": "false"
+        },
+        {
+          "command": "pushright.unstage",
+          "when": "false"
+        },
+        {
+          "command": "pushright.discard",
+          "when": "false"
+        },
+        {
+          "command": "pushright.openFile",
+          "when": "false"
+        },
+        {
+          "command": "pushright.openChange",
+          "when": "false"
+        },
+        {
+          "command": "pushright.takeOurs",
+          "when": "false"
+        },
+        {
+          "command": "pushright.takeTheirs",
+          "when": "false"
+        },
+        {
+          "command": "pushright.openCommitFile",
+          "when": "false"
+        },
+        {
+          "command": "pushright.revealCommit",
+          "when": "false"
+        },
+        {
+          "command": "pushright.copyId",
+          "when": "false"
+        },
+        {
+          "command": "pushright.item.openChanges",
+          "when": "false"
+        },
+        {
+          "command": "pushright.item.reveal",
+          "when": "false"
+        },
+        {
+          "command": "pushright.item.openFile",
+          "when": "false"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "pushright.commit",
+          "when": "scmProvider == pushright",
+          "group": "navigation@1"
+        },
+        {
+          "command": "pushright.pull",
+          "when": "scmProvider == pushright",
+          "group": "navigation@2"
+        },
+        {
+          "command": "pushright.push",
+          "when": "scmProvider == pushright",
+          "group": "navigation@3"
+        },
+        {
+          "command": "pushright.openGraph",
+          "when": "scmProvider == pushright",
+          "group": "navigation@4"
+        },
+        {
+          "command": "pushright.refresh",
+          "when": "scmProvider == pushright",
+          "group": "navigation@5"
+        },
+        {
+          "command": "pushright.fetch",
+          "when": "scmProvider == pushright",
+          "group": "1_sync@1"
+        },
+        {
+          "command": "pushright.checkout",
+          "when": "scmProvider == pushright",
+          "group": "1_sync@2"
+        },
+        {
+          "command": "pushright.inProgress",
+          "when": "scmProvider == pushright",
+          "group": "1_sync@3"
+        },
+        {
+          "command": "pushright.commitAmend",
+          "when": "scmProvider == pushright",
+          "group": "2_commit@1"
+        },
+        {
+          "command": "pushright.editIdentity",
+          "when": "scmProvider == pushright",
+          "group": "2_commit@2"
+        },
+        {
+          "command": "pushright.stageAll",
+          "when": "scmProvider == pushright",
+          "group": "3_changes@1"
+        },
+        {
+          "command": "pushright.unstageAll",
+          "when": "scmProvider == pushright",
+          "group": "3_changes@2"
+        },
+        {
+          "command": "pushright.discardAll",
+          "when": "scmProvider == pushright",
+          "group": "3_changes@3"
+        },
+        {
+          "command": "pushright.showLog",
+          "when": "scmProvider == pushright",
+          "group": "4_more@1"
+        },
+        {
+          "command": "pushright.takeover",
+          "when": "scmProvider == pushright",
+          "group": "4_more@2"
+        }
+      ],
+      "scm/resourceGroup/context": [
+        {
+          "command": "pushright.discardAll",
+          "when": "scmProvider == pushright && scmResourceGroup == changes",
+          "group": "inline@1"
+        },
+        {
+          "command": "pushright.stageAll",
+          "when": "scmProvider == pushright && scmResourceGroup == changes",
+          "group": "inline@2"
+        },
+        {
+          "command": "pushright.unstageAll",
+          "when": "scmProvider == pushright && scmResourceGroup == staged",
+          "group": "inline"
+        }
+      ],
+      "scm/resourceState/context": [
+        {
+          "command": "pushright.openFile",
+          "when": "scmProvider == pushright",
+          "group": "inline@1"
+        },
+        {
+          "command": "pushright.discard",
+          "when": "scmProvider == pushright && scmResourceGroup == changes",
+          "group": "inline@2"
+        },
+        {
+          "command": "pushright.stage",
+          "when": "scmProvider == pushright && scmResourceGroup != staged",
+          "group": "inline@3"
+        },
+        {
+          "command": "pushright.unstage",
+          "when": "scmProvider == pushright && scmResourceGroup == staged",
+          "group": "inline@3"
+        },
+        {
+          "command": "pushright.stage",
+          "when": "scmProvider == pushright && scmResourceGroup != staged",
+          "group": "1_change@1"
+        },
+        {
+          "command": "pushright.unstage",
+          "when": "scmProvider == pushright && scmResourceGroup == staged",
+          "group": "1_change@1"
+        },
+        {
+          "command": "pushright.discard",
+          "when": "scmProvider == pushright && scmResourceGroup == changes",
+          "group": "1_change@2"
+        },
+        {
+          "command": "pushright.takeOurs",
+          "when": "scmProvider == pushright && scmResourceGroup == conflicts",
+          "group": "2_conflict@1"
+        },
+        {
+          "command": "pushright.takeTheirs",
+          "when": "scmProvider == pushright && scmResourceGroup == conflicts",
+          "group": "2_conflict@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "pushright.stageSelection",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@1"
+        },
+        {
+          "command": "pushright.discardSelection",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@2"
+        },
+        {
+          "command": "pushright.unstageSelection",
+          "when": "resourceScheme == pushright-rev",
+          "group": "pushright@1"
+        },
+        {
+          "command": "pushright.lineHistory",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@3"
+        },
+        {
+          "command": "pushright.focusAuthor",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@4"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "pushright.toggleFileBlame",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@1"
+        },
+        {
+          "command": "pushright.fileHistory",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@2"
+        },
+        {
+          "command": "pushright.previousRevision",
+          "when": "pushright.hasRepo && resourceScheme =~ /^(file|pushright-rev)$/",
+          "group": "pushright@3"
+        },
+        {
+          "command": "pushright.nextRevision",
+          "when": "pushright.hasRepo && resourceScheme =~ /^(file|pushright-rev)$/",
+          "group": "pushright@4"
+        },
+        {
+          "command": "pushright.compareWith",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@5"
+        },
+        {
+          "command": "pushright.openAtRevision",
+          "when": "pushright.hasRepo && resourceScheme == file",
+          "group": "pushright@6"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "pushright.searchCommits",
+          "when": "view == pushright.search",
+          "group": "navigation"
+        },
+        {
+          "command": "pushright.openGraph",
+          "when": "view == pushright.fileHistory",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "pushright.item.reveal",
+          "when": "viewItem =~ /^commit/",
+          "group": "inline"
+        },
+        {
+          "command": "pushright.item.reveal",
+          "when": "viewItem =~ /^commit/",
+          "group": "1@1"
+        },
+        {
+          "command": "pushright.item.openFile",
+          "when": "viewItem == commitFile",
+          "group": "1@2"
+        },
+        {
+          "command": "pushright.copyId",
+          "when": "viewItem =~ /^commit/",
+          "group": "1@3"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "pushright.previousRevision",
+        "key": "alt+,",
+        "when": "editorTextFocus && pushright.hasRepo"
+      },
+      {
+        "command": "pushright.nextRevision",
+        "key": "alt+.",
+        "when": "editorTextFocus && pushright.hasRepo"
+      },
+      {
+        "command": "pushright.toggleFileBlame",
+        "key": "alt+b",
+        "when": "editorTextFocus && pushright.hasRepo"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pushright",
+          "title": "PushRight",
+          "icon": "$(repo-push)"
+        }
+      ]
+    },
+    "views": {
+      "pushright": [
+        {
+          "id": "pushright.fileHistory",
+          "name": "%view.fileHistory%"
+        },
+        {
+          "id": "pushright.lineHistory",
+          "name": "%view.lineHistory%"
+        },
+        {
+          "id": "pushright.search",
+          "name": "%view.search%"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "pushright.search",
+        "contents": "%welcome.search%"
+      }
+    ],
+    "configuration": {
+      "title": "PushRight",
+      "properties": {
+        "pushright.blame.line.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.line%"
+        },
+        "pushright.blame.line.format": {
+          "type": "string",
+          "default": "${author} · ${ago} · ${subject}",
+          "description": "%config.format%"
+        },
+        "pushright.blame.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.statusBar%"
+        },
+        "pushright.blame.file.colors": {
+          "type": "string",
+          "enum": [
+            "author",
+            "age"
+          ],
+          "default": "author",
+          "description": "%config.colors%"
+        },
+        "pushright.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.codeLens%"
+        }
+      }
+    }
+  }
+}

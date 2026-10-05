@@ -62,7 +62,7 @@ pub enum Op {
 }
 
 /// 名字来自界面输入，以 `-` 开头会被 git 当成选项
-fn safe(s: &str) -> Result<&str> {
+pub(crate) fn safe(s: &str) -> Result<&str> {
     if s.is_empty() || s.starts_with('-') {
         return Err(format!("PR_INVALID_NAME: {s:?}"));
     }

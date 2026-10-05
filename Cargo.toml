@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/engine", "src-tauri"]
+members = ["crates/engine", "crates/sidecar", "src-tauri"]
 
 # 开发构建也优化 engine 和依赖，否则大仓库加载慢一个数量级，看不出真实性能
 [profile.dev.package."*"]

@@ -1,0 +1,5 @@
+src/
+webview/
+*.mts
+tsconfig.json
+media/index.html

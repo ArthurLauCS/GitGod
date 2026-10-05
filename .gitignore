@@ -3,3 +3,7 @@ node_modules/
 dist/
 src-tauri/gen/schemas/
 *.local
+extension/out/
+extension/media/
+extension/bin/
+*.vsix
