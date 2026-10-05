@@ -38,6 +38,11 @@ export async function activate(context: vscode.ExtensionContext) {
   registerGraphView(context)
   registerBlame(context)
   registerHistory(context)
+  // SCM 会忽略视图的初始展开声明；每个工作区只主动展开一次，之后保留用户的收起选择。
+  if (repos.length && !context.workspaceState.get('graphOpened')) {
+    await vscode.commands.executeCommand('pushright.graph.focus', { preserveFocus: true })
+    await context.workspaceState.update('graphOpened', true)
+  }
   if (repos.length) offerTakeover(context)
   // 供 tests/vscode-smoke-host.cjs 使用
   return { engine, repos }
