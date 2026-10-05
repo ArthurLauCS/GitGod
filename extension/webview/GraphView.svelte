@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { Ref, Refs, Row } from '../../src/lib/api'
+  import type { Detail, FileChange, Ref, Refs, Row } from '../../src/lib/api'
   import Graph from '../../src/lib/Graph.svelte'
   import { graphKey } from '../../src/lib/graph-key'
   import { errorText, t } from '../../src/lib/i18n.svelte'
@@ -60,9 +60,12 @@
     running = false
   }
 
-  async function select(row: number, id: string) {
-    selectedRow = row
-    try { await invoke('reveal_commit', { tab: repo!.tab, id }) }
+  async function fetchFiles(id: string) {
+    try { return (await invoke<Detail>('detail', { tab: repo!.tab, id })).files }
+    catch (e) { throw errorText(String(e)) }
+  }
+  async function openFile(id: string, file: FileChange, preview: boolean) {
+    try { await invoke('open_commit_file', { tab: repo!.tab, id, path: file.path, preview }) }
     catch (e) { error = errorText(String(e)) }
   }
   async function fetchRows(start: number, count: number) {
@@ -87,7 +90,7 @@
   {#if loading}<p role="status">{t.loadingHistory}</p>{/if}
   {#if repo && count}
     {#key repo.tab}
-      <Graph compact {fetchRows} {count} {version} {badges} headId={repo.refs.head_id} {selectedRow} onselect={select} onmenu={(e) => e.preventDefault()} />
+      <Graph compact {fetchRows} {fetchFiles} onfile={openFile} {count} {version} {badges} headId={repo.refs.head_id} {selectedRow} onselect={(row) => selectedRow = row} onmenu={(e) => e.preventDefault()} />
     {/key}
   {:else if !loading && !error}
     <p>{repo ? t.noCommits : t.vscode.noRepo}</p>

@@ -155,6 +155,29 @@ exports.run = async () => {
       await until('untracked file opens', () => vscode.window.activeTextEditor?.document.getText() === `${entry.path}\n`)
     }
     step('new folders list and preview every untracked file without directory access errors')
+
+    // 侧栏文件入口必须打开不可变的父版本/提交版本，包括根提交、新增、删除和重命名。
+    const checkCommitFile = async (id, path, before, after) => {
+      await vscode.commands.executeCommand('pushright.graph.openFile', { tab: repo.tab, id, path, preview: false })
+      await until('commit file diff', () => diffOf() instanceof vscode.TabInputTextDiff && JSON.parse(diffOf().modified.query).rev === id && diffOf().modified.fsPath === join(root, path))
+      const [left, right] = await Promise.all([vscode.workspace.openTextDocument(diffOf().original), vscode.workspace.openTextDocument(diffOf().modified)])
+      assert.equal(left.getText(), before)
+      assert.equal(right.getText(), after)
+    }
+    const initial = git('rev-list', '--max-parents=0', 'HEAD')
+    await checkCommitFile(initial, 'src.ts', '', git('show', `${initial}:src.ts`) + '\n')
+    const previous = git('rev-parse', 'HEAD')
+    git('mv', 'src.ts', '重命名.ts')
+    git('rm', 'mine.txt')
+    git('add', '--', ...newPaths)
+    git('-c', 'commit.gpgsign=false', 'commit', '-m', 'rename, delete and add files')
+    const revision = git('rev-parse', 'HEAD')
+    const original = git('show', `${previous}:src.ts`) + '\n'
+    await checkCommitFile(revision, '重命名.ts', original, original)
+    await checkCommitFile(revision, 'mine.txt', 'local work\n', '')
+    await checkCommitFile(revision, newPaths[0], '', `${newPaths[0]}\n`)
+    assert.ok(!vscode.window.tabGroups.all.some((g) => g.tabs.some((tab) => tab.input instanceof vscode.TabInputWebview)))
+    step('commit files open native diffs for root, renamed, deleted and added files without a graph editor')
   } catch (e) {
     error = e.stack ?? String(e)
   }

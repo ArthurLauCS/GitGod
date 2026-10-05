@@ -235,6 +235,9 @@ export const messages = {
   vscode: {
     graphRepository: '提交图仓库',
     graphRetry: '重新加载提交图',
+    graphLoadingFiles: '正在加载改动文件…',
+    graphNoFiles: '此提交没有文件改动',
+    graphRetryFiles: '重试',
     noRepo: '这个窗口没有打开 Git 仓库',
     unsupported: 'PushRight 找不到适用于当前平台的 Git 引擎。预览版目前只支持 Windows x64。',
     upstreamMismatch: '上游名字不一致',
