@@ -6,7 +6,9 @@
 
 A Git desktop client built with Svelte, Tauri and Rust. PushRight makes push destinations explicit, recommends a remote branch with the same name, and defaults Pull to **Rebase instead of merge**.
 
-**v0.2.0 preview** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+**v0.2.3 preview** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+
+This update lists untracked files inside new folders individually, fixes directory access errors when previewing them, and improves branch-label contrast. The VS Code extension also opens its sidebar graph by default and uses a more compact layout.
 
 ![PushRight: commit graph, individual author styling and file differences](docs/images/desktop.jpg)
 
@@ -14,13 +16,13 @@ Screenshots show the actual desktop app with a local demo repository and fiction
 
 ## Download and install
 
-Download `PushRight_0.2.0_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v0.2.0).
+Download `PushRight_0.2.3_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v0.2.3).
 
 - Windows 10 / 11 x64; built and checked on Windows x64.
 - Install [Git for Windows](https://git-scm.com/downloads/win) and make `git` available on PATH.
 - Microsoft Edge WebView2 Runtime is required; the installer attempts an online installation if missing.
 - The installer offers English and Simplified Chinese. App language is selected independently.
-- This preview is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_0.2.0_x64-setup.exe -Algorithm SHA256`.
+- This preview is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_0.2.3_x64-setup.exe -Algorithm SHA256`.
 
 Previously named GitGod. PushRight retains the application data identifier for settings compatibility. The old GitGod installation may remain separately installed; it is not removed automatically.
 
@@ -98,12 +100,12 @@ App text, tooltips, explanations and app-generated errors are translated. Reposi
 
 ## VS Code extension (preview)
 
-The same engine and interface run inside VS Code. Install the Windows x64 preview from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.2). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
+The same engine and interface run inside VS Code. Install the Windows x64 preview from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.3). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-0.2.2.vsix
+code --install-extension extension/pushright-win32-x64-0.2.3.vsix
 ```
 
 - **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.
