@@ -95,12 +95,14 @@ PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败
 
 ## VS Code 扩展（预览）
 
-同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 预览版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.3) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
+扩展 **0.2.4** 新增提交内文件列表与原生差异、Auto / 全部分支 / 指定分支筛选、图内同名推送、子仓库识别，以及本机忽略和跟踪管理。
+
+同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 预览版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.4) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-0.2.3.vsix
+code --install-extension extension/pushright-win32-x64-0.2.4.vsix
 ```
 
 - **源代码管理面板**：已暂存、未暂存和冲突的文件；按文件或按选中的行暂存、取消暂存、丢弃；提交和修补上次提交；行号旁的改动标记和资源管理器角标。首次使用时 PushRight 会说明关闭 VS Code 自带 Git 的后果，由你决定是否关闭。
@@ -109,7 +111,7 @@ code --install-extension extension/pushright-win32-x64-0.2.3.vsix
 - **历史**：跟随当前文件的文件历史、选中行的行历史、上一版 / 下一版对比（`Alt+,` / `Alt+.`）、与任意分支、标签或提交对比，以及按提交说明、作者、文件、改动内容或提交号搜索提交。
 - **提交图**：执行「PushRight: 打开提交图」，桌面版的界面会在编辑器页签里打开。
 
-尚未包含：macOS、Linux 和远程开发（WSL / SSH）版本，PR / Issue 集成，交互式变基编辑器，自动定时获取。仓库按工作区文件夹识别，子目录里的嵌套仓库不会被识别。
+尚未包含：macOS、Linux 和远程开发（WSL / SSH）版本，PR / Issue 集成，交互式变基编辑器，自动定时获取。子模块需要先初始化。
 
 ## 当前边界
 

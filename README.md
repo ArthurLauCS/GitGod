@@ -100,12 +100,14 @@ App text, tooltips, explanations and app-generated errors are translated. Reposi
 
 ## VS Code extension (preview)
 
-The same engine and interface run inside VS Code. Install the Windows x64 preview from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.3). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
+Extension **0.2.4** adds inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, and local ignore / tracking controls.
+
+The same engine and interface run inside VS Code. Install the Windows x64 preview from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.4). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-0.2.3.vsix
+code --install-extension extension/pushright-win32-x64-0.2.4.vsix
 ```
 
 - **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.
@@ -114,7 +116,7 @@ code --install-extension extension/pushright-win32-x64-0.2.3.vsix
 - **History**: file history that follows the active editor, line history for a selection, previous / next revision (`Alt+,` / `Alt+.`), compare with any branch, tag or commit, and commit search by message, author, file, changed text or ID.
 - **Commit graph**: "PushRight: Open Commit Graph" opens the desktop interface in an editor tab.
 
-Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration, an interactive rebase editor, and automatic fetch. Repositories are detected from workspace folders; nested repositories are not.
+Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration, an interactive rebase editor, and automatic fetch. Submodules must already be initialized.
 
 ## Current limits
 
