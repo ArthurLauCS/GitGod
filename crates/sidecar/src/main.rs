@@ -2,7 +2,7 @@
 //! 标准输出每行一个 `{id, ok, value}`。命令名和参数与桌面版 src-tauri/src/main.rs 一致。
 
 use engine::graph::Graph;
-use engine::{conflict, detail, diff, history, identity, ops, refs, status, Repo, Result};
+use engine::{conflict, detail, diff, history, identity, local_files, ops, refs, status, Repo, Result};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -61,7 +61,8 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
     let repo = &*s.repo;
     match cmd {
         "load_graph" => {
-            let graph = Arc::new(Graph::load(repo, if arg(a, "full")? { usize::MAX } else { FIRST_PAGE })?);
+            let scope: Option<String> = arg(a, "scope")?;
+            let graph = Arc::new(Graph::load_scope(repo, if arg(a, "full")? { usize::MAX } else { FIRST_PAGE }, scope.as_deref().unwrap_or("all"))?);
             let len = graph.len();
             // 加载期间页签可能已经关闭
             if let Some(s) = tabs.sessions.write().unwrap().get_mut(&tab) {
@@ -106,6 +107,11 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
         "conflict_resolve" => out(conflict::resolve(repo, &arg::<String>(a, "path")?, &arg::<Vec<conflict::Side>>(a, "choices")?)?),
         "conflict_take" => out(conflict::take(repo, &arg::<String>(a, "path")?, arg(a, "theirs")?)?),
         // 以下命令只有扩展使用
+        "repositories" => out(local_files::repositories(repo)?),
+        "ignored" => out(local_files::ignored(repo, &arg::<String>(a, "path")?)?),
+        "is_tracked" => out(local_files::tracked(repo, &arg::<String>(a, "path")?)?),
+        "ignore_file" => out(local_files::ignore_file(repo, &arg::<String>(a, "path")?, arg(a, "shared")?)?),
+        "track_file" => out(local_files::track(repo, &arg::<String>(a, "path")?, arg(a, "track")?)?),
         "file_history" => out(history::file(repo, &arg::<String>(a, "path")?, arg(a, "limit")?)?),
         "line_history" => out(history::lines(repo, &arg::<String>(a, "path")?, arg(a, "start")?, arg(a, "end")?, arg(a, "limit")?)?),
         "search" => out(history::search(repo, arg(a, "kind")?, &arg::<String>(a, "query")?, arg(a, "limit")?)?),

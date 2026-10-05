@@ -92,6 +92,12 @@ test('sidecar answers the same commands as the desktop backend, plus history', {
     assert.deepEqual(rows.map((r) => r.subject), ['rename', 'shout three', 'add file'])
     assert.equal(refs.head, 'refs/heads/main')
     assert.deepEqual(history.map((c) => c.path), ['b.txt', 'a.txt', 'a.txt'])
+    execFileSync('git', ['-C', dir, 'branch', 'older', history[1].id])
+    assert.equal(await engine.call('load_graph', { tab, full: true, scope: 'refs/heads/older' }), 2)
+    assert.deepEqual((await engine.call('rows', { tab, start: 0, count: 10 })).map((r) => r.subject), ['shout three', 'add file'])
+    assert.equal(await engine.call('load_graph', { tab, full: true, scope: 'auto' }), 3)
+    assert.equal(await engine.call('load_graph', { tab, full: true, scope: 'all' }), 3)
+    await assert.rejects(engine.call('load_graph', { tab, full: true, scope: '--all' }), /PR_GRAPH_REF_GONE/)
     assert.equal(await engine.call('show', { tab, rev: history[2].id, path: 'a.txt' }), 'one\ntwo\nthree\n')
     assert.deepEqual((await engine.call('search', { tab, kind: 'author', query: 'alice', limit: 10 })).map((c) => c.subject), ['add file'])
 

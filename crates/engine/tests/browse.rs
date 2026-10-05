@@ -74,8 +74,39 @@ fn empty_repo() {
     let repo = Repo::open(&dir).unwrap();
     let graph = Graph::load(&repo, usize::MAX).unwrap();
     assert_eq!(graph.len(), 0);
+    assert_eq!(Graph::load_scope(&repo, usize::MAX, "auto").unwrap().len(), 0);
     assert!(graph.rows(&repo, 0, 100).unwrap().is_empty());
     let r = refs::list(&repo).unwrap();
     assert_eq!((r.head.as_deref(), r.head_id, r.refs.len()), (Some("refs/heads/main"), None, 0));
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn graph_scopes_follow_ancestry_and_auto_includes_remote_base() {
+    let dir = fixture("scopes");
+    git(&dir, 0, &["remote", "add", "origin", "https://example.invalid/repo.git"]);
+    git(&dir, 0, &["update-ref", "refs/remotes/origin/main", "main"]);
+    git(&dir, 0, &["update-ref", "refs/remotes/origin/feat", "feat"]);
+    git(&dir, 0, &["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+    git(&dir, 0, &["checkout", "-q", "feat"]);
+    git(&dir, 0, &["branch", "--set-upstream-to=origin/feat"]);
+    git(&dir, 0, &["branch", "unrelated"]);
+    git(&dir, 0, &["checkout", "-q", "unrelated"]);
+    git(&dir, 5, &["commit", "-q", "--allow-empty", "-m", "unrelated"]);
+    git(&dir, 0, &["checkout", "-q", "feat"]);
+    let repo = Repo::open(&dir).unwrap();
+    let subjects = |scope| Graph::load_scope(&repo, usize::MAX, scope).unwrap().rows(&repo, 0, 100).unwrap().into_iter().map(|r| r.subject).collect::<Vec<_>>();
+    assert_eq!(subjects("refs/heads/feat"), ["B", "A"]);
+    assert_eq!(subjects("refs/remotes/origin/feat"), ["B", "A"]);
+    assert_eq!(subjects("auto"), ["M", "C", "B", "A"]);
+    assert_eq!(subjects("all"), ["unrelated", "M", "C", "B", "A"]);
+    assert!(Graph::load_scope(&repo, 10, "--all").is_err());
+    assert_eq!(refs::list(&repo).unwrap().head.as_deref(), Some("refs/heads/feat"));
+    git(&dir, 0, &["checkout", "-q", "--detach", "feat"]);
+    assert_eq!(subjects("auto"), ["B", "A"]);
+    git(&dir, 0, &["checkout", "-q", "-b", "from-remote", "origin/feat"]);
+    assert_eq!(subjects("auto"), ["B", "A"], "creation source takes precedence over the remote default");
+    git(&dir, 0, &["config", "branch.from-remote.vscode-merge-base", "origin/main"]);
+    assert_eq!(subjects("auto"), ["M", "C", "B", "A"], "honor the existing VS Code base setting");
+    std::fs::remove_dir_all(dir).unwrap();
 }

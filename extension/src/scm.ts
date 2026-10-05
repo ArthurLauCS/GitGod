@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import type { Diff, Entry, Identity } from '../../src/lib/api'
 import {
-  activeRepo, attempt, engine, errorText, fileUri, help, onRepoChange, refresh, rel, repoOf, repos, REV, revOf, revUri, run, t, v, write, type Repo,
+  activeRepo, attempt, discoverRepositories, engine, errorText, fileUri, help, onRepoChange, refresh, rel, repoOf, repos, REV, revOf, revUri, run, t, v, write, type Repo,
 } from './core'
 import { statusCommands } from './sync'
 
@@ -143,7 +143,7 @@ export function registerScm(context: vscode.ExtensionContext) {
   const changed = new Map<Repo, Map<string, Entry>>()
   const groups = new Map<Repo, Record<'conflicts' | 'staged' | 'changes', vscode.SourceControlResourceGroup>>()
 
-  for (const repo of repos) {
+  const addControl = (repo: Repo) => {
     const control = vscode.scm.createSourceControl('pushright', `PushRight · ${repo.name}`, vscode.Uri.file(repo.root))
     control.acceptInputCommand = { command: 'pushright.commit', title: t.commit, arguments: [control] }
     control.quickDiffProvider = {
@@ -164,6 +164,7 @@ export function registerScm(context: vscode.ExtensionContext) {
   }
 
   const update = (repo: Repo) => {
+    if (!controls.has(repo)) addControl(repo)
     const control = controls.get(repo)!
     const g = groups.get(repo)!
     g.conflicts.resourceStates = repo.status.filter((e) => e.conflicted).map((e) => resource(repo, e, false))
@@ -186,8 +187,12 @@ export function registerScm(context: vscode.ExtensionContext) {
   const schedule = (uri: vscode.Uri) => {
     const repo = repoOf(uri)
     if (!repo || /[\\/]\.git[\\/].*\.lock$/.test(uri.fsPath)) return
-    clearTimeout(timers.get(repo))
-    timers.set(repo, setTimeout(() => refresh(repo), 300))
+    // 子模块的 Git 元数据在父仓库 .git/modules 下；那里变化时也刷新子仓库。
+    const affected = /[\\/]\.git[\\/]/.test(uri.fsPath) ? repos.filter((r) => r === repo || r.root.startsWith(repo.root + (process.platform === 'win32' ? '\\' : '/'))) : [repo]
+    for (const r of affected) {
+      clearTimeout(timers.get(r))
+      timers.set(r, setTimeout(async () => { if (uri.fsPath.endsWith('.gitmodules')) await discoverRepositories(); await refresh(r) }, 300))
+    }
   }
   const watcher = vscode.workspace.createFileSystemWatcher('**')
   const command = (id: string, fn: (...args: any[]) => unknown) => vscode.commands.registerCommand(`pushright.${id}`, fn)
@@ -245,7 +250,7 @@ export function registerScm(context: vscode.ExtensionContext) {
     command('commit', (arg) => ((repo) => repo && commit(repo, false))(target(arg))),
     command('commitAmend', (arg) => ((repo) => repo && commit(repo, true))(target(arg))),
     command('editIdentity', (arg) => ((repo) => repo && editIdentity(repo))(target(arg))),
-    command('refresh', () => repos.forEach(refresh)),
+    command('refresh', async () => { await discoverRepositories(); await Promise.all(repos.map(refresh)) }),
     command('stageSelection', () => applySelection('stage')),
     command('unstageSelection', () => applySelection('unstage')),
     command('discardSelection', () => applySelection('discard')),

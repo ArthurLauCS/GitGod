@@ -1,4 +1,9 @@
 {
+  "view.localFiles": "PushRight 本地文件",
+  "command.ignoreLocal": "仅本机忽略",
+  "command.ignoreShared": "加入 .gitignore",
+  "command.trackFile": "开始跟踪（暂存）",
+  "command.untrackFile": "停止跟踪并保留本地文件",
   "command.openGraph": "打开提交图",
   "command.pull": "拉取…",
   "command.push": "推送…",

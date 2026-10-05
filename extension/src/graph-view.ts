@@ -3,9 +3,15 @@ import * as vscode from 'vscode'
 import type { Detail } from '../../src/lib/api'
 import { engine, onPrefsChange, onRepoChange, repos, revUri, store, stored } from './core'
 import { setupWebview } from './webview'
+import { fetch, pull, push } from './sync'
 
 /** 原生历史图仍需要 proposed API；使用稳定的 WebviewView 放在相同的 SCM 容器内。 */
 export function registerGraphView(context: vscode.ExtensionContext) {
+  const scopes = { ...context.workspaceState.get<Record<string, string>>('graphScopes', {}) }
+  const scopeOf = (root: string, refs: { name: string }[]) => {
+    const scope = scopes[root] ?? 'auto'
+    return scope === 'auto' || scope === 'all' || refs.some((r) => r.name === scope) ? scope : 'auto'
+  }
   const openFile = async (args: { tab: number; id: string; path: string; preview?: boolean }) => {
     const repo = repos.find((r) => r.tab === args?.tab)
     if (!repo || typeof args.id !== 'string' || typeof args.path !== 'string') throw new Error('Unsupported graph request')
@@ -33,16 +39,22 @@ export function registerGraphView(context: vscode.ExtensionContext) {
           try {
             let value: unknown
             if (m.cmd === 'graph_repos') {
-              value = repos.map(({ tab, root, name, refs }) => ({ tab, root, name, refs }))
+              value = repos.map(({ tab, root, name, refs }) => ({ tab, root, name, refs, scope: scopeOf(root, refs.refs) }))
             } else {
               const repo = repos.find((r) => r.tab === m.args?.tab)
               if (!repo) throw new Error('PR_TAB_CLOSED')
-              if (m.cmd === 'detail' && typeof m.args.id === 'string') {
+              if (m.cmd === 'graph_scope' && typeof m.args.scope === 'string' && (['auto', 'all'].includes(m.args.scope) || repo.refs.refs.some((r) => r.name === m.args.scope && /^refs\/(heads|remotes)\//.test(r.name)))) {
+                scopes[repo.root] = m.args.scope
+                await context.workspaceState.update('graphScopes', scopes)
+              } else if (m.cmd === 'graph_sync' && ['fetch', 'pull', 'push'].includes(m.args.action)) {
+                if (m.args.action === 'push') await push(repo, true)
+                else await (m.args.action === 'pull' ? pull : fetch)(repo)
+              } else if (m.cmd === 'detail' && typeof m.args.id === 'string') {
                 value = await engine.call<Detail>('detail', { tab: repo.tab, id: m.args.id })
               } else if (m.cmd === 'open_commit_file') {
                 await openFile(m.args)
               } else if (m.cmd === 'load_graph' && typeof m.args.full === 'boolean') {
-                value = await engine.call(m.cmd, { tab: repo.tab, full: m.args.full })
+                value = await engine.call(m.cmd, { tab: repo.tab, full: m.args.full, scope: scopeOf(repo.root, repo.refs.refs) })
               } else if (m.cmd === 'rows' && Number.isInteger(m.args.start) && m.args.start >= 0 && Number.isInteger(m.args.count) && m.args.count > 0 && m.args.count <= 128) {
                 value = await engine.call(m.cmd, { tab: repo.tab, start: m.args.start, count: m.args.count })
               } else throw new Error('Unsupported graph request')

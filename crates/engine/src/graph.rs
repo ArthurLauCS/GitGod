@@ -37,8 +37,12 @@ pub struct Row {
 impl Graph {
     /// 从所有引用出发加载最近的 `limit` 个提交，按「子在父之前、其余按时间」排序。
     pub fn load(repo: &Repo, limit: usize) -> Result<Graph> {
+        Self::load_scope(repo, limit, "all")
+    }
+
+    pub fn load_scope(repo: &Repo, limit: usize, scope: &str) -> Result<Graph> {
         let gix = repo.gix();
-        let tips = refs::tips(&gix)?;
+        let tips = refs::graph_tips(repo, scope)?;
         let nodes = if tips.is_empty() {
             Vec::new()
         } else {

@@ -4,6 +4,7 @@ pub mod diff;
 pub mod graph;
 pub mod history;
 pub mod identity;
+pub mod local_files;
 pub mod ops;
 pub mod refs;
 pub mod status;
