@@ -2,7 +2,7 @@
   "name": "pushright",
   "displayName": "PushRight",
   "description": "%description%",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "AthurLau",
   "private": true,
   "icon": "icon.png",
