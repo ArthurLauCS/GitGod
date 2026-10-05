@@ -55,6 +55,29 @@ exports.run = async () => {
     assert.match(lens.command.title, /^bob, /)
     step('blames the file and shows the latest author as a code lens')
 
+    const lineCalls = []
+    const originalCall = api.engine.call.bind(api.engine)
+    api.engine.call = async (cmd, args) => {
+      const result = await originalCall(cmd, args)
+      if (cmd === 'line_history') lineCalls.push({ args, result })
+      return result
+    }
+    // 仅展开视图，随后移动光标，不执行 pushright.lineHistory 命令。
+    await vscode.commands.executeCommand('pushright.lineHistory.focus')
+    await vscode.window.showTextDocument(editor.document)
+    editor.selection = new vscode.Selection(10, 0, 10, 0)
+    await until('automatic line history', () => lineCalls.some((c) => c.args.start === 11 && c.args.end === 11 && c.result.some((r) => r.subject === 'raise value10')))
+    assert.equal(vscode.window.activeTextEditor.document.uri.toString(), file.toString())
+    step('line history follows the selected line without its context-menu command')
+    await vscode.commands.executeCommand('workbench.view.explorer')
+    await sleep(250)
+    const beforeHidden = lineCalls.length
+    editor.selection = new vscode.Selection(20, 0, 20, 0)
+    await sleep(350)
+    assert.equal(lineCalls.length, beforeHidden)
+    step('hidden line history does not query on cursor movement')
+    api.engine.call = originalCall
+
     // 改两处，只选中第一处暂存
     const text = editor.document.getText().split('\n')
     text[0] = 'export const value0 = -1'
