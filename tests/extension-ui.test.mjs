@@ -87,8 +87,10 @@ test('history context menus resolve their list and stale file requests cannot re
     EventEmitter: Event, TabInputTextDiff: class {},
     window: {
       activeTextEditor: undefined, onDidChangeActiveTextEditor: editorChanged.event,
-      createTreeView: (id, { treeDataProvider }) => { const view = { visible: true, onDidChangeVisibility: new Event().event, provider: treeDataProvider }; views.set(id, view); return view },
+      onDidChangeTextEditorSelection: new Event().event,
+      createTreeView: (id, { treeDataProvider }) => { const view = { visible: id !== 'pushright.lineHistory', onDidChangeVisibility: new Event().event, provider: treeDataProvider }; views.set(id, view); return view },
     },
+    workspace: { onDidChangeTextDocument: new Event().event, onDidSaveTextDocument: new Event().event },
     commands: { registerCommand: (id, fn) => commands.set(id, fn), executeCommand: (...args) => diffs.push(args) },
   }
   const core = {
@@ -111,6 +113,63 @@ test('history context menus resolve their list and stale file requests cannot re
   const count = pending.size
   repoChanged.fire(repo)
   assert.equal(pending.size, count)
+})
+
+test('line history follows selection without focus, coalesces reads and rejects stale results', async () => {
+  const selection = new Event(), editorChanged = new Event(), visibility = new Event(), changed = new Event(), saved = new Event(), repoChanged = new Event()
+  const views = new Map(), commands = new Map(), executed = [], calls = []
+  const repo = { tab: 0, refs: { head_id: 'head' } }
+  const range = (start, end = start, character = 2) => ({ start: { line: start, character: 0 }, end: { line: end, character } })
+  const editor = { document: { uri: uri('/repo/a.txt'), isDirty: false }, selection: range(0) }
+  const vscode = {
+    EventEmitter: Event,
+    window: {
+      activeTextEditor: editor, onDidChangeActiveTextEditor: editorChanged.event, onDidChangeTextEditorSelection: selection.event,
+      withProgress: (_, fn) => fn(),
+      createTreeView: (id, { treeDataProvider }) => { const view = { visible: id === 'pushright.lineHistory', onDidChangeVisibility: visibility.event, provider: treeDataProvider }; views.set(id, view); return view },
+    },
+    workspace: { onDidChangeTextDocument: changed.event, onDidSaveTextDocument: saved.event },
+    commands: { registerCommand: (id, fn) => commands.set(id, fn), executeCommand: (...args) => executed.push(args) },
+  }
+  const core = { onRepoChange: repoChanged, repoOf: () => repo, rel: () => 'a.txt', v: { lineHistoryLoading: 'loading' }, t: { errors: { PR_LINE_HISTORY_CHANGED: 'changed' } }, errorText: String,
+    engine: { call: (cmd, args) => { const job = deferred(); calls.push({ cmd, args, job }); return job.promise } },
+  }
+  const context = { subscriptions: [] }
+  load('history', { vscode, './core': core }).registerHistory(context)
+  const pause = () => new Promise((r) => setTimeout(r, 160))
+  const move = (r) => { editor.selection = r; selection.fire({ textEditor: editor }) }
+  const list = views.get('pushright.lineHistory').provider
+  try {
+    await pause()
+    assert.equal(calls[0].args.start, 1)
+    move(range(1)); move(range(2, 3, 0)); await pause()
+    assert.equal(calls.length, 1, 'wait for the existing query instead of launching parallel Git logs')
+    calls[0].job.resolve([{ id: 'stale' }]); await pause()
+    assert.deepEqual(list.items, [])
+    assert.equal(calls.length, 2)
+    assert.deepEqual([calls[1].args.start, calls[1].args.end], [3, 3])
+    const latest = [{ id: 'latest', path: 'a.txt' }]
+    calls[1].job.resolve(latest); await pause()
+    assert.equal(list.items, latest)
+    move(range(2)); await pause()
+    assert.equal(calls.length, 2, 'same line does not reload')
+    assert.deepEqual(executed, [], 'following the cursor must not focus the history pane')
+    editor.document.isDirty = true; changed.fire({ document: editor.document }); await pause()
+    assert.equal(list.view.message, 'changed')
+    assert.deepEqual(list.items, [])
+    assert.equal(calls.length, 2)
+    editor.document.isDirty = false; saved.fire(editor.document); await pause()
+    assert.equal(calls.length, 3)
+    calls[2].job.resolve(latest); await pause()
+    list.view.visible = false; visibility.fire(); move(range(5)); await pause()
+    assert.equal(calls.length, 3, 'hidden views do not request history')
+    list.view.visible = true; visibility.fire(); await pause()
+    assert.equal(calls[3].args.start, 6)
+    calls[3].job.resolve([]); await pause()
+    repo.refs.head_id = 'new-head'; repoChanged.fire(repo); await pause()
+    assert.equal(calls.length, 5)
+    calls[4].job.resolve([])
+  } finally { context.subscriptions.forEach((s) => s?.dispose?.()) }
 })
 
 test('push mismatch recommends an explicit same-name destination; cancel sends nothing', async () => {

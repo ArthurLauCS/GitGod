@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import * as vscode from 'vscode'
-import { activeRepo, ago, attempt, date, engine, fileUri, onRepoChange, rel, repoOf, revOf, revUri, short, t, v, type Repo } from './core'
+import { activeRepo, ago, attempt, date, engine, errorText, fileUri, onRepoChange, rel, repoOf, REV, revOf, revUri, short, t, v, type Repo } from './core'
 
 /** 与 crates/engine/src/history.rs 的 Commit 对应 */
 interface Commit {
@@ -56,6 +56,12 @@ export function registerHistory(context: vscode.ExtensionContext) {
   lines.view.message = v.lineHistoryHint
   let fileRequest = 0
   let fileHead: string | null = null
+  let lineRequest = 0
+  let lineKey = ''
+  let lineHead: string | null = null
+  let lineTimer: ReturnType<typeof setTimeout>
+  let lineBusy = false
+  let lineAgain = false
 
   /** 让文件历史列表对应这个文件；已经是它就不重取。 */
   async function loadFile(repo: Repo, path: string) {
@@ -104,20 +110,69 @@ export function registerHistory(context: vscode.ExtensionContext) {
     return openChanges(files.items[to], files)
   }
 
-  async function lineHistory(uri?: vscode.Uri, start?: number, end?: number) {
+  async function lineHistory(uri?: vscode.Uri, start?: number, end?: number, focus = true) {
     const editor = vscode.window.activeTextEditor
     uri ??= editor?.document.uri
     const repo = uri?.scheme === 'file' ? repoOf(uri) : undefined
-    if (!uri || !repo) return
-    if (editor?.document.uri.toString() === uri.toString() && editor.document.isDirty) return void vscode.window.showWarningMessage(t.errors.PR_LINE_HISTORY_CHANGED)
+    if (!uri || !repo) {
+      if (!focus && uri?.scheme !== REV) {
+        lineKey = ''
+        lines.set(undefined, '', [], '')
+        lines.view.message = v.lineHistoryHint
+      }
+      return
+    }
     start ??= editor!.selection.start.line + 1
-    end ??= editor!.selection.end.line + 1
+    end ??= editor!.selection.end.line + (editor!.selection.end.character === 0 && editor!.selection.end.line >= start ? 0 : 1)
     const path = rel(repo, uri)
-    await vscode.commands.executeCommand('pushright.lineHistory.focus')
-    const items = await vscode.window.withProgress({ location: { viewId: 'pushright.lineHistory' } }, () =>
-      attempt(engine.call<Commit[]>('line_history', { tab: repo.tab, path, start, end, limit: LIMIT })),
-    )
-    lines.set(repo, path, items ?? [], `${basename(path)}:${start}-${end}`)
+    if (focus) {
+      await vscode.commands.executeCommand('pushright.lineHistory.focus')
+      clearTimeout(lineTimer)
+      lineAgain = false
+    }
+    const request = ++lineRequest
+    const description = `${basename(path)}:${start}-${end}`
+    lineHead = repo.refs.head_id
+    if (editor?.document.uri.toString() === uri.toString() && editor.document.isDirty) {
+      lineKey = ''
+      lines.set(repo, path, [], description)
+      lines.view.message = t.errors.PR_LINE_HISTORY_CHANGED
+      return
+    }
+    const key = JSON.stringify([repo.tab, path, start, end, lineHead])
+    if (lineKey === key) return
+    lineKey = ''
+    lines.set(repo, path, [], description)
+    lines.view.message = v.lineHistoryLoading
+    try {
+      const items = await vscode.window.withProgress({ location: { viewId: 'pushright.lineHistory' } }, () =>
+        engine.call<Commit[]>('line_history', { tab: repo.tab, path, start, end, limit: LIMIT }),
+      )
+      if (request !== lineRequest) return
+      lineKey = key
+      lines.set(repo, path, items, description)
+    } catch (error) {
+      if (request === lineRequest) {
+        lineKey = ''
+        lines.view.message = errorText(error)
+      }
+    }
+  }
+
+  /** 自动跟随不切走编辑器焦点；最多一项自动查询在途，连续移动只取最后的选区。 */
+  function followLines() {
+    clearTimeout(lineTimer)
+    ++lineRequest
+    if (!lines.view.visible) return
+    lineTimer = setTimeout(async () => {
+      if (lineBusy) { lineAgain = true; return }
+      lineBusy = true
+      try { await lineHistory(undefined, undefined, undefined, false) }
+      finally {
+        lineBusy = false
+        if (lineAgain) { lineAgain = false; followLines() }
+      }
+    }, 120)
   }
 
   async function search() {
@@ -166,9 +221,20 @@ export function registerHistory(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     files.view, lines.view, found.view,
     vscode.window.onDidChangeActiveTextEditor(follow),
+    vscode.window.onDidChangeActiveTextEditor(followLines),
+    vscode.window.onDidChangeTextEditorSelection((e) => { if (e.textEditor === vscode.window.activeTextEditor) followLines() }),
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      if (e.document === vscode.window.activeTextEditor?.document) { lineKey = ''; followLines() }
+    }),
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (doc === vscode.window.activeTextEditor?.document) { lineKey = ''; followLines() }
+    }),
+    lines.view.onDidChangeVisibility(followLines),
+    { dispose: () => { clearTimeout(lineTimer); ++lineRequest; lineAgain = false } },
     files.view.onDidChangeVisibility(follow),
     // 有了新提交后文件历史要重取
     onRepoChange.event((repo) => files.repo === repo && files.view.visible && loadFile(repo, files.path)),
+    onRepoChange.event((repo) => { if (lines.repo === repo && lineHead !== repo.refs.head_id) followLines() }),
     command('fileHistory', async () => {
       await vscode.commands.executeCommand('pushright.fileHistory.focus')
       follow()
@@ -187,4 +253,5 @@ export function registerHistory(context: vscode.ExtensionContext) {
     }),
   )
   follow()
+  followLines()
 }
