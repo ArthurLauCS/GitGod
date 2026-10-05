@@ -120,8 +120,8 @@
   // VS Code 扩展从编辑器跳到某个提交
   $effect(() => {
     const reveal = (e: Event) => active && jump((e as CustomEvent<string>).detail)
-    addEventListener('pushright:reveal', reveal)
-    return () => removeEventListener('pushright:reveal', reveal)
+    addEventListener('pushright:jump', reveal)
+    return () => removeEventListener('pushright:jump', reveal)
   })
 
   // 回到窗口、切回本页签或执行完操作后：引用指向有变化才重新加载提交图

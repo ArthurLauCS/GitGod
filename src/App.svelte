@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { open } from '@tauri-apps/plugin-dialog'
   import * as api from './lib/api'
   import Icon from './lib/Icon.svelte'
@@ -75,6 +76,22 @@
   ;(async () => {
     for (const path of [...load('tabs'), ...(await api.initialRepos())]) await openRepo(path)
   })()
+
+  $effect(() => {
+    const reveal = async (event: Event) => {
+      const { id, root } = (event as CustomEvent<{ id: string; root?: string }>).detail
+      if (root) {
+        const normalize = (p: string) => p.replaceAll('\\', '/').toLowerCase()
+        const tab = tabs.find((tab) => normalize(tab.path) === normalize(root))
+        if (tab) active = tab.id
+        else await openRepo(root)
+      }
+      await tick()
+      dispatchEvent(new CustomEvent('pushright:jump', { detail: id }))
+    }
+    addEventListener('pushright:reveal', reveal)
+    return () => removeEventListener('pushright:reveal', reveal)
+  })
 </script>
 
 <svelte:window {onkeydown} />

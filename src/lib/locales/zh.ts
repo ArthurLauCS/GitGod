@@ -6,6 +6,9 @@ export const messages = {
   stashPopHint: '放回工作区，并从贮藏列表里移除',
   renameHint: '只改本地分支的名字',
   errors: {
+    PR_LINE_HISTORY_CHANGED: '请先提交或贮藏此文件的改动再查看行历史；行号必须与 HEAD 一致',
+    PR_FILE_TOO_LARGE: '此版本超过 4 MiB，无法在编辑器中显示',
+    PR_NOT_TEXT_FILE: '此版本不是文本文件',
     PR_TAB_CLOSED: '页签已关闭',
     PR_INVALID_NAME: '名称不合法',
     PR_CONFLICT_MARKERS: '文件里的冲突标记不完整',

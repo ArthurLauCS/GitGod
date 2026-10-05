@@ -23,7 +23,7 @@ exports.run = async () => {
     const file = vscode.Uri.file(join(root, 'src.ts'))
     const step = (name) => passed.push(name)
 
-    const extension = vscode.extensions.getExtension('pushright.pushright')
+    const extension = vscode.extensions.getExtension(process.env.PUSHRIGHT_SMOKE_ID)
     const api = await extension.activate()
     assert.equal(api.repos.length, 1)
     assert.equal(api.repos[0].refs.head, 'refs/heads/feature/x')
@@ -94,10 +94,10 @@ exports.run = async () => {
     assert.ok(vscode.window.tabGroups.all.some((g) => g.tabs.some((tab) => tab.input instanceof vscode.TabInputWebview)))
     step('commit graph panel loads and talks to the engine')
 
-    if (process.env.PUSHRIGHT_SMOKE_SHOT) {
-      await sleep(3000)
-      execFileSync('powershell', ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; $b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $i=New-Object System.Drawing.Bitmap $b.Width,$b.Height; [System.Drawing.Graphics]::FromImage($i).CopyFromScreen($b.Location,[System.Drawing.Point]::Empty,$b.Size); $i.Save('${process.env.PUSHRIGHT_SMOKE_SHOT}')`])
-    }
+    const graphTab = vscode.window.tabGroups.all.flatMap((g) => g.tabs).find((tab) => tab.input instanceof vscode.TabInputWebview)
+    await vscode.window.tabGroups.close(graphTab)
+    await until('graph session closed', () => api.engine.call('refs', { tab: 1 }).then(() => false, (e) => String(e).includes('PR_TAB_CLOSED')))
+    step('closing the commit graph releases its engine session')
   } catch (e) {
     error = e.stack ?? String(e)
   }

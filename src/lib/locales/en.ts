@@ -7,6 +7,9 @@ export const messages = {
   stashPopHint: 'Restore these changes and remove the stash if successful',
   renameHint: 'Rename the local branch only',
   errors: {
+    PR_LINE_HISTORY_CHANGED: 'Commit or stash changes to this file before viewing line history; line numbers must match HEAD',
+    PR_FILE_TOO_LARGE: 'This revision exceeds 4 MiB and cannot be displayed in the editor',
+    PR_NOT_TEXT_FILE: 'This revision is not a text file',
     PR_TAB_CLOSED: 'This tab has been closed',
     PR_INVALID_NAME: 'Invalid name',
     PR_CONFLICT_MARKERS: 'The file contains incomplete conflict markers',

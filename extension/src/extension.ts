@@ -25,7 +25,7 @@ export async function activate(context: vscode.ExtensionContext) {
     log, onRepoChange, onPrefsChange,
     { dispose: () => engine.dispose() },
     command('openGraph', () => openPanel(context)),
-    command('revealCommit', (id: string) => openPanel(context, id)),
+    command('revealCommit', (id: string, root?: string) => openPanel(context, { id, root: root ?? activeRepo()?.root })),
     command('pull', onRepo(pull)),
     command('push', onRepo(push)),
     command('fetch', onRepo(fetch)),
