@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1
+
+- Adopt the MIT license and include it in the VSIX and desktop installer.
+- Update direct downloads to the licensed release. Runtime behavior is unchanged from 1.0.0.
+
+采用 MIT 开源许可证，随 VSIX 与桌面安装包分发，并更新直接下载入口。功能与首个正式版 1.0.0 保持一致。
+
 ## 1.0.0
 
 First stable release for Windows x64, with English and Simplified Chinese UI.
