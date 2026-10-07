@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0
+
+- Add repository comparisons, reviewed-file markers, remote management, interactive rebase and reflog recovery to the full graph interface.
+- Add clone/init, image previews and read-only streaming pages for large patches.
+- Page file/line history and search beyond 200 entries; map unchanged lines in dirty buffers back to HEAD.
+- Allow native text revision limits of 4–64 MiB. Windows local workspaces only; PR/Issue collaboration and cloud patches are excluded.
+
+新增整仓比较、审阅标记、远程管理、交互式变基、Reflog 恢复、克隆/初始化、图片预览及大补丁分页；历史可加载更多，本地修改后的未变选区仍可查询行历史。仅完善 Windows 本地功能。
+
 ## 1.0.1
 
 - Adopt the MIT license and include it in the VSIX and desktop installer.

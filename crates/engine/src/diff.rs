@@ -1,9 +1,10 @@
 use crate::{decode, err, Repo, Result};
 use gix::ObjectId;
 use serde::Serialize;
-use std::io::Read;
+use std::io::{BufReader, Read};
+use base64::Engine;
 
-// ponytail: 超过这个大小的补丁不解析不显示；需要时改成按区块分页
+// Editable patches stay bounded; larger patches use the read-only streaming pages below.
 const MAX_PATCH: usize = 4 << 20;
 
 #[derive(Serialize, Default)]
@@ -11,6 +12,10 @@ pub struct Diff {
     pub binary: bool,
     pub too_large: bool,
     pub hunks: Vec<Hunk>,
+    pub images: Option<[Option<String>; 2]>,
+    pub next: Option<usize>,
+    pub paged: bool,
+    pub clipped: bool,
 }
 
 #[derive(Serialize)]
@@ -92,7 +97,7 @@ fn parse(patch: &[u8]) -> Diff {
             Hunk { header, lines }
         })
         .collect();
-    Diff { binary: raw.binary, too_large: false, hunks }
+    Diff { binary: raw.binary, hunks, ..Default::default() }
 }
 
 fn patch(repo: &Repo, path: &str, staged: bool) -> Result<Vec<u8>> {
@@ -107,16 +112,21 @@ fn patch(repo: &Repo, path: &str, staged: bool) -> Result<Vec<u8>> {
 /// 工作区（`staged` 为 false）或暂存区的单文件改动。未跟踪文件整个显示为新增。
 pub fn worktree(repo: &Repo, path: &str, staged: bool, untracked: bool) -> Result<Diff> {
     if !untracked {
-        return Ok(parse(&patch(repo, path, staged)?));
+        let mut diff = parse(&patch(repo, path, staged)?);
+        if diff.binary { diff.images = images(repo, if staged { Some("HEAD") } else { Some("") }, if staged { Some("") } else { None }, path, path)?; }
+        return Ok(diff);
     }
     let mut bytes = Vec::new();
     std::fs::File::open(repo.path.join(path)).map_err(err)?
         .take(MAX_PATCH as u64 + 1).read_to_end(&mut bytes).map_err(err)?;
     if bytes.len() > MAX_PATCH {
+        if let Some(images) = images(repo, Some("HEAD"), None, path, path)? {
+            if images.iter().any(Option::is_some) { return Ok(Diff { binary: true, images: Some(images), ..Default::default() }); }
+        }
         return Ok(Diff { too_large: true, ..Default::default() });
     }
     if bytes.contains(&0) {
-        return Ok(Diff { binary: true, ..Default::default() });
+        return Ok(Diff { binary: true, images: images(repo, Some("HEAD"), None, path, path)?, ..Default::default() });
     }
     let text = decode(&bytes);
     let lines: Vec<_> = text
@@ -131,7 +141,130 @@ pub fn worktree(repo: &Repo, path: &str, staged: bool, untracked: bool) -> Resul
 pub fn commit(repo: &Repo, id: &str, path: &str) -> Result<Diff> {
     let oid = ObjectId::from_hex(id.as_bytes()).map_err(err)?.to_string();
     let args = ["show", "--format=", "--no-color", "--no-ext-diff", "--diff-merges=first-parent", &oid, "--", path];
-    Ok(parse(&repo.git_limited(&args, MAX_PATCH)?))
+    let mut diff = parse(&repo.git_limited(&args, MAX_PATCH)?);
+    if diff.binary {
+        let detail = crate::detail::detail(repo, &oid)?;
+        let old = detail.files.iter().find(|f| f.path == path).and_then(|f| f.old_path.as_deref()).unwrap_or(path);
+        diff.images = images(repo, Some(&format!("{oid}^")), Some(&oid), old, path)?;
+    }
+    Ok(diff)
+}
+
+pub fn between(repo: &Repo, left: &str, right: &str, path: &str, old_path: Option<&str>) -> Result<Diff> {
+    let left = crate::tools::revision(repo, left)?;
+    let right = crate::tools::revision(repo, right)?;
+    let old = old_path.unwrap_or(path);
+    let mut diff = parse(&repo.git_limited(&["--literal-pathspecs", "diff", "-M", "--no-color", "--no-ext-diff", "--no-textconv", &left, &right, "--", old, path], MAX_PATCH)?);
+    if diff.binary { diff.images = images(repo, Some(&left), Some(&right), old, path)?; }
+    Ok(diff)
+}
+
+fn images(repo: &Repo, left: Option<&str>, right: Option<&str>, old: &str, path: &str) -> Result<Option<[Option<String>; 2]>> {
+    if !["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico"].contains(&path.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str()) { return Ok(None); }
+    let read = |rev: Option<&str>, path: &str| -> Result<Option<String>> {
+        const LIMIT: usize = 32 << 20;
+        let bytes = if let Some(rev) = rev {
+            let spec = format!("{rev}:{path}");
+            let info = repo.git_in(&["cat-file", "--batch-check=%(objecttype) %(objectsize)", "-z"], format!("{spec}\0").as_bytes())?;
+            if decode(&info).ends_with(" missing\n") { return Ok(None); }
+            if !decode(&info).strip_prefix("blob ").and_then(|s| s.trim().parse::<usize>().ok()).is_some_and(|n| n <= LIMIT) { return Err("PR_IMAGE_TOO_LARGE".into()); }
+            repo.git_limited(&["show", &spec], LIMIT)?
+        } else {
+            let real = match repo.path.join(path).canonicalize() {
+                Ok(real) => real,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+                Err(e) => return Err(err(e)),
+            };
+            if !real.starts_with(repo.path.canonicalize().map_err(err)?) { return Err("PR_INVALID_PATH".into()); }
+            let mut bytes = Vec::new();
+            std::fs::File::open(real).map_err(err)?.take(LIMIT as u64 + 1).read_to_end(&mut bytes).map_err(err)?;
+            bytes
+        };
+        if bytes.len() > LIMIT { return Err("PR_IMAGE_TOO_LARGE".into()); }
+        let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { "image/png" }
+            else if bytes.starts_with(b"\xff\xd8\xff") { "image/jpeg" }
+            else if bytes.starts_with(b"GIF8") { "image/gif" }
+            else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") { "image/webp" }
+            else if bytes.starts_with(b"BM") { "image/bmp" }
+            else if bytes.starts_with(b"\0\0\x01\0") { "image/x-icon" }
+            else { return Ok(None); };
+        Ok(Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))))
+    };
+    Ok(Some([read(left, old)?, read(right, path)?]))
+}
+
+/// Stream a read-only page. Long lines are clipped without retaining their remainder.
+/// ponytail: later pages rescan the Git stream; add a disk spool only if profiling warrants it.
+pub fn page(repo: &Repo, mode: &str, left: &str, right: &str, path: &str, old_path: Option<&str>, skip: usize) -> Result<Diff> {
+    if mode == "untracked" { return untracked_page(repo, path, skip); }
+    let mut args = vec!["--literal-pathspecs", "diff", "-M", "--no-color", "--no-ext-diff", "--no-textconv"];
+    match mode {
+        "compare" => { crate::ops::safe(left)?; crate::ops::safe(right)?; args.extend([left, right]); }
+        "commit" => { crate::ops::safe(right)?; args = vec!["--literal-pathspecs", "show", "--format=", "--no-color", "--no-ext-diff", "--no-textconv", "--diff-merges=first-parent", right]; }
+        "staged" => args.push("--cached"),
+        "unstaged" => {},
+        _ => return Err("PR_INVALID_NAME".into()),
+    }
+    args.extend(["--", old_path.unwrap_or(path), path]);
+    let mut child = crate::git_command(&repo.path).args(&args).stdin(std::process::Stdio::null()).spawn().map_err(err)?;
+    let mut stderr = child.stderr.take().unwrap();
+    let errors = std::thread::spawn(move || { let mut out = Vec::new(); let _ = stderr.by_ref().take(65536).read_to_end(&mut out); let _ = std::io::copy(&mut stderr, &mut std::io::sink()); out });
+    let result: Result<Diff> = (|| {
+        let mut reader = BufReader::new(child.stdout.take().unwrap());
+        let mut result = Diff { paged: true, ..Default::default() };
+        let (mut old, mut new, mut index) = (0, 0, 0);
+        let mut header = String::new();
+        loop {
+            let (line, clipped) = crate::preview_line(&mut reader)?;
+            if line.is_empty() { break; }
+            if line.starts_with(b"diff --git ") { header.clear(); }
+            if line.starts_with(b"@@ ") {
+                header = decode(&line).trim_end().to_owned();
+                let start = |sign| header.split(' ').find(|s| s.starts_with(sign)).and_then(|s| s[1..].split(',').next()?.parse::<u32>().ok()).unwrap_or(0);
+                old = start('-'); new = start('+');
+                continue;
+            }
+            if header.is_empty() { if line.starts_with(b"Binary files") { result.binary = true; } continue; }
+            let kind = line[0] as char;
+            if ![' ', '+', '-', '\\'].contains(&kind) { continue; }
+            if index >= skip + 1000 { result.next = Some(index); break; }
+            if index >= skip {
+                if result.hunks.last().is_none_or(|h| h.header != header) { result.hunks.push(Hunk { header: header.clone(), lines: vec![] }); }
+                result.hunks.last_mut().unwrap().lines.push(Line { kind, text: decode(&line[1..]).trim_end_matches(['\n', '\r']).to_owned(), old_no: matches!(kind, ' ' | '-').then_some(old), new_no: matches!(kind, ' ' | '+').then_some(new) });
+                result.clipped |= clipped;
+            }
+            if matches!(kind, ' ' | '-') { old += 1; }
+            if matches!(kind, ' ' | '+') { new += 1; }
+            index += 1;
+        }
+        Ok(result)
+    })();
+    if result.as_ref().map_or(true, |d: &Diff| d.next.is_some()) { let _ = child.kill(); }
+    let status = child.wait().map_err(err)?;
+    let errors = errors.join().unwrap();
+    let result = result?;
+    if !status.success() && result.next.is_none() { return Err(decode(&errors)); }
+    Ok(result)
+}
+
+fn untracked_page(repo: &Repo, path: &str, skip: usize) -> Result<Diff> {
+    let real = repo.path.join(path).canonicalize().map_err(err)?;
+    if !real.starts_with(repo.path.canonicalize().map_err(err)?) { return Err("PR_INVALID_PATH".into()); }
+    let mut reader = BufReader::new(std::fs::File::open(real).map_err(err)?);
+    let mut result = Diff { paged: true, hunks: vec![Hunk { header: "@@ new file @@".into(), lines: vec![] }], ..Default::default() };
+    let mut index = 0;
+    loop {
+        let (line, clipped) = crate::preview_line(&mut reader)?;
+        if line.is_empty() { break; }
+        if line.contains(&0) { return Ok(Diff { binary: true, ..Default::default() }); }
+        if index >= skip + 1000 { result.next = Some(index); break; }
+        if index >= skip {
+            result.hunks[0].lines.push(Line { kind: '+', text: decode(&line).trim_end_matches(['\n', '\r']).into(), old_no: None, new_no: Some(index as u32 + 1) });
+            result.clipped |= clipped;
+        }
+        index += 1;
+    }
+    Ok(result)
 }
 
 /// 暂存（`staged` 为 false）或取消暂存第 `hunk` 个区块里选中的行。`lines` 是区块内的行下标。

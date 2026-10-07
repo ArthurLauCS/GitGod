@@ -953,6 +953,7 @@ dependencies = [
 name = "engine"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "criterion",
  "encoding_rs",
  "gix",
@@ -3750,7 +3751,7 @@ dependencies = [
 
 [[package]]
 name = "pushright"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "engine",
  "tauri",
@@ -4255,6 +4256,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 name = "sidecar"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
  "engine",
  "serde",
  "serde_json",

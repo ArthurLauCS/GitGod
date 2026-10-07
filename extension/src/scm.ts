@@ -150,8 +150,10 @@ export function registerScm(context: vscode.ExtensionContext) {
     const key = uri.toString()
     let pending = cache.get(key)
     if (!pending) {
-      pending = engine.call<string | null>('show', { tab: repo.tab, rev: revOf(uri), path: rel(repo, uri) })
-        .then((content) => content === null ? null : Buffer.from(content), (error) => { if (cache.get(key) === pending) cache.delete(key); throw new Error(errorText(error)) })
+      const image = /\.(png|jpe?g|gif|webp|bmp|ico)$/i.test(uri.fsPath)
+      const limit = (image ? 32 : Math.min(64, Math.max(4, vscode.workspace.getConfiguration('pushright').get<number>('history.maxFileSizeMiB', 4)))) << 20
+      pending = engine.call<string | null>(image ? 'show_binary' : 'show', { tab: repo.tab, rev: revOf(uri), path: rel(repo, uri), limit })
+        .then((content) => content === null ? null : Buffer.from(content, image ? 'base64' : 'utf8'), (error) => { if (cache.get(key) === pending) cache.delete(key); throw new Error(errorText(error)) })
       cache.set(key, pending)
     }
     return pending

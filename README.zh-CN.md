@@ -4,9 +4,11 @@
 
 面向多分支日常工作的 Git 桌面可视化客户端，使用 Svelte、Tauri 和 Rust 构建。
 
-当前版本为 **v1.0.1 正式版（MIT 许可更新）**，提供 Windows x64 安装包。首次启动默认英文，内置完整英文和简体中文语言包，可在右上角切换，选择会保存在本机。界面、提示、操作说明和应用自身的错误均提供双语；仓库内容和 Git / 系统原始输出保持原文，系统原生对话框使用系统语言。
+**1.1.0 正式版**新增仓库比较、审阅标记、远程管理、交互式变基、Reflog 恢复、图片差异、克隆/初始化，以及历史和大补丁分页。详见[发行说明](docs/RELEASE_1.1.0.md)和[自测记录](docs/FEATURE_COMPLETION.md)。
 
-本次发布统一更新桌面客户端与编辑器扩展。扩展修复未暂存及行内差异详情，复用行边改动标记的版本读取，并支持关闭、重新打开仓库及保存关闭状态。
+当前版本为 **v1.1.0 正式版（MIT 许可）**，提供 Windows x64 安装包。首次启动默认英文，内置完整英文和简体中文语言包，可在右上角切换，选择会保存在本机。界面、提示、操作说明和应用自身的错误均提供双语；仓库内容和 Git / 系统原始输出保持原文，系统原生对话框使用系统语言。
+
+本次发布同步更新桌面客户端与编辑器扩展，两者共用新增仓库工具。扩展自带引擎，无须先安装桌面版。
 
 ![PushRight 桌面版：提交图、独立作者样式与差异视图](docs/images/desktop.jpg)
 
@@ -14,14 +16,14 @@
 
 ## 下载与安装
 
-**[下载桌面安装包](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/PushRight_1.0.1_x64-setup.exe)** · **[下载 VSIX（VS Code / Cursor）](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/pushright-win32-x64-1.0.1.vsix)** · [SHA256 校验值](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/SHA256SUMS.txt)
+**[下载桌面安装包](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/PushRight_1.1.0_x64-setup.exe)** · **[下载 VSIX（VS Code / Cursor）](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/pushright-win32-x64-1.1.0.vsix)** · [SHA256 校验值](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/SHA256SUMS.txt)
 
-从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases) 下载 `PushRight_1.0.1_x64-setup.exe`，运行安装程序。
+从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases) 下载 `PushRight_1.1.0_x64-setup.exe`，运行安装程序。
 
 - 支持 Windows 10 / 11 x64；本次发布在 Windows x64 上构建和验证。
 - 需要安装 [Git for Windows](https://git-scm.com/downloads/win)，并确保 `git` 在 PATH 中可用。
 - 需要 Microsoft Edge WebView2 Runtime；缺少时安装程序会尝试联网安装。
-- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\PushRight_1.0.1_x64-setup.exe -Algorithm SHA256` 核对文件。
+- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\PushRight_1.1.0_x64-setup.exe -Algorithm SHA256` 核对文件。
 
 安装器支持英文和简体中文，应用语言独立选择。产品此前名为 GitGod；PushRight 保留应用数据标识以兼容已有设置。旧版 GitGod 可能作为独立安装保留，不会被自动删除。
 
@@ -81,7 +83,7 @@ PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败
 
 首屏只加载 2000 条提交，完整历史后台补齐；提交图使用紧凑骨架、每 1024 行的检查点，以及按可见窗口获取作者和标题。切换已有分支、引用重命名时，只更新标记和选中行，提交起点集合不变就复用提交图。
 
-差异读取最多保留 4 MiB + 1 字节；超限后停止读取，Git 差异进程会被终止。超过上限的文件仍可整文件暂存或提交。
+可编辑差异读取最多保留 4 MiB + 1 字节。超限或超过 5000 行时，可切换每页 1000 行的只读预览；单行超过 64 KiB 时截断并提示。超过上限的文件仍可整文件暂存或提交。
 
 在本机的 148 万提交 Linux 仓库及 128 MiB 文件上进行了复测，环境、数据规模、结果和复现命令见 [性能记录](docs/PERFORMANCE.md)。
 
@@ -93,18 +95,20 @@ PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败
 - 分支创建、切换、重命名与删除；合并、变基、cherry-pick、revert、reset 和标签操作。
 - Fetch、明确选择变基或合并的 Pull、明确选择目标的 Push，以及 stash 操作。
 - Worktree 管理、冲突块处理、进行中操作的继续与中止。
+- 仓库工具：任意提交/分支比较、共同祖先比较、文件审阅标记、远程地址管理、交互式变基和 Reflog 恢复。
+- PNG/JPEG/GIF/WebP/BMP/ICO 图片前后预览；欢迎页提供克隆与初始化入口。
 - 中英语言切换、深浅主题、可调面板、独立作者样式、操作说明和命令日志。
 
 ## VS Code / Cursor 扩展
 
-扩展 **1.0.1** 包含提交内文件列表与原生差异、Auto / 全部分支 / 指定分支筛选、图内同名推送、子仓库识别，以及本机忽略和跟踪管理。
+扩展 **1.1.0** 包含提交内文件列表与原生差异、Auto / 全部分支 / 指定分支筛选、图内同名推送、子仓库识别，以及本机忽略和跟踪管理。
 
-同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 正式版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
+同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 正式版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-1.0.1.vsix
+code --install-extension extension/pushright-win32-x64-1.1.0.vsix
 ```
 
 - **源代码管理面板**：已暂存、未暂存和冲突的文件；按文件或按选中的行暂存、取消暂存、丢弃；提交和修补上次提交；行号旁的改动标记和资源管理器角标。首次使用时 PushRight 会说明关闭 VS Code 自带 Git 的后果，由你决定是否关闭。
@@ -113,13 +117,13 @@ code --install-extension extension/pushright-win32-x64-1.0.1.vsix
 - **历史**：跟随当前文件的文件历史、选中行的行历史、上一版 / 下一版对比（`Alt+,` / `Alt+.`）、与任意分支、标签或提交对比，以及按提交说明、作者、文件、改动内容或提交号搜索提交。
 - **提交图**：执行「PushRight: 打开提交图」，桌面版的界面会在编辑器页签里打开。
 
-尚未包含：macOS、Linux 和远程开发（WSL / SSH）版本，PR / Issue 集成，交互式变基编辑器，自动定时获取。子模块需要先初始化。
+尚未包含：macOS、Linux 和远程开发（WSL / SSH）版本，PR / Issue 集成，自动定时获取。子模块需要先初始化。
 
 ## 当前边界
 
 - PR / Issue 和托管平台协作集成尚未交付。
 - 提交列表只渲染可见行，但完整历史仍会在后台读取；超大仓库的时间和内存开销需要进一步实测优化。
-- 超过 4 MiB 的补丁不显示完整差异。读取限制约束的是应用保留的数据，Git 子进程在输出补丁前仍可能消耗较多时间和内存。
+- 大补丁按页只读预览，分页会重新扫描补丁；Git 子进程在输出前仍可能消耗较多时间和内存。部分暂存/丢弃继续限制为 4 MiB。
 - 提交图最多显示 24 条轨道，实际数量随面板宽度变化；高度并行的复杂历史可能无法显示所有连线。
 - 尚未提供自动更新，也未发布 macOS / Linux 安装包。
 - 部分操作提供撤销入口，并非所有 Git 操作都能撤销；删除分支、丢弃变更、重置等操作前应检查提示。

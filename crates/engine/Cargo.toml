@@ -12,5 +12,6 @@ criterion = "0.8.2"
 
 [dependencies]
 encoding_rs = "0.8.42"
+base64 = "0.22.1"
 gix = "0.88.0"
 serde = { version = "1.0.229", features = ["derive"] }

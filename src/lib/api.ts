@@ -52,6 +52,10 @@ export type Op =
   | { op: 'push'; remote: string; branch: string; remote_branch: string; force: boolean; set_upstream: boolean }
   | { op: 'create_tag'; name: string; target: string; message: string }
   | { op: 'delete_tag'; name: string }
+  | { op: 'remote_add'; name: string; url: string }
+  | { op: 'remote_url'; name: string; url: string; push: boolean }
+  | { op: 'remote_remove'; name: string }
+  | { op: 'remote_rename'; old: string; new: string }
   | { op: 'continue'; what: InProgress }
   | { op: 'abort'; what: InProgress }
 export interface Stash {
@@ -127,7 +131,25 @@ export interface Diff {
   binary: boolean
   too_large: boolean
   hunks: Hunk[]
+  images?: [string | null, string | null] | null
+  next?: number | null
+  paged?: boolean
+  clipped?: boolean
 }
+
+export interface Comparison { left: string; right: string; files: FileChange[] }
+export interface Remote { name: string; fetch: string; push: string }
+export interface Reflog { id: string; selector: string; subject: string }
+export interface RebaseStep { id: string; subject: string; action: string; message: string }
+export interface RebasePlan { head: string; base: string; steps: RebaseStep[] }
+export const createRepo = (path: string, url: string | null) => invoke<string>('create_repo', { path, url })
+export const compare = (tab: number, left: string, right: string, commonBase: boolean) => invoke<Comparison>('compare', { tab, left, right, commonBase })
+export const diffBetween = (tab: number, left: string, right: string, path: string, oldPath: string | null) => invoke<Diff>('diff_between', { tab, left, right, path, oldPath })
+export const diffPage = (tab: number, mode: string, left: string, right: string, path: string, skip: number, oldPath: string | null = null) => invoke<Diff>('diff_page', { tab, mode, left, right, path, skip, oldPath })
+export const remoteDetails = (tab: number) => invoke<Remote[]>('remote_details', { tab })
+export const reflog = (tab: number, skip = 0) => invoke<Reflog[]>('reflog', { tab, skip, limit: 201 })
+export const rebasePlan = (tab: number, base: string) => invoke<RebasePlan>('rebase_plan', { tab, base })
+export const rebaseRun = (tab: number, plan: RebasePlan) => invoke<Log>('rebase_run', { tab, ...plan })
 
 export const initialRepos = () => invoke<string[]>('initial_repos')
 /** 返回 [页签 id, 工作区路径, 已加载的提交数] */

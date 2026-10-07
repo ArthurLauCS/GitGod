@@ -1,0 +1,211 @@
+mod common;
+use common::{git, init};
+use engine::{diff, history, ops::{self, Op}, rebase, tools, Repo};
+use std::fs;
+
+fn commit(dir: &std::path::Path, n: u32, path: &str, text: &str) {
+    fs::write(dir.join(path), text).unwrap();
+    git(dir, n, &["add", "."]);
+    git(dir, n, &["commit", "-q", "-m", &format!("change {n}")]);
+}
+fn run(repo: &Repo, op: Op) { let log = ops::run(repo, op).unwrap(); assert!(log.ok, "{}", log.output); }
+
+#[test]
+fn compare_remotes_and_reflog_recovery() {
+    let dir = init("tools-compare");
+    commit(&dir, 1, "old.txt", "one\n");
+    git(&dir, 0, &["branch", "other"]);
+    git(&dir, 0, &["mv", "old.txt", "new.txt"]);
+    git(&dir, 2, &["commit", "-qm", "rename"]);
+    let repo = Repo::open(&dir).unwrap();
+    let comparison = tools::compare(&repo, "other", "HEAD", false).unwrap();
+    assert_eq!(comparison.files[0].old_path.as_deref(), Some("old.txt"));
+    assert_eq!(comparison.files[0].path, "new.txt");
+    assert!(tools::compare(&repo, "--all", "HEAD", false).is_err());
+    git(&dir, 0, &["checkout", "-q", "other"]);
+    commit(&dir, 3, "other.txt", "branch\n");
+    assert_eq!(tools::compare(&repo, "other", "main", true).unwrap().files.len(), 1);
+    run(&repo, Op::RemoteAdd { name: "test".into(), url: "https://example.invalid/old.git".into() });
+    run(&repo, Op::RemoteUrl { name: "test".into(), url: "https://example.invalid/new.git".into(), push: false });
+    run(&repo, Op::RemoteUrl { name: "test".into(), url: "https://example.invalid/push.git".into(), push: true });
+    run(&repo, Op::RemoteRename { old: "test".into(), new: "renamed".into() });
+    let remote = tools::remotes(&repo).unwrap().remove(0);
+    assert_eq!(remote.name, "renamed"); assert!(remote.fetch.ends_with("new.git")); assert!(remote.push.ends_with("push.git"));
+    run(&repo, Op::RemoteRemove { name: "renamed".into() });
+    assert!(tools::remotes(&repo).unwrap().is_empty());
+    let lost = tools::revision(&repo, "HEAD").unwrap();
+    git(&dir, 0, &["reset", "--hard", "HEAD~1"]);
+    assert!(tools::reflog(&repo, 0, 201).unwrap().iter().any(|r| r.id == lost));
+    run(&repo, Op::CreateBranch { name: "recovered".into(), start: lost.clone(), checkout: false });
+    assert_eq!(tools::revision(&repo, "recovered").unwrap(), lost);
+    assert_eq!(history::show(&repo, "recovered", "other.txt").unwrap().as_deref(), Some("branch\n"));
+}
+
+#[test]
+fn clone_init_and_nonempty_destinations() {
+    let dir = init("tools-create");
+    commit(&dir, 1, "a", "source\n");
+    let dest = dir.join("clone space's");
+    tools::create(dest.to_str().unwrap(), Some(dir.to_str().unwrap())).unwrap();
+    assert_eq!(fs::read_to_string(dest.join("a")).unwrap().replace("\r\n", "\n"), "source\n");
+    assert!(tools::create(dest.to_str().unwrap(), Some(dir.to_str().unwrap())).is_err());
+    let empty = dir.join("fresh"); fs::create_dir(&empty).unwrap();
+    tools::create(empty.to_str().unwrap(), None).unwrap();
+    assert!(empty.join(".git").is_dir());
+    let occupied = dir.join("occupied"); fs::create_dir(&occupied).unwrap(); fs::write(occupied.join("keep"), "keep").unwrap();
+    assert!(tools::create(occupied.to_str().unwrap(), Some(dir.to_str().unwrap())).is_err());
+    assert_eq!(fs::read_to_string(occupied.join("keep")).unwrap(), "keep");
+}
+
+#[test]
+fn native_rebase_reorder_reword_squash_and_edit() {
+    let dir = init("rebase space's");
+    commit(&dir, 1, "base", "base\n");
+    commit(&dir, 2, "a", "a\n");
+    commit(&dir, 3, "b", "b\n");
+    commit(&dir, 4, "c", "c\n");
+    let repo = Repo::open(&dir).unwrap();
+    let mut plan = rebase::plan(&repo, "HEAD~3").unwrap();
+    let old_head = plan.head.clone();
+    plan.steps.swap(0, 1);
+    plan.steps[0].action = "reword".into();
+    plan.steps[0].message = "new message ' $() ` ;\n\nbody".into();
+    plan.steps[2].action = "squash".into();
+    plan.steps[2].message = "combined".into();
+    let result = rebase::run(&repo, &plan.base, &plan.head, &plan.steps).unwrap();
+    assert!(result.ok, "{}", result.output);
+    let history = history::file(&repo, "b", 10).unwrap();
+    assert_eq!(history[0].subject, "new message ' $() ` ;");
+    assert_eq!(engine::detail::detail(&repo, &tools::revision(&repo, "HEAD").unwrap()).unwrap().message, "combined");
+    for p in ["a", "b", "c"] { assert!(dir.join(p).exists()); }
+    let backup = result.output.lines().next().unwrap();
+    assert_eq!(tools::revision(&repo, backup).unwrap(), old_head);
+    assert!(rebase::run(&repo, &plan.base, &plan.head, &plan.steps).is_err(), "stale plan must be rejected");
+    let mut plan = rebase::plan(&repo, "HEAD~1").unwrap();
+    plan.steps[0].action = "edit".into();
+    assert!(rebase::run(&repo, &plan.base, &plan.head, &plan.steps).unwrap().ok);
+    assert!(engine::refs::list(&repo).unwrap().in_progress.is_some());
+    assert!(rebase::continue_rebase(&repo).unwrap().ok);
+    assert!(engine::refs::list(&repo).unwrap().in_progress.is_none());
+}
+
+#[test]
+fn rebase_conflicts_abort_and_invalid_plan_preserve_data() {
+    let dir = init("rebase-conflict");
+    commit(&dir, 1, "a", "base\n"); commit(&dir, 2, "a", "second\n"); commit(&dir, 3, "a", "third\n");
+    let repo = Repo::open(&dir).unwrap();
+    let mut plan = rebase::plan(&repo, "HEAD~2").unwrap();
+    fs::write(dir.join("private"), "keep").unwrap();
+    assert!(rebase::run(&repo, &plan.base, &plan.head, &plan.steps).is_err());
+    fs::remove_file(dir.join("private")).unwrap();
+    plan.steps[0].action = "exec".into();
+    assert!(rebase::run(&repo, &plan.base, &plan.head, &plan.steps).is_err());
+    plan.steps[0].action = "pick".into(); plan.steps.swap(0, 1);
+    let log = rebase::run(&repo, &plan.base, &plan.head, &plan.steps).unwrap();
+    assert!(!log.ok); assert!(engine::refs::list(&repo).unwrap().in_progress.is_some());
+    run(&repo, Op::Abort { what: engine::ops::InProgress::Rebase });
+    assert_eq!(tools::revision(&repo, "HEAD").unwrap(), plan.head);
+    assert_eq!(fs::read_to_string(dir.join("a")).unwrap(), "third\n");
+    let result = rebase::run(&repo, &plan.base, &plan.head, &plan.steps).unwrap();
+    assert!(!result.ok);
+    fs::write(dir.join("a"), "resolved third\n").unwrap();
+    git(&dir, 0, &["add", "a"]);
+    let result = rebase::continue_rebase(&repo).unwrap();
+    if !result.ok {
+        fs::write(dir.join("a"), "resolved second\n").unwrap();
+        git(&dir, 0, &["add", "a"]);
+        assert!(rebase::continue_rebase(&repo).unwrap().ok);
+    }
+    assert!(engine::refs::list(&repo).unwrap().in_progress.is_none());
+}
+
+#[test]
+fn history_pages_and_dirty_line_mapping() {
+    let dir = init("tools-history");
+    commit(&dir, 1, "a", "one\ntwo\nthree\n");
+    commit(&dir, 2, "a", "one\ntwo\nTHREE\n");
+    git(&dir, 0, &["mv", "a", "renamed"]); git(&dir, 3, &["commit", "-qm", "rename"]);
+    let repo = Repo::open(&dir).unwrap();
+    assert_eq!(history::file_page(&repo, "renamed", 1, 1).unwrap()[0].subject, "change 2");
+    assert_eq!(history::search_page(&repo, history::SearchKind::Message, "change", 1, 1).unwrap()[0].subject, "change 1");
+    let lines = history::lines_page(&repo, "renamed", 4, 4, 201, 0, Some("inserted\none\ntwo\nTHREE\n")).unwrap();
+    assert_eq!(lines[0].subject, "change 2");
+    assert_eq!(lines[0].path, "a");
+    assert_eq!(history::lines_page(&repo, "renamed", 4, 4, 1, 1, Some("inserted\none\ntwo\nTHREE\n")).unwrap()[0].subject, "change 1");
+    assert!(history::lines_page(&repo, "renamed", 1, 1, 201, 0, Some("inserted\none\ntwo\nTHREE\n")).is_err());
+    assert!(history::lines_page(&repo, "renamed", 2, 2, 201, 0, Some("one\nchanged\nTHREE\n")).is_err());
+    assert_eq!(fs::read_to_string(dir.join("renamed")).unwrap(), "one\ntwo\nTHREE\n");
+}
+
+#[test]
+fn histories_continue_beyond_two_hundred_commits() {
+    use std::io::Write;
+    let dir = init("history-205");
+    let mut input = String::new();
+    for i in 0..205 {
+        let message = format!("revision {i}");
+        let content = format!("line {i}\n");
+        input.push_str(&format!("commit refs/heads/main\ncommitter t <t@t> {} +0000\ndata {}\n{}\nM 100644 inline file.txt\ndata {}\n{}\n", 1_700_000_000 + i, message.len(), message, content.len(), content));
+    }
+    input.push_str("done\n");
+    let mut child = std::process::Command::new("git").arg("-C").arg(&dir).args(["fast-import", "--quiet"]).stdin(std::process::Stdio::piped()).spawn().unwrap();
+    child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+    assert!(child.wait().unwrap().success());
+    git(&dir, 0, &["reset", "--hard", "HEAD"]);
+    let repo = Repo::open(&dir).unwrap();
+    assert_eq!(history::file_page(&repo, "file.txt", 201, 0).unwrap().len(), 201);
+    let next = history::file_page(&repo, "file.txt", 201, 200).unwrap();
+    assert_eq!(next.len(), 5); assert_eq!(next[4].subject, "revision 0");
+    assert_eq!(history::search_page(&repo, history::SearchKind::Message, "revision", 201, 200).unwrap().len(), 5);
+    assert_eq!(history::lines_page(&repo, "file.txt", 1, 1, 201, 200, None).unwrap().len(), 5);
+}
+
+#[test]
+fn rebase_fixup_drop_and_drop_all() {
+    let dir = init("rebase-drop");
+    commit(&dir, 1, "base", "base\n"); commit(&dir, 2, "a", "a\n"); commit(&dir, 3, "b", "b\n"); commit(&dir, 4, "c", "c\n");
+    let repo = Repo::open(&dir).unwrap();
+    let mut plan = rebase::plan(&repo, "HEAD~3").unwrap();
+    plan.steps[1].action = "fixup".into(); plan.steps[2].action = "drop".into();
+    let result = rebase::run(&repo, &plan.base, &plan.head, &plan.steps).unwrap();
+    assert!(result.ok, "{}", result.output);
+    assert!(dir.join("a").exists() && dir.join("b").exists() && !dir.join("c").exists());
+    assert_eq!(rebase::plan(&repo, &plan.base).unwrap().steps.len(), 1);
+    let mut next = rebase::plan(&repo, &plan.base).unwrap();
+    next.steps[0].action = "drop".into();
+    let result = rebase::run(&repo, &next.base, &next.head, &next.steps).unwrap();
+    assert!(result.ok, "{}", result.output);
+    assert_eq!(tools::revision(&repo, "HEAD").unwrap(), plan.base);
+}
+
+#[test]
+fn images_and_large_diff_pages() {
+    let dir = init("tools-diff");
+    use base64::Engine;
+    let png = base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvWoAAAAASUVORK5CYII=").unwrap();
+    fs::write(dir.join("a.png"), &png).unwrap();
+    commit(&dir, 1, "large.txt", "small\n");
+    let repo = Repo::open(&dir).unwrap();
+    let image = diff::commit(&repo, &tools::revision(&repo, "HEAD").unwrap(), "a.png").unwrap();
+    assert!(image.images.unwrap()[1].as_ref().unwrap().starts_with("data:image/png;base64,"));
+    let text = (0..3600).map(|i| format!("{i} {}\n", "x".repeat(1400))).collect::<String>();
+    fs::write(dir.join("large.txt"), &text).unwrap();
+    assert!(diff::worktree(&repo, "large.txt", false, false).unwrap().too_large);
+    let mut offset = 0;
+    let mut added = 0;
+    loop {
+        let page = diff::page(&repo, "unstaged", "", "", "large.txt", None, offset).unwrap();
+        assert!(page.paged);
+        added += page.hunks.iter().flat_map(|h| &h.lines).filter(|l| l.kind == '+').count();
+        if let Some(next) = page.next { assert!(next > offset); offset = next; } else { break; }
+    }
+    assert_eq!(added, 3600);
+    git(&dir, 2, &["commit", "-qam", "large"]);
+    assert!(history::show(&repo, "HEAD", "large.txt").is_err());
+    assert_eq!(history::show_limit(&repo, "HEAD", "large.txt", 8 << 20).unwrap().unwrap(), text);
+    fs::write(dir.join("long.txt"), "x".repeat(5 << 20)).unwrap();
+    let preview = diff::page(&repo, "untracked", "", "", "long.txt", None, 0).unwrap();
+    assert!(preview.clipped);
+    assert!(preview.hunks[0].lines[0].text.len() <= 65536);
+    assert!(diff::page(&repo, "untracked", "", "", "../outside", None, 0).is_err());
+}

@@ -6,7 +6,9 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
-**[下载 VSIX · Windows x64 · 1.0.1](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/pushright-win32-x64-1.0.1.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1)
+**1.1.0 正式版**为 Windows 本地工作区增加仓库工具、历史分页、图片差异与大补丁预览。
+
+**[下载 VSIX · Windows x64 · 1.1.0](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/pushright-win32-x64-1.1.0.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0)
 
 ## 使用条件
 
@@ -32,6 +34,9 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 - 新增目录逐个列出未跟踪文件，可在暂存前查看每个文件，并分别暂存；仍遵守忽略规则。
 - 运行 **PushRight: 打开提交图** 或点击侧栏提交图标题栏按钮，在编辑器页签中浏览分支、提交和差异。如果曾隐藏侧栏图，可在源代码管理的“视图”菜单中重新勾选 **PushRight 提交图**。
 - 快速修改当前仓库的提交名和邮箱。
+- 在“打开提交图”的完整界面中选择 **仓库工具**：比较两个提交/分支、标记已审阅文件、管理远程地址、编辑变基顺序/动作、从 Reflog 创建恢复分支。欢迎页提供克隆与初始化。
+- 文件、行历史和搜索每页 200 条，可“加载更多”；有本地或未保存修改时，将未改变的选区映射回 HEAD 后查询。
+- 图片差异前后预览；大补丁可按每页 1000 行只读浏览。
 - 在仓库列表中右键选择 **关闭仓库**，保留已打开的文件，并阻止切换文件、刷新或重载时自动重新发现。使用 **PushRight: 重新打开已关闭仓库…** 恢复。
 
 首次启用会说明关闭 VS Code 内置 Git 的影响，由你决定是否让推送和拉取统一经过 PushRight。依赖内置 Git 的扩展可能因此停止工作。与 GitLens 同时启用时，可关闭其中一个的 Blame 注释以免重复。
@@ -55,17 +60,18 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 - 尚无 PR／Issue 和托管平台协作，不能替代 GitLens 或 GitHub Pull Requests 的这些功能。
 - 子模块需要先初始化。不会后台扫描被忽略的目录树来查找仓库；打开其中的文件或将其添加为工作区文件夹即可识别。
-- 每个文件历史列表最多 200 条。查看行历史前需提交或贮藏该文件的改动，确保选区行号与 HEAD 一致。
-- 历史文本与补丁限 4 MiB；二进制版本不会当作文本展示，仍可按整个文件操作。
+- 选区包含新增或被修改的行时，行历史会提示无法对应到 HEAD；改查文件历史或提交后再查。
+- 原生历史文本默认 4 MiB，可通过 `pushright.history.maxFileSizeMiB` 调整至 64 MiB。大补丁按页只读；单行超过 64 KiB 会截断。图片预览限 32 MiB/侧，支持 PNG/JPEG/GIF/WebP/BMP/ICO；其他二进制仍可整文件操作。
+- 交互式变基处理当前 HEAD 祖先之后的线性提交区间，不处理包含合并提交的区间或根提交；自动保留 `pushright-backup/*` 分支。Reflog 恢复创建新分支，不重置当前分支。
 - 完整提交历史在后台加载。实测范围见[性能报告](https://github.com/ArthurLauCS/PushRight/blob/main/docs/PERFORMANCE.md)。
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-1.0.1.vsix
-cursor --install-extension pushright-win32-x64-1.0.1.vsix
+code --install-extension pushright-win32-x64-1.1.0.vsix
+cursor --install-extension pushright-win32-x64-1.1.0.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。

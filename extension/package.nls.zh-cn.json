@@ -1,4 +1,5 @@
 {
+  "config.maxFileSize": "历史文本文件大小上限，单位 MiB（4–64）。调大会增加编辑器内存占用；大补丁也可在提交图中分页预览。",
   "command.closeRepository": "关闭仓库",
   "command.reopenRepository": "重新打开已关闭仓库…",
   "view.localFiles": "PushRight 本地文件",

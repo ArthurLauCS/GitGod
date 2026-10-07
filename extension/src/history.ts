@@ -12,8 +12,9 @@ interface Commit {
   path: string
 }
 
-// ponytail: 每个列表最多取这么多条，不翻页；历史更长的文件需要时再加「加载更多」
+// Pages are fetched on demand; the extra row indicates whether another page exists.
 const LIMIT = 200
+const MORE: Commit = { id: '', author: '', author_email: '', time: 0, subject: '', path: '' }
 
 /** 侧栏里的一个提交列表 */
 class CommitList implements vscode.TreeDataProvider<Commit> {
@@ -21,6 +22,10 @@ class CommitList implements vscode.TreeDataProvider<Commit> {
   /** 列表对应的文件（当前名字）；搜索结果没有 */
   path = ''
   items: Commit[] = []
+  more = false
+  loader?: (skip: number) => Promise<Commit[]>
+  private generation = 0
+  private loading = false
   private readonly changed = new vscode.EventEmitter<void>()
   readonly onDidChangeTreeData = this.changed.event
   readonly view: vscode.TreeView<Commit>
@@ -30,15 +35,35 @@ class CommitList implements vscode.TreeDataProvider<Commit> {
   }
 
   set(repo: Repo | undefined, path: string, items: Commit[], description: string) {
-    Object.assign(this, { repo, path, items })
+    ++this.generation
+    this.more = items.length > LIMIT
+    Object.assign(this, { repo, path, items: this.more ? items.slice(0, LIMIT) : items })
     this.view.description = description
     this.view.message = items.length ? undefined : v.noHistory
     this.changed.fire()
   }
 
-  getChildren = () => this.items
+  getChildren = () => this.more ? [...this.items, MORE] : this.items
+
+  async loadMore() {
+    if (!this.more || !this.loader || this.loading) return
+    this.loading = true
+    const generation = this.generation
+    try {
+      const items = await this.loader(this.items.length)
+      if (generation !== this.generation) return
+      this.more = items.length > LIMIT
+      this.items = [...this.items, ...items.slice(0, LIMIT)]
+      this.changed.fire()
+    } finally { this.loading = false }
+  }
 
   getTreeItem(c: Commit) {
+    if (c === MORE) {
+      const item = new vscode.TreeItem(t.tools.loadMore)
+      item.command = { command: 'pushright.loadMore', title: '', arguments: [this] }
+      return item
+    }
     const item = new vscode.TreeItem(c.subject)
     item.description = `${c.author} · ${ago(c.time)}`
     item.tooltip = `${c.id.slice(0, 8)} · ${date(c.time)}`
@@ -68,10 +93,12 @@ export function registerHistory(context: vscode.ExtensionContext) {
     const request = ++fileRequest
     const head = repo.refs.head_id
     if (files.repo === repo && files.path === path && fileHead === head) return
-    const items = (await attempt(engine.call<Commit[]>('file_history', { tab: repo.tab, path, limit: LIMIT }))) ?? []
+    const loader = (skip: number) => engine.call<Commit[]>('file_history', { tab: repo.tab, path, limit: LIMIT + 1, skip })
+    const items = (await attempt(loader(0))) ?? []
     if (request !== fileRequest || !repos.includes(repo)) return
     fileHead = head
     files.set(repo, path, items, basename(path))
+    files.loader = loader
   }
 
   /** 文件历史跟随当前编辑器，只在视图可见时去取。 */
@@ -82,8 +109,10 @@ export function registerHistory(context: vscode.ExtensionContext) {
   }
 
   /** 这个提交对该文件做了什么：与它的上一版对比。 */
-  function openChanges(c: Commit, list = [files, lines].find((l) => l.items.includes(c))) {
+  async function openChanges(c: Commit, list = [files, lines].find((l) => l.items.includes(c))) {
     if (!list?.repo) return
+    if (list === files && list.more && list.items.at(-1) === c) await list.loadMore()
+    if (!list.items.includes(c)) return
     const older = list.items[list.items.indexOf(c) + 1]
     // 行历史的相邻两条不一定是文件的相邻两版，所以左边固定取父提交；路径取更早那条的，重命名时才对得上
     const left = revUri(list.repo, list === files && older ? older.path : c.path, `${c.id}^`)
@@ -102,6 +131,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
     // 对比视图里按右侧的版本定位；右侧是工作区文件、左侧是最近一版时为 -1；普通编辑器算还没开始（-2）
     const found = rev === undefined ? -1 : files.items.findIndex((c) => c.id === rev)
     const at = found >= 0 ? found : input instanceof vscode.TabInputTextDiff && revOf(input.original) === files.items[0].id && rev === undefined ? -1 : -2
+    if (delta > 0 && at + delta >= files.items.length) await files.loadMore()
     const to = Math.max(-1, Math.min(files.items.length - 1, at + delta))
     if (to === -1) {
       const head = files.items[0]
@@ -133,24 +163,21 @@ export function registerHistory(context: vscode.ExtensionContext) {
     const request = ++lineRequest
     const description = `${basename(path)}:${start}-${end}`
     lineHead = repo.refs.head_id
-    if (editor?.document.uri.toString() === uri.toString() && editor.document.isDirty) {
-      lineKey = ''
-      lines.set(repo, path, [], description)
-      lines.view.message = t.errors.PR_LINE_HISTORY_CHANGED
-      return
-    }
     const key = JSON.stringify([repo.tab, path, start, end, lineHead])
     if (lineKey === key) return
     lineKey = ''
     lines.set(repo, path, [], description)
     lines.view.message = v.lineHistoryLoading
+    const contents = editor?.document.uri.toString() === uri.toString() ? editor.document.getText() : undefined
+    const loader = (skip: number) => engine.call<Commit[]>('line_history_page', { tab: repo.tab, path, start, end, limit: LIMIT + 1, skip, contents })
     try {
       const items = await vscode.window.withProgress({ location: { viewId: 'pushright.lineHistory' } }, () =>
-        engine.call<Commit[]>('line_history', { tab: repo.tab, path, start, end, limit: LIMIT }),
+        loader(0),
       )
       if (request !== lineRequest || !repos.includes(repo)) return
       lineKey = key
       lines.set(repo, path, items, description)
+      lines.loader = loader
     } catch (error) {
       if (request === lineRequest) {
         lineKey = ''
@@ -185,10 +212,11 @@ export function registerHistory(context: vscode.ExtensionContext) {
     const query = kind && (await vscode.window.showInputBox({ title: `${v.searchTitle} · ${kind.label}` }))
     if (!query || !repos.includes(repo)) return
     await vscode.commands.executeCommand('pushright.search.focus')
+    const loader = (skip: number) => engine.call<Commit[]>('search', { tab: repo.tab, kind: kind.by, query, limit: LIMIT + 1, skip })
     const items = await vscode.window.withProgress({ location: { viewId: 'pushright.search' } }, () =>
-      attempt(engine.call<Commit[]>('search', { tab: repo.tab, kind: kind.by, query, limit: LIMIT })),
+      attempt(loader(0)),
     )
-    if (repos.includes(repo)) found.set(repo, '', items ?? [], `${kind.label}: ${query}`)
+    if (repos.includes(repo)) { found.set(repo, '', items ?? [], `${kind.label}: ${query}`); found.loader = loader }
   }
 
   /** 当前文件与某个分支、标签或提交对比。 */
@@ -250,6 +278,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
     command('compareWith', compareWith),
     command('openAtRevision', openAtRevision),
     command('searchCommits', search),
+    command('loadMore', (list: CommitList) => attempt(list.loadMore())),
     command('item.openChanges', openChanges),
     command('item.reveal', (c: Commit) => vscode.commands.executeCommand('pushright.revealCommit', c.id, [files, lines, found].find((l) => l.items.includes(c))?.repo?.root)),
     command('item.openFile', (c: Commit) => {

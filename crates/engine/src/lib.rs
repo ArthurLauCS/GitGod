@@ -8,6 +8,8 @@ pub mod local_files;
 pub mod ops;
 pub mod refs;
 pub mod status;
+pub mod tools;
+pub mod rebase;
 
 use std::path::{Path, PathBuf};
 use std::io::{Read, Write};
@@ -17,6 +19,22 @@ pub type Result<T> = std::result::Result<T, String>;
 
 pub(crate) fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
+}
+
+/// A bounded preview line; drain the remainder instead of retaining an arbitrarily long line.
+pub(crate) fn preview_line(reader: &mut impl std::io::BufRead) -> Result<(Vec<u8>, bool)> {
+    use std::io::BufRead;
+    let mut line = Vec::new();
+    reader.by_ref().take(65536).read_until(b'\n', &mut line).map_err(err)?;
+    let clipped = line.len() == 65536 && !line.ends_with(b"\n");
+    if clipped {
+        loop {
+            let mut rest = Vec::new();
+            let n = reader.by_ref().take(65536).read_until(b'\n', &mut rest).map_err(err)?;
+            if n == 0 || rest.ends_with(b"\n") { break; }
+        }
+    }
+    Ok((line, clipped))
 }
 
 /// 读走 gix（进程内），写和 status/diff 走 git CLI，依据见 M0 基准。
@@ -80,6 +98,7 @@ impl Repo {
 fn git_command(dir: &Path) -> Command {
     let mut cmd = Command::new("git");
     cmd.arg("-C").arg(dir);
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
     cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)]
     std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x0800_0000); // CREATE_NO_WINDOW

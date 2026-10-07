@@ -54,6 +54,7 @@
   "view.lineHistory": "Line History",
   "view.search": "Search Results",
   "welcome.search": "Find commits by message, author, file, changed text or ID.\n[Search Commits](command:pushright.searchCommits)\n[Open Commit Graph](command:pushright.openGraph)",
+  "config.maxFileSize": "Maximum text revision size in MiB (4–64). Larger values increase editor memory use. Large patches can be read in the graph's paged preview.",
   "config.line": "Show the author, date and subject of the last change at the end of the current line.",
   "config.format": "Template for the end-of-line annotation. Available: ${author}, ${ago}, ${date}, ${subject}, ${id}.",
   "config.statusBar": "Show the current line’s author in the status bar.",

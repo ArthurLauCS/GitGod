@@ -2,7 +2,8 @@
 //! 标准输出每行一个 `{id, ok, value}`。命令名和参数与桌面版 src-tauri/src/main.rs 一致。
 
 use engine::graph::Graph;
-use engine::{conflict, detail, diff, history, identity, local_files, ops, refs, status, Repo, Result};
+use base64::Engine;
+use engine::{conflict, detail, diff, history, identity, local_files, ops, refs, status, tools, rebase, Repo, Result};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -43,6 +44,7 @@ fn out(value: impl Serialize) -> Result<Value> {
 }
 
 fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
+    if cmd == "create_repo" { return out(tools::create(&arg::<String>(a, "path")?, arg::<Option<String>>(a, "url")?.as_deref())?); }
     if cmd == "open_repo" {
         let path: String = arg(a, "path")?;
         let repo = Arc::new(Repo::open(path.as_ref())?);
@@ -60,6 +62,13 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
     let s = tabs.sessions.read().unwrap().get(&tab).cloned().ok_or("PR_TAB_CLOSED")?;
     let repo = &*s.repo;
     match cmd {
+        "compare" => out(tools::compare(repo, &arg::<String>(a, "left")?, &arg::<String>(a, "right")?, arg(a, "commonBase")?)?),
+        "diff_between" => out(diff::between(repo, &arg::<String>(a, "left")?, &arg::<String>(a, "right")?, &arg::<String>(a, "path")?, arg::<Option<String>>(a, "oldPath")?.as_deref())?),
+        "diff_page" => out(diff::page(repo, &arg::<String>(a, "mode")?, &arg::<String>(a, "left")?, &arg::<String>(a, "right")?, &arg::<String>(a, "path")?, arg::<Option<String>>(a, "oldPath")?.as_deref(), arg(a, "skip")?)?),
+        "remote_details" => out(tools::remotes(repo)?),
+        "reflog" => out(tools::reflog(repo, arg(a, "skip")?, arg(a, "limit")?)?),
+        "rebase_plan" => out(rebase::plan(repo, &arg::<String>(a, "base")?)?),
+        "rebase_run" => out(rebase::run(repo, &arg::<String>(a, "base")?, &arg::<String>(a, "head")?, &arg::<Vec<rebase::Step>>(a, "steps")?)?),
         "load_graph" => {
             let scope: Option<String> = arg(a, "scope")?;
             let graph = Arc::new(Graph::load_scope(repo, if arg(a, "full")? { usize::MAX } else { FIRST_PAGE }, scope.as_deref().unwrap_or("all"))?);
@@ -112,10 +121,12 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
         "is_tracked" => out(local_files::tracked(repo, &arg::<String>(a, "path")?)?),
         "ignore_file" => out(local_files::ignore_file(repo, &arg::<String>(a, "path")?, arg(a, "shared")?)?),
         "track_file" => out(local_files::track(repo, &arg::<String>(a, "path")?, arg(a, "track")?)?),
-        "file_history" => out(history::file(repo, &arg::<String>(a, "path")?, arg(a, "limit")?)?),
+        "file_history" => out(history::file_page(repo, &arg::<String>(a, "path")?, arg(a, "limit")?, arg::<Option<usize>>(a, "skip")?.unwrap_or(0))?),
         "line_history" => out(history::lines(repo, &arg::<String>(a, "path")?, arg(a, "start")?, arg(a, "end")?, arg(a, "limit")?)?),
-        "search" => out(history::search(repo, arg(a, "kind")?, &arg::<String>(a, "query")?, arg(a, "limit")?)?),
-        "show" => out(history::show(repo, &arg::<String>(a, "rev")?, &arg::<String>(a, "path")?)?),
+        "line_history_page" => out(history::lines_page(repo, &arg::<String>(a, "path")?, arg(a, "start")?, arg(a, "end")?, arg(a, "limit")?, arg(a, "skip")?, arg::<Option<String>>(a, "contents")?.as_deref())?),
+        "search" => out(history::search_page(repo, arg(a, "kind")?, &arg::<String>(a, "query")?, arg(a, "limit")?, arg::<Option<usize>>(a, "skip")?.unwrap_or(0))?),
+        "show" => out(history::show_limit(repo, &arg::<String>(a, "rev")?, &arg::<String>(a, "path")?, arg::<Option<usize>>(a, "limit")?.unwrap_or(4 << 20))?),
+        "show_binary" => out(history::blob(repo, &arg::<String>(a, "rev")?, &arg::<String>(a, "path")?, 32 << 20)?.map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes))),
         _ => Err(format!("unknown command: {cmd}")),
     }
 }

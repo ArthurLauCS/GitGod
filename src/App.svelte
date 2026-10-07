@@ -4,6 +4,7 @@
   import * as api from './lib/api'
   import Icon from './lib/Icon.svelte'
   import RepoView from './lib/RepoView.svelte'
+  import Dialog from './lib/Dialog.svelte'
   import { theme, toggleTheme } from './lib/theme.svelte'
   import { t, locale, setLocale, errorText, type Locale } from './lib/i18n.svelte'
 
@@ -20,6 +21,24 @@
   /** 当前页签 id；null 时显示打开仓库页 */
   let active = $state<number | null>(null)
   let error = $state('')
+  let dialog = $state<Dialog>()
+  let creating = $state(false)
+
+  async function create(clone: boolean) {
+    const dir = await open({ directory: true, title: clone ? t.tools.cloneParent : t.tools.initRepo })
+    if (!dir) return
+    const values = await dialog!.ask({ title: clone ? t.tools.cloneRepo : t.tools.initRepo, message: dir, fields: clone ? [
+      { key: 'url', label: t.tools.url, type: 'text' },
+      { key: 'name', label: t.tools.folderName, type: 'text' },
+    ] : [] })
+    if (!values) return
+    if (clone && /[\\/:*?"<>|]|^\.{1,2}$/.test(String(values.name))) { error = t.errors.PR_INVALID_NAME; return }
+    creating = true
+    error = ''
+    try { await openRepo(await api.createRepo(clone ? `${dir}/${values.name}` : dir, clone ? String(values.url) : null)) }
+    catch (e) { error = String(e) }
+    finally { creating = false }
+  }
 
   const name = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path
   const save = () => localStorage.setItem('tabs', JSON.stringify(tabs.map((x) => x.path)))
@@ -131,7 +150,10 @@
       <h1>{t.appName}</h1>
       <p class="lead">{t.welcomeLead}</p>
       <p class="muted">{t.openRepoHint}</p>
-      <button class="btn primary" onclick={pick}>{t.openRepo}</button>
+      <button class="btn primary" disabled={creating} onclick={pick}>{t.openRepo}</button>
+      <button class="btn" disabled={creating} onclick={() => create(true)}>{t.tools.cloneRepo}</button>
+      <button class="btn" disabled={creating} onclick={() => create(false)}>{t.tools.initRepo}</button>
+      {#if creating}<p>{t.working}</p>{/if}
       {#if error}<p class="error">{errorText(error)}</p>{/if}
       {#if recent.length}
         <h2>{t.recent}</h2>
@@ -142,6 +164,8 @@
     </div>
   {/if}
 </div>
+
+<Dialog bind:this={dialog} />
 
 <style>
   :global(#app) {

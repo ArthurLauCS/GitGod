@@ -6,9 +6,11 @@
 
 A Git desktop client built with Svelte, Tauri and Rust. PushRight makes push destinations explicit, recommends a remote branch with the same name, and defaults Pull to **Rebase instead of merge**.
 
-**v1.0.1, the MIT license update to the first stable release,** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+Version **1.1.0** adds repository comparisons, reviewed files, remote management, interactive rebase, reflog recovery, image diffs, clone/init, and paged history and large patches. See the [release notes](docs/RELEASE_1.1.0.md) and [verification record (Chinese)](docs/FEATURE_COMPLETION.md).
 
-This release includes the desktop client and editor extension. The extension fixes unstaged and inline diffs, shares revision reads for gutter markers, and adds persistent repository close/reopen controls.
+**v1.1.0 (MIT licensed)** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+
+The desktop client and editor extension share the new repository tools. The extension includes its own engine and does not require the desktop installation.
 
 ![PushRight: commit graph, individual author styling and file differences](docs/images/desktop.jpg)
 
@@ -16,15 +18,15 @@ Screenshots show the actual desktop app with a local demo repository and fiction
 
 ## Download and install
 
-**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/PushRight_1.0.1_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/pushright-win32-x64-1.0.1.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/SHA256SUMS.txt)
+**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/PushRight_1.1.0_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/pushright-win32-x64-1.1.0.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/SHA256SUMS.txt)
 
-Download `PushRight_1.0.1_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1).
+Download `PushRight_1.1.0_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0).
 
 - Windows 10 / 11 x64; built and checked on Windows x64.
 - Install [Git for Windows](https://git-scm.com/downloads/win) and make `git` available on PATH.
 - Microsoft Edge WebView2 Runtime is required; the installer attempts an online installation if missing.
 - The installer offers English and Simplified Chinese. App language is selected independently.
-- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.0.1_x64-setup.exe -Algorithm SHA256`.
+- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.1.0_x64-setup.exe -Algorithm SHA256`.
 
 Previously named GitGod. PushRight retains the application data identifier for settings compatibility. The old GitGod installation may remain separately installed; it is not removed automatically.
 
@@ -84,7 +86,7 @@ The app reports effective identities and overrides from environment variables, `
 
 The initial view loads 2,000 commits; full history follows in the background. The graph uses a compact skeleton, checkpoints every 1,024 rows and visible-window metadata. Existing branch switches and ref renames reuse the graph when the set of starting commit IDs stays unchanged.
 
-Diff reads retain at most 4 MiB + 1 byte. Oversized output stops the reader and terminates the Git diff process. Whole-file staging and commits remain available.
+Editable diff reads retain at most 4 MiB + 1 byte. Larger patches or previews beyond 5,000 lines offer read-only pages of 1,000 lines; lines beyond 64 KiB are clipped with a notice. Whole-file staging and commits remain available.
 
 Measurements on a local Linux repository with 1.48 million commits and a 128 MiB file, including scope and reproduction commands, are in the [performance report (Chinese)](docs/PERFORMANCE.md).
 
@@ -96,20 +98,22 @@ Measurements on a local Linux repository with 1.48 million commits and a 128 MiB
 - Create, switch, rename and delete branches; merge, rebase, cherry-pick, revert, reset and tags.
 - Fetch, explicit Pull mode, destination-aware Push and stashes.
 - Worktrees, conflict resolution, Continue and Abort.
+- Repository tools: arbitrary revision/branch and merge-base comparisons, reviewed files, remote URLs, interactive rebase and reflog recovery.
+- Before/after PNG/JPEG/GIF/WebP/BMP/ICO previews; clone and initialize from the welcome page.
 - English / Simplified Chinese, light / dark themes, resizable panels, individual author styles, operation explanations and command logs.
 
 App text, tooltips, explanations and app-generated errors are translated. Repository content, commit messages, branch names and raw Git/OS output stay verbatim. Native OS dialogs use the system language.
 
 ## VS Code / Cursor extension
 
-Extension **1.0.1** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, and local ignore / tracking controls.
+Extension **1.1.0** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, and local ignore / tracking controls.
 
-The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
+The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-1.0.1.vsix
+code --install-extension extension/pushright-win32-x64-1.1.0.vsix
 ```
 
 - **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.
@@ -118,13 +122,13 @@ code --install-extension extension/pushright-win32-x64-1.0.1.vsix
 - **History**: file history that follows the active editor, line history for a selection, previous / next revision (`Alt+,` / `Alt+.`), compare with any branch, tag or commit, and commit search by message, author, file, changed text or ID.
 - **Commit graph**: "PushRight: Open Commit Graph" opens the desktop interface in an editor tab.
 
-Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration, an interactive rebase editor, and automatic fetch. Submodules must already be initialized.
+Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration, and automatic fetch. Submodules must already be initialized.
 
 ## Current limits
 
 - PR / Issue and hosting-provider collaboration are not delivered yet.
 - Visible rows are virtualized, but complete history is still read in the background.
-- Patches over 4 MiB are not displayed in full. The limit bounds retained app data; Git may still consume time and memory before producing output.
+- Large patches offer read-only pages that rescan the Git stream; Git may still consume time and memory before producing output. Partial staging/discard remains limited to 4 MiB patches.
 - The graph has at most 24 lanes, reduced by available width. Highly parallel histories can omit connections.
 - No automatic updates or macOS / Linux installers yet.
 - Undo covers some local operations, not every Git action. Check prompts before destructive operations.
