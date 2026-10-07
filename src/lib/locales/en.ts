@@ -225,6 +225,8 @@ export const messages = {
   noCommits: 'This repository has no commits yet',
   status: { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed', C: 'Copied', T: 'Type changed', '?': 'Untracked', U: 'Conflicted' } as Record<string, string>,
   vscode: {
+    closeRepository: 'Close repository',
+    reopenRepository: 'Reopen closed repository',
     graphRepository: 'Repository for the commit graph',
     graphRetry: 'Reload graph',
     graphLoadingFiles: 'Loading changed files…',

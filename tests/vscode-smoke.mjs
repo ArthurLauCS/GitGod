@@ -1,5 +1,5 @@
 // 在真实的 VS Code 里跑一遍扩展：npm run ext:smoke（先 npm run ext:build）。
-// 用临时的用户目录和扩展目录，不碰本机 VS Code 的设置。可指定 PUSHRIGHT_SMOKE_EXTENSION 测试解包后的 VSIX。
+// 用临时的用户目录和扩展目录，不碰本机设置。PUSHRIGHT_SMOKE_EXTENSION 指定解包后的 VSIX，PUSHRIGHT_SMOKE_CODE 可指定 Cursor 可执行文件。
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -45,7 +45,7 @@ writeFileSync(join(user, 'User', 'settings.json'), JSON.stringify({
 }))
 
 const where = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['code'], { encoding: 'utf8' }).stdout.split(/\r?\n/)[0]
-const code = process.platform === 'win32' ? join(dirname(dirname(where)), 'Code.exe') : where
+const code = process.env.PUSHRIGHT_SMOKE_CODE ?? (process.platform === 'win32' ? join(dirname(dirname(where)), 'Code.exe') : where)
 if (!existsSync(code)) throw new Error('VS Code not found on PATH')
 
 const result = join(base, 'result.json')

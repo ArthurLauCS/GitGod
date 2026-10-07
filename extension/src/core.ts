@@ -33,6 +33,8 @@ export interface Repo {
 }
 
 export const repos: Repo[] = []
+export const closedRepos = new Map<string, string>()
+/** 状态更新或仓库关闭；接收方通过 repos 判断仓库是否仍然打开。 */
 export const onRepoChange = new vscode.EventEmitter<Repo>()
 export const onPrefsChange = new vscode.EventEmitter<void>()
 export const log = vscode.window.createOutputChannel('PushRight')
@@ -43,6 +45,7 @@ export const panel: { post?: (message: object) => void } = {}
 
 export async function openRepos(ctx: vscode.ExtensionContext, exe: string) {
   context = ctx
+  for (const root of context.workspaceState.get<string[]>('closedRepositories', [])) closedRepos.set(fold(root), root)
   engine = startEngine(exe)
   await discoverRepositories()
 }
@@ -58,13 +61,14 @@ async function discover(extra: string[]) {
   const queue = [...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath), ...repos.map((r) => r.root), ...extra]
   const seen = new Set<string>()
   for (const path of queue) {
-    if (seen.has(fold(path))) continue
+    if (seen.has(fold(path)) || closedRepos.has(fold(path))) continue
     seen.add(fold(path))
     try {
       let repo = repos.find((r) => fold(r.root) === fold(path))
       if (!repo) {
         const [tab, actual] = await engine.call<[number, string, number]>('open_repo', { path })
         const root = vscode.Uri.file(actual).fsPath
+        if (closedRepos.has(fold(root))) { await engine.call('close_repo', { tab }); continue }
         repo = repos.find((r) => fold(r.root) === fold(root))
         if (repo) await engine.call('close_repo', { tab })
         else {
@@ -77,7 +81,7 @@ async function discover(extra: string[]) {
           await refresh(repo)
         }
       }
-      queue.push(...await engine.call<string[]>('repositories', { tab: repo.tab }))
+      if (repos.includes(repo)) queue.push(...await engine.call<string[]>('repositories', { tab: repo.tab }))
     } catch {
       // 工作区本身可能是装着多个仓库的容器；只扫描它的直接子目录。
       if (vscode.workspace.workspaceFolders?.some((f) => fold(f.uri.fsPath) === fold(path))) {
@@ -87,6 +91,28 @@ async function discover(extra: string[]) {
     }
   }
   await vscode.commands.executeCommand('setContext', 'pushright.hasRepo', repos.length > 0)
+  await vscode.commands.executeCommand('setContext', 'pushright.hasClosedRepos', closedRepos.size > 0)
+}
+
+/** 仅关闭当前窗口里的仓库会话；记住选择，避免文件切换或刷新时重新发现。 */
+export async function closeRepo(repo: Repo) {
+  const index = repos.indexOf(repo)
+  if (index < 0) return
+  closedRepos.set(fold(repo.root), repo.root)
+  repos.splice(index, 1)
+  onRepoChange.fire(repo)
+  await Promise.all([
+    context.workspaceState.update('closedRepositories', [...closedRepos.values()]),
+    engine.call('close_repo', { tab: repo.tab }),
+    vscode.commands.executeCommand('setContext', 'pushright.hasRepo', repos.length > 0),
+    vscode.commands.executeCommand('setContext', 'pushright.hasClosedRepos', true),
+  ])
+}
+
+export async function reopenRepo(root: string) {
+  if (!closedRepos.delete(fold(root))) return
+  await context.workspaceState.update('closedRepositories', [...closedRepos.values()])
+  await discoverRepositories([root])
 }
 
 /** 打开被父仓库忽略的嵌套仓库文件时，也要按最近的 .git 归属，不能在父仓库执行操作。 */
@@ -95,6 +121,7 @@ export async function discoverForFile(uri: vscode.Uri) {
   const known = repoOf(uri)
   const start = await stat(uri.fsPath).then((s) => s.isDirectory() ? uri.fsPath : dirname(uri.fsPath), () => dirname(uri.fsPath))
   for (let dir = start; dir !== dirname(dir) && fold(dir) !== fold(known?.root ?? ''); dir = dirname(dir)) {
+    if (closedRepos.has(fold(dir))) return
     if (await stat(join(dir, '.git')).then(() => true, () => false)) { await discoverRepositories([dir]); break }
   }
 }
@@ -103,6 +130,7 @@ const refreshing = new WeakMap<Repo, { again: boolean }>()
 
 /** 重新读取引用和工作区状态。进行中又被调用时，结束后再读一次，期间的多次调用合并。 */
 export async function refresh(repo: Repo) {
+  if (!repos.includes(repo)) return
   const running = refreshing.get(repo)
   if (running) return void (running.again = true)
   const state = { again: false }
@@ -120,8 +148,8 @@ export async function refresh(repo: Repo) {
     } catch (e) {
       log.appendLine(errorText(e))
     }
-    onRepoChange.fire(repo)
-  } while (state.again)
+    if (repos.includes(repo)) onRepoChange.fire(repo)
+  } while (state.again && repos.includes(repo))
   refreshing.delete(repo)
 }
 
@@ -164,9 +192,14 @@ const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase(
 export function repoOf(uri: vscode.Uri | undefined): Repo | undefined {
   if (!uri || (uri.scheme !== 'file' && uri.scheme !== REV)) return
   const file = fold(uri.fsPath)
-  return repos
+  const repo = repos
     .filter((r) => file === fold(r.root) || file.startsWith(fold(r.root) + sep))
     .sort((a, b) => b.root.length - a.root.length)[0]
+  // 关闭子仓库后，其文件不能落到仍打开的父仓库上执行 Git 操作。
+  for (const root of closedRepos.keys()) {
+    if ((!repo || root.length > repo.root.length) && (file === root || file.startsWith(root + sep))) return
+  }
+  return repo
 }
 
 export function activeRepo(): Repo | undefined {

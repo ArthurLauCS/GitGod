@@ -1,4 +1,6 @@
 {
+  "command.closeRepository": "关闭仓库",
+  "command.reopenRepository": "重新打开已关闭仓库…",
   "view.localFiles": "PushRight 本地文件",
   "command.ignoreLocal": "仅本机忽略",
   "command.ignoreShared": "加入 .gitignore",

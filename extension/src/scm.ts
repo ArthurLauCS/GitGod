@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import type { Diff, Entry, Identity } from '../../src/lib/api'
 import {
-  activeRepo, attempt, discoverRepositories, engine, errorText, fileUri, help, onRepoChange, refresh, rel, repoOf, repos, REV, revOf, revUri, run, t, v, write, type Repo,
+  activeRepo, attempt, closedRepos, closeRepo, discoverRepositories, engine, errorText, fileUri, help, onRepoChange, refresh, rel, reopenRepo, repoOf, repos, REV, revOf, revUri, run, t, v, write, type Repo,
 } from './core'
 import { statusCommands } from './sync'
 
@@ -49,7 +49,7 @@ async function openChange({ repo, entry, staged, resourceUri }: Resource) {
   if (entry.conflicted || entry.unstaged === '?') return void vscode.window.showTextDocument(resourceUri)
   const left = staged ? revUri(repo, entry.old_path ?? entry.path, 'HEAD') : revUri(repo, entry.path, '')
   const right = !staged && entry.unstaged === 'D' ? revUri(repo, entry.path, '', true) : staged ? revUri(repo, entry.path, '') : resourceUri
-  vscode.commands.executeCommand('vscode.diff', left, right, `${basename(entry.path)} (${staged ? t.staged : t.unstaged})`)
+  return vscode.commands.executeCommand('vscode.diff', left, right, `${basename(entry.path)} (${staged ? t.staged : t.unstaged})`)
 }
 
 async function commit(repo: Repo, amend: boolean) {
@@ -137,11 +137,30 @@ export async function offerTakeover(context: vscode.ExtensionContext, force = fa
 }
 
 export function registerScm(context: vscode.ExtensionContext) {
-  const revChanged = new vscode.EventEmitter<vscode.Uri>()
+  const revChanged = new vscode.EventEmitter<vscode.FileChangeEvent[]>()
   const decorationsChanged = new vscode.EventEmitter<undefined>()
+  // Quick Diff 的存在性检查、stat 和 readFile 共用一次读取；仓库刷新后失效。
+  const contents = new WeakMap<Repo, Map<string, Promise<Buffer | null>>>()
+  let revisionTime = Date.now()
+  const readRevision = (uri: vscode.Uri): Promise<Buffer | null> => {
+    const repo = repoOf(uri)
+    if (!repo || JSON.parse(uri.query).empty) return Promise.resolve(Buffer.alloc(0))
+    let cache = contents.get(repo)
+    if (!cache) contents.set(repo, cache = new Map())
+    const key = uri.toString()
+    let pending = cache.get(key)
+    if (!pending) {
+      pending = engine.call<string | null>('show', { tab: repo.tab, rev: revOf(uri), path: rel(repo, uri) })
+        .then((content) => content === null ? null : Buffer.from(content), (error) => { if (cache.get(key) === pending) cache.delete(key); throw new Error(errorText(error)) })
+      cache.set(key, pending)
+    }
+    return pending
+  }
+  const readonly = () => { throw vscode.FileSystemError.NoPermissions() }
   /** 每个仓库里有改动的文件：小写路径 → 状态 */
   const changed = new Map<Repo, Map<string, Entry>>()
   const groups = new Map<Repo, Record<'conflicts' | 'staged' | 'changes', vscode.SourceControlResourceGroup>>()
+  const timers = new Map<Repo, ReturnType<typeof setTimeout>>()
 
   const addControl = (repo: Repo) => {
     const control = vscode.scm.createSourceControl('pushright', `PushRight · ${repo.name}`, vscode.Uri.file(repo.root))
@@ -150,7 +169,7 @@ export function registerScm(context: vscode.ExtensionContext) {
       // 暂存区里没有这个文件（未跟踪、被忽略）时不显示行号旁的改动标记
       provideOriginalResource: (uri) =>
         uri.scheme === 'file' && repoOf(uri) === repo
-          ? engine.call('show', { tab: repo.tab, rev: '', path: rel(repo, uri) }).then((content) => content === null ? undefined : revUri(repo, rel(repo, uri), ''), () => undefined)
+          ? readRevision(revUri(repo, rel(repo, uri), '')).then((content) => content === null ? undefined : revUri(repo, rel(repo, uri), ''), () => undefined)
           : undefined,
     }
     const group = (id: string, label: string, hide: boolean) => {
@@ -164,6 +183,18 @@ export function registerScm(context: vscode.ExtensionContext) {
   }
 
   const update = (repo: Repo) => {
+    contents.delete(repo)
+    revisionTime = Math.max(Date.now(), revisionTime + 1)
+    if (!repos.includes(repo)) {
+      clearTimeout(timers.get(repo))
+      timers.delete(repo)
+      controls.get(repo)?.dispose()
+      controls.delete(repo)
+      groups.delete(repo)
+      changed.delete(repo)
+      decorationsChanged.fire(undefined)
+      return
+    }
     if (!controls.has(repo)) addControl(repo)
     const control = controls.get(repo)!
     const g = groups.get(repo)!
@@ -177,13 +208,12 @@ export function registerScm(context: vscode.ExtensionContext) {
     decorationsChanged.fire(undefined)
     // 暂存区和 HEAD 的内容可能变了，让打开着的对比视图重新取
     for (const doc of vscode.workspace.textDocuments) {
-      if (repoOf(doc.uri) === repo && ['', 'HEAD'].includes(revOf(doc.uri) ?? '-')) revChanged.fire(doc.uri)
+      if (repoOf(doc.uri) === repo && ['', 'HEAD'].includes(revOf(doc.uri) ?? '-')) revChanged.fire([{ type: vscode.FileChangeType.Changed, uri: doc.uri }])
     }
   }
   repos.forEach(update)
 
   // 文件或 .git 有变化时刷新，300 毫秒内的连续变化合并成一次
-  const timers = new Map<Repo, ReturnType<typeof setTimeout>>()
   const schedule = (uri: vscode.Uri) => {
     const repo = repoOf(uri)
     if (!repo || /[\\/]\.git[\\/].*\.lock$/.test(uri.fsPath)) return
@@ -209,15 +239,19 @@ export function registerScm(context: vscode.ExtensionContext) {
     onRepoChange.event(update),
     watcher.onDidChange(schedule), watcher.onDidCreate(schedule), watcher.onDidDelete(schedule),
     vscode.window.onDidChangeWindowState((state) => state.focused && repos.forEach(refresh)),
-    vscode.workspace.registerTextDocumentContentProvider(REV, {
-      onDidChange: revChanged.event,
-      provideTextDocumentContent: (uri) => {
-        const repo = repoOf(uri)
-        // 这个版本里没有该文件时显示为空，对比视图里就是整份新增或删除
-        if (!repo || JSON.parse(uri.query).empty) return ''
-        return engine.call<string | null>('show', { tab: repo.tab, rev: revOf(uri), path: rel(repo, uri) })
-          .then((content) => content ?? '', (error) => { throw new Error(errorText(error)) })
-      },
+    // 文件模型由 VS Code 统一复用，避免虚拟文本提供器重新创建仍被 diff 引用的模型。
+    vscode.workspace.registerFileSystemProvider(REV, {
+      onDidChangeFile: revChanged.event,
+      watch: () => new vscode.Disposable(() => {}),
+      stat: async (uri) => ({ type: vscode.FileType.File, ctime: 0, mtime: revisionTime, size: (await readRevision(uri))?.length ?? 0 }),
+      // 版本中不存在的文件仍显示为空，保留新增/删除对比。
+      readFile: async (uri) => await readRevision(uri) ?? Buffer.alloc(0),
+      readDirectory: () => [],
+      createDirectory: readonly, writeFile: readonly, delete: readonly, rename: readonly,
+    }, { isReadonly: true, isCaseSensitive: true }),
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      const repo = repoOf(doc.uri)
+      if (repo) contents.get(repo)?.delete((doc.uri.scheme === 'file' ? revUri(repo, rel(repo, doc.uri), '') : doc.uri).toString())
     }),
     vscode.window.registerFileDecorationProvider({
       onDidChangeFileDecorations: decorationsChanged.event,
@@ -251,6 +285,14 @@ export function registerScm(context: vscode.ExtensionContext) {
     command('commitAmend', (arg) => ((repo) => repo && commit(repo, true))(target(arg))),
     command('editIdentity', (arg) => ((repo) => repo && editIdentity(repo))(target(arg))),
     command('refresh', async () => { await discoverRepositories(); await Promise.all(repos.map(refresh)) }),
+    command('closeRepository', async (arg) => {
+      const repo = repoArg(arg) ?? (await vscode.window.showQuickPick(repos.map((repo) => ({ label: repo.name, description: repo.root, repo })), { title: v.closeRepository }))?.repo
+      if (repo) await attempt(closeRepo(repo))
+    }),
+    command('reopenRepository', async () => {
+      const pick = await vscode.window.showQuickPick([...closedRepos.values()].map((root) => ({ label: basename(root), description: root, root })), { title: v.reopenRepository })
+      if (pick) await attempt(reopenRepo(pick.root))
+    }),
     command('stageSelection', () => applySelection('stage')),
     command('unstageSelection', () => applySelection('unstage')),
     command('discardSelection', () => applySelection('discard')),

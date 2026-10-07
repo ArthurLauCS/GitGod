@@ -2,12 +2,14 @@
   "name": "pushright",
   "displayName": "PushRight",
   "description": "%description%",
-  "version": "0.2.4",
+  "version": "1.0.0",
   "publisher": "AthurLau",
   "private": true,
   "icon": "icon.png",
   "license": "UNLICENSED",
   "repository": { "type": "git", "url": "https://github.com/ArthurLauCS/PushRight.git" },
+  "homepage": "https://github.com/ArthurLauCS/PushRight#download-and-install",
+  "bugs": { "url": "https://github.com/ArthurLauCS/PushRight/issues" },
   "capabilities": {
     "untrustedWorkspaces": { "supported": false },
     "virtualWorkspaces": false
@@ -28,6 +30,8 @@
   ],
   "contributes": {
     "commands": [
+      { "command": "pushright.closeRepository", "title": "%command.closeRepository%", "category": "PushRight", "enablement": "pushright.hasRepo" },
+      { "command": "pushright.reopenRepository", "title": "%command.reopenRepository%", "category": "PushRight", "enablement": "pushright.hasClosedRepos" },
       { "command": "pushright.ignoreLocal", "title": "%command.ignoreLocal%", "category": "PushRight" },
       { "command": "pushright.ignoreShared", "title": "%command.ignoreShared%", "category": "PushRight" },
       { "command": "pushright.trackFile", "title": "%command.trackFile%", "category": "PushRight" },
@@ -263,6 +267,9 @@
       }
     ],
     "menus": {
+      "scm/sourceControl": [
+        { "command": "pushright.closeRepository", "when": "scmProvider == pushright", "group": "navigation@1" }
+      ],
       "explorer/context": [
         { "command": "pushright.ignoreLocal", "when": "pushright.hasRepo && resourceScheme == file", "group": "pushright@1" },
         { "command": "pushright.ignoreShared", "when": "pushright.hasRepo && resourceScheme == file", "group": "pushright@2" },
@@ -324,6 +331,7 @@
         }
       ],
       "scm/title": [
+        { "command": "pushright.closeRepository", "when": "scmProvider == pushright", "group": "4_more@3" },
         {
           "command": "pushright.commit",
           "when": "scmProvider == pushright",

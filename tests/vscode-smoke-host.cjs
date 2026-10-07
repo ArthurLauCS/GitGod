@@ -47,7 +47,17 @@ exports.run = async () => {
     assert.equal(head.getText(), git('show', 'HEAD:src.ts') + '\n')
     step('serves file contents at a revision')
 
+    const showCall = api.engine.call.bind(api.engine)
+    let reads = 0
+    api.engine.call = async (cmd, args) => {
+      if (cmd === 'show' && args.rev === '' && args.path === 'src.ts') reads++
+      return showCall(cmd, args)
+    }
     const editor = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file))
+    await until('quick diff baseline', () => editor.diffInformation?.some((d) => d.original?.scheme === 'pushright-rev'))
+    assert.equal(reads, 1, 'opening a file reads the index only once for both existence and content')
+    step('quick diff loads its baseline with one index read')
+    api.engine.call = showCall
     const lens = await until('blame code lens', async () => {
       const lenses = await vscode.commands.executeCommand('vscode.executeCodeLensProvider', file)
       return lenses?.find((l) => l.command?.command === 'pushright.fileHistory' && /^bob, /.test(l.command.title))
@@ -84,11 +94,27 @@ exports.run = async () => {
     text[20] = 'export const value20 = -20'
     writeFileSync(file.fsPath, text.join('\n'))
     await until('editor reload', () => editor.document.lineAt(0).text.endsWith('-1'))
-    editor.selection = new vscode.Selection(0, 0, 0, 5)
+    await vscode.commands.executeCommand('pushright.refresh')
+    const change = { repo: api.repos[0], entry: api.repos[0].status.find((e) => e.path === 'src.ts'), staged: false, resourceUri: file }
+    await until('two gutter changes', () => editor.diffInformation?.some((d) => d.original?.scheme === 'pushright-rev' && d.changes.length === 2))
+    await vscode.commands.executeCommand('editor.action.dirtydiff.next')
+    for (let i = 0; i < 2; i++) {
+      await vscode.commands.executeCommand('pushright.openChange', change)
+      await until('unstaged diff', () => vscode.window.tabGroups.activeTabGroup.activeTab?.input instanceof vscode.TabInputTextDiff)
+      const input = vscode.window.tabGroups.activeTabGroup.activeTab.input
+      const [left, right] = await Promise.all([vscode.workspace.openTextDocument(input.original), vscode.workspace.openTextDocument(input.modified)])
+      assert.equal(left.getText(), git('show', ':src.ts') + '\n')
+      assert.equal(right.getText(), text.join('\n'))
+      await vscode.window.tabGroups.close(vscode.window.tabGroups.activeTabGroup.activeTab)
+    }
+    step('opens and reopens an unstaged diff while the file and quick diff are already loaded')
+    const selectedEditor = await vscode.window.showTextDocument(editor.document)
+    selectedEditor.selection = new vscode.Selection(0, 0, 0, 5)
     await vscode.commands.executeCommand('pushright.stageSelection')
     assert.match(git('diff', '--cached'), /\+export const value0 = -1/)
     assert.doesNotMatch(git('diff', '--cached'), /value20 = -20/)
     assert.match(git('diff'), /\+export const value20 = -20/)
+    await until('gutter updates after staging', () => selectedEditor.diffInformation?.some((d) => d.original?.scheme === 'pushright-rev' && d.changes.length === 1))
     step('stages only the selected lines')
 
     await until('status refresh', () => api.repos[0].status.some((e) => e.staged))
@@ -208,6 +234,29 @@ exports.run = async () => {
     assert.ok(!git('status', '--porcelain', '--untracked-files=all').includes('private-skill.md'))
     await vscode.commands.executeCommand('pushright.localFiles.focus')
     step('discovers submodules and nested repositories and keeps local ignore rules in the selected repository')
+
+    // 单独打开工作区外的文件会发现新仓库；关闭后保留文件，并且刷新、重新聚焦都不能打开它。
+    const outside = vscode.Uri.file(join(root, '..', 'other', 'src.ts'))
+    const outsideEditor = await vscode.window.showTextDocument(outside)
+    const external = await until('external repository discovery', () => api.repos.find((r) => r.root === join(root, '..', 'other')))
+    await vscode.commands.executeCommand('pushright.closeRepository', external)
+    assert.equal(api.repos.includes(external), false)
+    await assert.rejects(api.engine.call('refs', { tab: external.tab }), /PR_TAB_CLOSED/)
+    assert.equal(outsideEditor.document.isClosed, false)
+    await vscode.window.showTextDocument(vscode.Uri.file(join(root, '重命名.ts')))
+    await vscode.window.showTextDocument(outside)
+    await vscode.commands.executeCommand('pushright.refresh')
+    assert.equal(api.repos.length, 3)
+    const reopening = vscode.commands.executeCommand('pushright.reopenRepository')
+    await sleep(500)
+    await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem')
+    await reopening
+    assert.ok(api.repos.some((r) => r.root === external.root))
+    await vscode.commands.executeCommand('pushright.closeRepository', sub)
+    await vscode.commands.executeCommand('pushright.refresh')
+    assert.equal(api.repos.some((r) => r.root === sub.root), false)
+    assert.ok(api.repos.includes(repo), 'closing a subrepository preserves its parent')
+    step('closes external and nested repositories, keeps their files open and supports explicit reopening')
   } catch (e) {
     error = e.stack ?? String(e)
   }

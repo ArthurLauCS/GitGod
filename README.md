@@ -6,9 +6,9 @@
 
 A Git desktop client built with Svelte, Tauri and Rust. PushRight makes push destinations explicit, recommends a remote branch with the same name, and defaults Pull to **Rebase instead of merge**.
 
-**v0.2.3 preview** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+**v1.0.0, the first stable release,** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
 
-This update lists untracked files inside new folders individually, fixes directory access errors when previewing them, and improves branch-label contrast. The VS Code extension also opens its sidebar graph by default and uses a more compact layout.
+This release includes the desktop client and editor extension. The extension fixes unstaged and inline diffs, shares revision reads for gutter markers, and adds persistent repository close/reopen controls.
 
 ![PushRight: commit graph, individual author styling and file differences](docs/images/desktop.jpg)
 
@@ -16,13 +16,15 @@ Screenshots show the actual desktop app with a local demo repository and fiction
 
 ## Download and install
 
-Download `PushRight_0.2.3_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v0.2.3).
+**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.0/PushRight_1.0.0_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.0/pushright-win32-x64-1.0.0.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.0/SHA256SUMS.txt)
+
+Download `PushRight_1.0.0_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0).
 
 - Windows 10 / 11 x64; built and checked on Windows x64.
 - Install [Git for Windows](https://git-scm.com/downloads/win) and make `git` available on PATH.
 - Microsoft Edge WebView2 Runtime is required; the installer attempts an online installation if missing.
 - The installer offers English and Simplified Chinese. App language is selected independently.
-- This preview is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_0.2.3_x64-setup.exe -Algorithm SHA256`.
+- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.0.0_x64-setup.exe -Algorithm SHA256`.
 
 Previously named GitGod. PushRight retains the application data identifier for settings compatibility. The old GitGod installation may remain separately installed; it is not removed automatically.
 
@@ -98,16 +100,16 @@ Measurements on a local Linux repository with 1.48 million commits and a 128 MiB
 
 App text, tooltips, explanations and app-generated errors are translated. Repository content, commit messages, branch names and raw Git/OS output stay verbatim. Native OS dialogs use the system language.
 
-## VS Code extension (preview)
+## VS Code / Cursor extension
 
-Extension **0.2.4** adds inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, and local ignore / tracking controls.
+Extension **1.0.0** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, and local ignore / tracking controls.
 
-The same engine and interface run inside VS Code. Install the Windows x64 preview from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.4). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
+The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-0.2.4.vsix
+code --install-extension extension/pushright-win32-x64-1.0.0.vsix
 ```
 
 - **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.
@@ -120,7 +122,7 @@ Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integra
 
 ## Current limits
 
-- Desktop and VS Code extension previews. PR / Issue and hosting-provider collaboration are not delivered yet.
+- PR / Issue and hosting-provider collaboration are not delivered yet.
 - Visible rows are virtualized, but complete history is still read in the background.
 - Patches over 4 MiB are not displayed in full. The limit bounds retained app data; Git may still consume time and memory before producing output.
 - The graph has at most 24 lanes, reduced by available width. Highly parallel histories can omit connections.

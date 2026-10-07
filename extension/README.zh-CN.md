@@ -6,6 +6,8 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
+**[下载 VSIX · Windows x64 · 1.0.0](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.0/pushright-win32-x64-1.0.0.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0)
+
 ## 使用条件
 
 - Windows 10 / 11 x64、VS Code 1.90 及以上、PATH 中可运行 Git。
@@ -30,6 +32,7 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 - 新增目录逐个列出未跟踪文件，可在暂存前查看每个文件，并分别暂存；仍遵守忽略规则。
 - 运行 **PushRight: 打开提交图** 或点击侧栏提交图标题栏按钮，在编辑器页签中浏览分支、提交和差异。如果曾隐藏侧栏图，可在源代码管理的“视图”菜单中重新勾选 **PushRight 提交图**。
 - 快速修改当前仓库的提交名和邮箱。
+- 在仓库列表中右键选择 **关闭仓库**，保留已打开的文件，并阻止切换文件、刷新或重载时自动重新发现。使用 **PushRight: 重新打开已关闭仓库…** 恢复。
 
 首次启用会说明关闭 VS Code 内置 Git 的影响，由你决定是否让推送和拉取统一经过 PushRight。依赖内置 Git 的扩展可能因此停止工作。与 GitLens 同时启用时，可关闭其中一个的 Blame 注释以免重复。
 
@@ -48,7 +51,7 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 忽略规则不能隐藏已跟踪文件的改动。停止跟踪不会强行丢弃独立的暂存修改。撤销忽略可编辑相应的 `.gitignore` 或 `.git/info/exclude`；强制跟踪文件不会删除已有规则。
 
-## 预览版限制
+## 当前限制
 
 - 尚无 PR／Issue 和托管平台协作，不能替代 GitLens 或 GitHub Pull Requests 的这些功能。
 - 子模块需要先初始化。不会后台扫描被忽略的目录树来查找仓库；打开其中的文件或将其添加为工作区文件夹即可识别。
@@ -58,10 +61,11 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.4) 下载 Windows x64 VSIX，然后执行 VS Code 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-0.2.4.vsix
+code --install-extension pushright-win32-x64-1.0.0.vsix
+cursor --install-extension pushright-win32-x64-1.0.0.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。
