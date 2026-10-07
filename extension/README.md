@@ -6,7 +6,7 @@
 
 PushRight brings Git source control, blame, history and a commit graph into VS Code. It makes push destinations explicit and defaults every Pull to **Rebase instead of merge**. English and Simplified Chinese are included; the extension follows VS Code's display language.
 
-**[Download VSIX · Windows x64 · 1.0.0](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.0/pushright-win32-x64-1.0.0.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0)
+**[Download VSIX · Windows x64 · 1.0.1](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/pushright-win32-x64-1.0.1.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1)
 
 ## Requirements
 
@@ -61,13 +61,13 @@ Ignore rules do not hide changes to tracked files. Stop-tracking refuses to disc
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
 
 ```sh
-code --install-extension pushright-win32-x64-1.0.0.vsix
-cursor --install-extension pushright-win32-x64-1.0.0.vsix
+code --install-extension pushright-win32-x64-1.0.1.vsix
+cursor --install-extension pushright-win32-x64-1.0.1.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.
 
-Third-party notices ship in `THIRD_PARTY_NOTICES.txt`. The author has not selected an open-source license for PushRight.
+Third-party notices ship in `THIRD_PARTY_NOTICES.txt`. PushRight is licensed under the [MIT License](https://github.com/ArthurLauCS/PushRight/blob/main/LICENSE).
