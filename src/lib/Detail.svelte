@@ -4,13 +4,16 @@
   import { authorColor } from './author'
   import { layout } from './layout.svelte'
   import Splitter from './Splitter.svelte'
-  import { fmtTime, t } from './i18n.svelte'
+  import { fmtTime, t, errorText } from './i18n.svelte'
 
   let {
     detail,
     onjump,
     fetchDiff,
-  }: { detail: Detail | null; onjump: (id: string) => void; fetchDiff: (id: string, path: string) => Promise<Diff> } = $props()
+    fetchPage,
+    reviewKey = '',
+    comparison = false,
+  }: { detail: Detail | null; onjump: (id: string) => void; fetchDiff: (id: string, path: string) => Promise<Diff>; fetchPage?: (id: string, path: string, skip: number) => Promise<Diff>; reviewKey?: string; comparison?: boolean } = $props()
 
   // 提交信息第一行是标题，其余是正文
   const subject = $derived(detail?.message.split('\n')[0] ?? '')
@@ -19,6 +22,13 @@
   /** 正在看 diff 的文件；null 时右侧显示提交信息 */
   let file = $state<string | null>(null)
   let diff = $state.raw<Diff | null>(null)
+  let error = $state('')
+  let reviewed = $state<string[]>([])
+  $effect(() => { reviewed = JSON.parse(localStorage.getItem(reviewKey) ?? '[]') })
+  function review(path: string) {
+    reviewed = reviewed.includes(path) ? reviewed.filter((p) => p !== path) : [...reviewed, path]
+    if (reviewKey) localStorage.setItem(reviewKey, JSON.stringify(reviewed))
+  }
 
   $effect(() => {
     detail
@@ -27,11 +37,12 @@
   $effect(() => {
     const f = file
     diff = null
+    error = ''
     if (!f || !detail) return
     let stale = false
     fetchDiff(detail.id, f).then(
       (d) => stale || (diff = d),
-      () => {},
+      (e) => { if (!stale) error = errorText(e) },
     )
     return () => (stale = true)
   })
@@ -42,20 +53,23 @@
     <div class="files" style:width="min({layout.files}px, 45%)">
       <h3>{t.files(detail.files.length)}</h3>
       {#each detail.files as f (f.path)}
+        <div class="file-row">
+        <input type="checkbox" aria-label={`${t.tools.reviewed}: ${f.path}`} title={t.tools.reviewed} checked={reviewed.includes(f.path)} onchange={() => review(f.path)} />
         <button class="file" class:selected={file === f.path} title={f.path} onclick={() => (file = file === f.path ? null : f.path)}>
           <span class="status s{f.status}" title={t.status[f.status] ?? f.status}>{f.status}</span>
           <span class="path">{#if f.old_path}<span class="muted">{f.old_path} → </span>{/if}{f.path}</span>
         </button>
+        </div>
       {/each}
     </div>
     <Splitter key="files" min={200} max={640} />
     {#if file}
-      <DiffView {diff} />
+      {#if error}<p class="empty">{error}</p>{:else}<DiffView {diff} fetchPage={fetchPage ? (skip) => fetchPage!(detail!.id, file!, skip) : undefined} />{/if}
     {:else}
       <div class="info">
         <h2>{subject}</h2>
         {#if body}<pre class="message">{body}</pre>{/if}
-        <dl>
+        {#if !comparison}<dl>
           <dt>{t.colCommit}</dt>
           <dd class="mono">{detail.id}</dd>
           <dt>{t.author}</dt>
@@ -72,7 +86,7 @@
               {/each}
             </dd>
           {/if}
-        </dl>
+        </dl>{/if}
       </div>
     {/if}
   {:else}
@@ -81,6 +95,8 @@
 </section>
 
 <style>
+  .file-row { display: flex; align-items: center; padding-left: 8px; }
+  .file-row .file { min-width: 0; }
   section {
     flex: none;
     display: flex;

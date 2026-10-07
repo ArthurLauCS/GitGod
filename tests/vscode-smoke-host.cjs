@@ -28,6 +28,15 @@ exports.run = async () => {
     assert.equal(api.repos.length, 1)
     assert.equal(api.repos[0].refs.head, 'refs/heads/feature/x')
     step('activates and opens the workspace repository')
+    const initialTab = api.repos[0].tab
+    const comparison = await api.engine.call('compare', { tab: initialTab, left: 'HEAD~1', right: 'HEAD', commonBase: false })
+    assert.ok(comparison.files.some((f) => f.path === 'mine.txt'))
+    const comparedDiff = await api.engine.call('diff_between', { tab: initialTab, left: comparison.left, right: comparison.right, path: 'mine.txt', oldPath: null })
+    assert.ok(comparedDiff.hunks.length)
+    assert.ok((await api.engine.call('remote_details', { tab: initialTab })).some((r) => r.name === 'origin'))
+    assert.ok((await api.engine.call('reflog', { tab: initialTab, skip: 0, limit: 201 })).length)
+    assert.equal((await api.engine.call('rebase_plan', { tab: initialTab, base: 'HEAD~1' })).steps.length, 1)
+    step('routes comparison, diff, remote details, reflog and rebase planning through the bundled engine')
 
     const registered = new Set(await vscode.commands.getCommands())
     const missing = extension.packageJSON.contributes.commands.map((c) => c.command).filter((c) => !registered.has(c))
@@ -46,6 +55,10 @@ exports.run = async () => {
     const head = await vscode.workspace.openTextDocument(file.with({ scheme: 'pushright-rev', query: JSON.stringify({ rev: 'HEAD' }) }))
     assert.equal(head.getText(), git('show', 'HEAD:src.ts') + '\n')
     step('serves file contents at a revision')
+    const image = vscode.Uri.file(join(root, 'preview.png')).with({ scheme: 'pushright-rev', query: JSON.stringify({ rev: 'HEAD' }) })
+    const imageBytes = await vscode.workspace.fs.readFile(image)
+    assert.equal(Buffer.from(imageBytes).toString('base64'), 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvWoAAAAASUVORK5CYII=')
+    step('serves binary image revisions without text decoding')
 
     const showCall = api.engine.call.bind(api.engine)
     let reads = 0
@@ -69,7 +82,7 @@ exports.run = async () => {
     const originalCall = api.engine.call.bind(api.engine)
     api.engine.call = async (cmd, args) => {
       const result = await originalCall(cmd, args)
-      if (cmd === 'line_history') lineCalls.push({ args, result })
+      if (cmd === 'line_history_page') lineCalls.push({ args, result })
       return result
     }
     // 仅展开视图，随后移动光标，不执行 pushright.lineHistory 命令。

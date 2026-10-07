@@ -17,6 +17,7 @@ git(work, 'config', 'user.name', 'carol')
 git(work, 'config', 'user.email', 'carol@example.com')
 const lines = Array.from({ length: 30 }, (_, i) => `export const value${i} = ${i}`)
 writeFileSync(join(work, 'src.ts'), lines.join('\n') + '\n')
+writeFileSync(join(work, 'preview.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvWoAAAAASUVORK5CYII=', 'base64'))
 git(work, 'add', '.')
 // 两次提交相隔不到一秒，显式给出作者时间，「最近修改者」才有确定的答案
 git(work, ...as('alice'), 'commit', '-q', '--date=2024-01-01T00:00:00', '-m', 'add values')

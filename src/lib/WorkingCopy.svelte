@@ -180,6 +180,7 @@
   {:else}
     <DiffView
       {diff}
+      fetchPage={sel ? (skip) => api.diffPage(tab, sel!.staged ? 'staged' : entries.find((e) => e.path === sel!.path)?.unstaged === '?' ? 'untracked' : 'unstaged', '', '', sel!.path, skip) : undefined}
       mode={sel?.staged ? 'staged' : 'unstaged'}
       onapply={(hunk, header, lines) => sel && run(api.applyLines(tab, sel.path, sel.staged, hunk, header, lines))}
       ondiscard={(hunk, header, lines) => sel && discardLines(sel.path, hunk, header, lines)}

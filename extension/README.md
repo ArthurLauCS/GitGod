@@ -6,7 +6,9 @@
 
 PushRight brings Git source control, blame, history and a commit graph into VS Code. It makes push destinations explicit and defaults every Pull to **Rebase instead of merge**. English and Simplified Chinese are included; the extension follows VS Code's display language.
 
-**[Download VSIX · Windows x64 · 1.0.1](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.1/pushright-win32-x64-1.0.1.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1)
+**1.1.0** adds repository tools, paged history, image diffs and large-patch previews for Windows local workspaces.
+
+**[Download VSIX · Windows x64 · 1.1.0](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.0/pushright-win32-x64-1.1.0.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0)
 
 ## Requirements
 
@@ -32,6 +34,9 @@ Pull asks every time, with **Rebase instead of merge** checked. Keep it checked 
 - New folders list their untracked files individually, so you can inspect and stage each file before committing. Ignored files stay excluded.
 - Run **PushRight: Open Commit Graph**, or use the sidebar graph's title button, to browse branches, commits and file differences in an editor tab. If the sidebar graph was hidden, enable **PushRight Graph** in Source Control's **Views** menu.
 - Change the commit name and email for the current repository.
+- In the full **Open Commit Graph** view, choose **Repository tools** to compare revisions, mark reviewed files, manage remote URLs, edit rebase actions/order, and recover reflog entries into new branches. Clone and initialize are available on the welcome page.
+- File history, line history and search load 200 entries per page with **Load more**. Unchanged selections in modified or unsaved buffers are mapped back to HEAD for line history.
+- Preview image changes side by side and large patches in read-only pages of 1,000 lines.
 - Right-click a repository and choose **Close Repository** to keep its files open without rediscovering it on file switches, refreshes or reloads. Use **PushRight: Reopen Closed Repository…** to restore it.
 
 On first use, PushRight offers to turn off built-in Git, so push and pull go through its checks. This is optional. Extensions that depend on built-in Git may stop working when it is disabled. If you keep GitLens enabled, turn off duplicate blame annotations in one extension.
@@ -55,17 +60,18 @@ Ignore rules do not hide changes to tracked files. Stop-tracking refuses to disc
 
 - PR / Issue and hosting-provider collaboration are not included yet. PushRight does not replace those parts of GitLens or GitHub Pull Requests.
 - Submodules must already be initialized. Ignored directory trees are not scanned for repositories in the background; open a file inside one or add it as a workspace folder.
-- File history lists at most 200 commits. Commit or stash changes to a file before viewing its line history, so selection line numbers match HEAD.
-- Text revisions and patches are limited to 4 MiB. Binary revisions are not rendered as text. Whole-file Git operations remain available.
+- Line history reports selections containing new or modified lines that cannot map to HEAD; use file history or commit first.
+- Native text revisions default to 4 MiB; `pushright.history.maxFileSizeMiB` raises this up to 64 MiB. Large patches are read-only pages; lines over 64 KiB are clipped. Image previews support PNG/JPEG/GIF/WebP/BMP/ICO, up to 32 MiB per side. Other binary files support whole-file operations.
+- Interactive rebase edits linear commits after an ancestor of HEAD, excluding merge ranges and the root commit, and retains a `pushright-backup/*` branch. Reflog recovery creates a new branch without resetting the current one.
 - Full commit history loads in the background. See the [performance report](https://github.com/ArthurLauCS/PushRight/blob/main/docs/PERFORMANCE.md) for measured limits.
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.1), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.0), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
 
 ```sh
-code --install-extension pushright-win32-x64-1.0.1.vsix
-cursor --install-extension pushright-win32-x64-1.0.1.vsix
+code --install-extension pushright-win32-x64-1.1.0.vsix
+cursor --install-extension pushright-win32-x64-1.1.0.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.

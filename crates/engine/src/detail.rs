@@ -49,7 +49,7 @@ pub fn detail(repo: &Repo, id: &str) -> Result<Detail> {
 }
 
 /// `--name-status -z` 的格式：状态\0路径\0，重命名/复制是 状态\0旧路径\0新路径\0
-fn parse_name_status(out: &str) -> Vec<FileChange> {
+pub(crate) fn parse_name_status(out: &str) -> Vec<FileChange> {
     let mut fields = out.split('\0');
     let mut files = Vec::new();
     while let Some(status) = fields.next().and_then(|s| s.chars().next()) {

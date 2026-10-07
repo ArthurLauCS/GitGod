@@ -57,6 +57,10 @@ pub enum Op {
     Push { remote: String, branch: String, remote_branch: String, force: bool, set_upstream: bool },
     CreateTag { name: String, target: String, message: String },
     DeleteTag { name: String },
+    RemoteAdd { name: String, url: String },
+    RemoteUrl { name: String, url: String, push: bool },
+    RemoteRemove { name: String },
+    RemoteRename { old: String, new: String },
     Continue { what: InProgress },
     Abort { what: InProgress },
 }
@@ -149,6 +153,15 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
             args.extend([safe(name)?, safe(target)?]);
         }
         Op::DeleteTag { name } => args.extend(["tag", "-d", safe(name)?]),
+        Op::RemoteAdd { name, url } => args.extend(["remote", "add", safe(name)?, safe(url)?]),
+        Op::RemoteUrl { name, url, push } => {
+            args.extend(["remote", "set-url"]);
+            if *push { args.push("--push"); }
+            args.extend([safe(name)?, safe(url)?]);
+        }
+        Op::RemoteRemove { name } => args.extend(["remote", "remove", safe(name)?]),
+        Op::RemoteRename { old, new } => args.extend(["remote", "rename", safe(old)?, safe(new)?]),
+        Op::Continue { what: InProgress::Rebase } => return crate::rebase::continue_rebase(repo),
         Op::Continue { what } | Op::Abort { what } => {
             let cmd = match what {
                 InProgress::Merge => "merge",

@@ -15,6 +15,7 @@
   import Sidebar from './Sidebar.svelte'
   import WorkingCopy from './WorkingCopy.svelte'
   import Worktrees from './Worktrees.svelte'
+  import Tools from './Tools.svelte'
   import { t, errorText } from './i18n.svelte'
 
   let {
@@ -45,7 +46,23 @@
   let identity = $state.raw<api.Identity | null>(null)
   let logs = $state.raw<api.Log[]>([])
   let showLog = $state(false)
-  let view = $state<'history' | 'changes' | 'worktrees'>('history')
+  let view = $state<'history' | 'changes' | 'worktrees' | 'tools'>('history')
+  let compareLeft = $state('HEAD~1')
+  let compareRight = $state('HEAD')
+  let compareVersion = $state(0)
+
+  async function rebase(plan: api.RebasePlan) {
+    busy = true
+    error = ''
+    const log = await guard(api.rebaseRun(tab, plan))
+    if (log) { logs = [...logs, log]; showLog = true }
+    busy = false
+    await refresh()
+    if (refs.in_progress) view = 'changes'
+    return log?.ok ?? false
+  }
+
+  function compareWith(id: string) { compareRight = id; ++compareVersion; view = 'tools' }
   let tracks = $state.raw(new Map<string, api.Track>())
   let selectedRow = $state<number | null>(null)
   let detail = $state.raw<api.Detail | null>(null)
@@ -501,12 +518,16 @@
         items.pop()
       }
     }
+    if (kind !== 'stash') items.push(null, { label: t.tools.compareFrom, action: () => { compareLeft = name } }, { label: t.tools.compareTo, action: () => compareWith(name) })
     menu!.show(e, items)
   }
 
   function commitMenu(e: MouseEvent, id: string) {
     const onto = head ?? 'HEAD'
     menu!.show(e, [
+      { label: t.tools.compareFrom, action: () => { compareLeft = id } },
+      { label: t.tools.compareTo, action: () => compareWith(id) },
+      null,
       {
         label: t.checkoutCommit,
         hint: explain.checkout_commit.short,
@@ -638,7 +659,7 @@
           <p class="none">{t.noCommits}</p>
         {/if}
         <Splitter key="detail" dir="y" min={120} max={640} invert />
-        <Detail {detail} onjump={jump} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} />
+        <Detail {detail} onjump={jump} reviewKey={`review:${JSON.stringify([path, detail?.id])}`} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} fetchPage={(id, path, skip) => api.diffPage(tab, 'commit', '', id, path, skip)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
         <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} rebasing={refs.in_progress === 'rebase'} reload={refresh} oncommitted={committed} {discard} {discardLines} />
@@ -647,6 +668,9 @@
         <div class="pane">
           <Worktrees {worktrees} {onopen} onremove={removeWorktree} onnew={() => addWorktree('HEAD', false)} />
         </div>
+      {/if}
+      {#if view === 'tools'}
+        {#key compareVersion}<Tools {tab} {path} {refs} {busy} left={compareLeft} right={compareRight} {exec} {rebase} {ask} />{/key}
       {/if}
     </div>
   </main>

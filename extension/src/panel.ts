@@ -1,10 +1,10 @@
 import * as vscode from 'vscode'
-import { engine, panel as hook, refresh, repos, store } from './core'
+import { discoverRepositories, engine, panel as hook, refresh, repos, store } from './core'
 import { setupWebview } from './webview'
 
 /** 每个窗口各自决定的键，不跨窗口保存：页签来自工作区，主题和语言跟随 VS Code */
 const SESSION = new Set(['tabs', 'recent', 'theme', 'locale'])
-const WRITES = new Set(['op', 'stage', 'unstage', 'commit', 'apply_lines', 'discard_lines', 'conflict_resolve', 'conflict_take', 'set_commit_identity'])
+const WRITES = new Set(['op', 'stage', 'unstage', 'commit', 'apply_lines', 'discard_lines', 'conflict_resolve', 'conflict_take', 'set_commit_identity', 'rebase_run'])
 
 let current: vscode.WebviewPanel | undefined
 
@@ -45,6 +45,7 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: { id: strin
         tabs.set(tab, path)
       } else if (m.cmd === 'close_repo') tabs.delete(m.args.tab)
       webview.postMessage({ id: m.id, ok: true, value })
+      if (m.cmd === 'create_repo') await discoverRepositories([value as string])
       // 完整图加载后再定位，避免初始化选择 HEAD 覆盖外部指定的提交。
       if (reveal && m.cmd === 'load_graph' && m.args.full && (!reveal.root || vscode.Uri.file(tabs.get(m.args.tab) ?? '').fsPath.toLowerCase() === reveal.root.toLowerCase())) {
         webview.postMessage({ reveal })

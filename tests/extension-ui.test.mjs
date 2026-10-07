@@ -196,6 +196,24 @@ test('history context menus resolve their list and stale file requests cannot re
   const count = pending.size
   repoChanged.fire(repo)
   assert.equal(pending.size, count)
+  const page = Array.from({ length: 201 }, (_, i) => ({ id: `commit${i}`, path: 'a.txt' }))
+  list.set(repo, 'a.txt', page, 'a.txt')
+  const next = deferred()
+  list.loader = (skip) => { assert.equal(skip, 200); return next.promise }
+  const loading = list.loadMore()
+  assert.equal(list.items.length, 200)
+  next.resolve([{ id: 'last', path: 'old.txt' }])
+  await loading
+  assert.equal(list.items.length, 201)
+  assert.equal(list.more, false)
+  const latePage = deferred()
+  list.set(repo, 'a.txt', page, 'a.txt')
+  list.loader = () => latePage.promise
+  const stalePage = list.loadMore()
+  list.set(repo, 'b.txt', [], 'b.txt')
+  latePage.resolve([{ id: 'obsolete', path: 'a.txt' }])
+  await stalePage
+  assert.deepEqual(list.items, [], 'late pages cannot append to another file history')
   core.repos.length = 0
   repoChanged.fire(repo)
   pending.get('a.txt').resolve(a)
@@ -208,7 +226,7 @@ test('line history follows selection without focus, coalesces reads and rejects 
   const views = new Map(), commands = new Map(), executed = [], calls = []
   const repo = { tab: 0, refs: { head_id: 'head' } }
   const range = (start, end = start, character = 2) => ({ start: { line: start, character: 0 }, end: { line: end, character } })
-  const editor = { document: { uri: uri('/repo/a.txt'), isDirty: false }, selection: range(0) }
+  const editor = { document: { uri: uri('/repo/a.txt'), isDirty: false, getText: () => 'one\ntwo\nthree\n' }, selection: range(0) }
   const vscode = {
     EventEmitter: Event,
     window: {
@@ -243,20 +261,24 @@ test('line history follows selection without focus, coalesces reads and rejects 
     assert.equal(calls.length, 2, 'same line does not reload')
     assert.deepEqual(executed, [], 'following the cursor must not focus the history pane')
     editor.document.isDirty = true; changed.fire({ document: editor.document }); await pause()
-    assert.equal(list.view.message, 'changed')
+    assert.equal(list.view.message, 'loading')
     assert.deepEqual(list.items, [])
-    assert.equal(calls.length, 2)
-    editor.document.isDirty = false; saved.fire(editor.document); await pause()
     assert.equal(calls.length, 3)
+    assert.equal(calls[2].cmd, 'line_history_page')
+    assert.equal(calls[2].args.contents, editor.document.getText())
     calls[2].job.resolve(latest); await pause()
+    assert.equal(list.items, latest, 'dirty buffers are mapped by the engine instead of being rejected wholesale')
+    editor.document.isDirty = false; saved.fire(editor.document); await pause()
+    assert.equal(calls.length, 4)
+    calls[3].job.resolve(latest); await pause()
     list.view.visible = false; visibility.fire(); move(range(5)); await pause()
-    assert.equal(calls.length, 3, 'hidden views do not request history')
+    assert.equal(calls.length, 4, 'hidden views do not request history')
     list.view.visible = true; visibility.fire(); await pause()
-    assert.equal(calls[3].args.start, 6)
-    calls[3].job.resolve([]); await pause()
+    assert.equal(calls[4].args.start, 6)
+    calls[4].job.resolve([]); await pause()
     repo.refs.head_id = 'new-head'; repoChanged.fire(repo); await pause()
-    assert.equal(calls.length, 5)
-    calls[4].job.resolve([])
+    assert.equal(calls.length, 6)
+    calls[5].job.resolve([])
   } finally { context.subscriptions.forEach((s) => s?.dispose?.()) }
 })
 
@@ -292,6 +314,7 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
     commands: { registerCommand: (id, fn) => commands.set(id, fn) },
     window: { activeTextEditor: editor, onDidChangeWindowState: event },
     workspace: {
+      getConfiguration: () => ({ get: (_, fallback) => fallback }),
       textDocuments: [], createFileSystemWatcher: () => ({ onDidChange: event, onDidCreate: event, onDidDelete: event }),
       onDidCloseTextDocument: new Event().event,
       registerFileSystemProvider: (scheme, provider, options) => { assert.equal(options.isReadonly, true); providers.set(scheme, provider) },

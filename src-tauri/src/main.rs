@@ -9,7 +9,7 @@ use engine::graph::{Graph, Row};
 use engine::identity::{self, Identity};
 use engine::ops::{self, Log, Op};
 use engine::refs::{self, Refs, Stash, Track, Worktree};
-use engine::{Repo, Result};
+use engine::{Repo, Result, tools, rebase};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
@@ -187,11 +187,44 @@ fn conflict_take(state: State, tab: u32, path: String, theirs: bool) -> Result<(
     conflict::take(&session(&state, tab)?.repo, &path, theirs)
 }
 
+#[tauri::command(async)]
+fn create_repo(path: String, url: Option<String>) -> Result<String> { tools::create(&path, url.as_deref()) }
+
+#[tauri::command(async)]
+fn compare(state: State, tab: u32, left: String, right: String, common_base: bool) -> Result<tools::Comparison> {
+    tools::compare(&session(&state, tab)?.repo, &left, &right, common_base)
+}
+
+#[tauri::command(async)]
+fn diff_between(state: State, tab: u32, left: String, right: String, path: String, old_path: Option<String>) -> Result<Diff> {
+    diff::between(&session(&state, tab)?.repo, &left, &right, &path, old_path.as_deref())
+}
+
+#[tauri::command(async)]
+fn diff_page(state: State, tab: u32, mode: String, left: String, right: String, path: String, old_path: Option<String>, skip: usize) -> Result<Diff> {
+    diff::page(&session(&state, tab)?.repo, &mode, &left, &right, &path, old_path.as_deref(), skip)
+}
+
+#[tauri::command(async)]
+fn remote_details(state: State, tab: u32) -> Result<Vec<tools::Remote>> { tools::remotes(&session(&state, tab)?.repo) }
+
+#[tauri::command(async)]
+fn reflog(state: State, tab: u32, skip: usize, limit: usize) -> Result<Vec<tools::Reflog>> { tools::reflog(&session(&state, tab)?.repo, skip, limit) }
+
+#[tauri::command(async)]
+fn rebase_plan(state: State, tab: u32, base: String) -> Result<rebase::Plan> { rebase::plan(&session(&state, tab)?.repo, &base) }
+
+#[tauri::command(async)]
+fn rebase_run(state: State, tab: u32, base: String, head: String, steps: Vec<rebase::Step>) -> Result<Log> {
+    rebase::run(&session(&state, tab)?.repo, &base, &head, &steps)
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Tabs::default())
         .invoke_handler(tauri::generate_handler![
+            create_repo, compare, diff_between, diff_page, remote_details, reflog, rebase_plan, rebase_run,
             initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
             commit, last_message, commit_identity, set_commit_identity, diff_worktree, diff_commit, apply_lines, op, remotes, tracking, discard_lines, conflict_read, conflict_resolve, conflict_take
         ])

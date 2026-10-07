@@ -5,7 +5,7 @@
   import { t } from './i18n.svelte'
 
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
-  type View = 'history' | 'changes' | 'worktrees'
+  type View = 'history' | 'changes' | 'worktrees' | 'tools'
 
   let {
     refs,
@@ -56,6 +56,7 @@
 
 <aside style:width="min({layout.sidebar}px, 36vw)">
   <nav>
+    <button class:on={view === 'tools'} onclick={() => onview('tools')}><Icon name="log" /><span>{t.tools.nav}</span></button>
     <button class:on={view === 'changes'} onclick={() => onview('changes')}>
       <Icon name="changes" /><span>{t.changes}</span>{#if changes}<span class="pill">{changes}</span>{/if}
     </button>
