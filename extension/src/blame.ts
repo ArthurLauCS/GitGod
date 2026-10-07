@@ -42,6 +42,7 @@ function hover(root: string, c: BlameCommit): vscode.MarkdownString | undefined 
 
 export function registerBlame(context: vscode.ExtensionContext) {
   interface Entry {
+    repo: Repo
     version: number
     blame: Blame
     cancel: () => void
@@ -71,7 +72,7 @@ export function registerBlame(context: vscode.ExtensionContext) {
     const old = cache.get(key)
     if (!repo || old?.version === doc.version) return
     old?.cancel()
-    const entry: Entry = { version: doc.version, blame: { lines: [], done: false }, cancel: () => {} }
+    const entry: Entry = { repo, version: doc.version, blame: { lines: [], done: false }, cancel: () => {} }
     cache.set(key, entry)
     entry.cancel = runBlame(repo.root, rel(repo, doc.uri), doc.isDirty ? doc.getText() : undefined, (blame) => {
       entry.blame = blame
@@ -80,9 +81,9 @@ export function registerBlame(context: vscode.ExtensionContext) {
     })
   }
 
-  function drop(filter: (uri: vscode.Uri) => boolean) {
+  function drop(filter: (uri: vscode.Uri, entry: Entry) => boolean) {
     for (const [key, entry] of cache) {
-      if (!filter(vscode.Uri.parse(key))) continue
+      if (!filter(vscode.Uri.parse(key), entry)) continue
       entry.cancel()
       cache.delete(key)
     }
@@ -293,6 +294,13 @@ export function registerBlame(context: vscode.ExtensionContext) {
     }),
     // 有了新提交（或切了分支），原来「尚未提交」的行有了归属
     onRepoChange.event((repo) => {
+      if (!repos.includes(repo)) {
+        heads.delete(repo)
+        drop((_, entry) => entry.repo === repo)
+        renderAll()
+        lensChanged.fire()
+        return
+      }
       if (heads.get(repo) === repo.refs.head_id) return
       heads.set(repo, repo.refs.head_id)
       drop((uri) => repoOf(uri) === repo)

@@ -237,6 +237,8 @@ export const messages = {
   noCommits: '这个仓库还没有提交',
   status: { A: '新增', M: '修改', D: '删除', R: '重命名', C: '复制', T: '类型变更', '?': '未跟踪', U: '冲突' } as Record<string, string>,
   vscode: {
+    closeRepository: '关闭仓库',
+    reopenRepository: '重新打开已关闭仓库',
     graphRepository: '提交图仓库',
     graphRetry: '重新加载提交图',
     graphLoadingFiles: '正在加载改动文件…',

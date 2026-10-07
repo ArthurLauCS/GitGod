@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import ts from 'typescript'
 
@@ -20,7 +21,63 @@ class Event {
   dispose() {}
 }
 const deferred = () => { let resolve; const promise = new Promise((r) => resolve = r); return { promise, resolve } }
-const uri = (fsPath) => ({ fsPath, scheme: 'file', with: (other) => ({ ...uri(fsPath), ...other }) })
+const uri = (fsPath) => ({ fsPath, scheme: 'file', toString() { return `${this.scheme}:${this.fsPath}?${this.query ?? ''}` }, with: (other) => ({ ...uri(fsPath), ...other }) })
+
+test('closed repositories stay closed across discovery, pending refreshes and reloads until explicitly reopened', async () => {
+  const root = resolve('repo-close-test'), child = join(root, 'child'), external = resolve('external-repo-test')
+  const saved = {}, sessions = new Map(), contexts = new Map()
+  let next = 0, delayed
+  const engine = { call: async (cmd, args) => {
+    if (cmd === 'open_repo') { const tab = next++; sessions.set(tab, args.path); return [tab, args.path, 1] }
+    if (cmd === 'close_repo') { sessions.delete(args.tab); return }
+    if (cmd === 'repositories') return sessions.get(args.tab) === root ? [child] : []
+    if (cmd === 'refs') return { head_id: 'head', refs: [] }
+    if (cmd === 'status' && delayed) return delayed.promise
+    return []
+  } }
+  const vscode = { EventEmitter: Event, env: { language: 'en' }, Uri: { file: uri },
+    window: { createOutputChannel: () => ({ appendLine() {} }) },
+    workspace: { workspaceFolders: [{ uri: uri(root) }] },
+    commands: { executeCommand: (_, key, value) => contexts.set(key, value) },
+  }
+  const locale = { messages: { vscode: {} }, explanations: {} }
+  const deps = { vscode, './engine': { startEngine: () => engine }, '../../src/lib/locales/en': locale, '../../src/lib/locales/zh': locale,
+    'node:fs/promises': { readdir: async () => [], stat: async () => ({ isDirectory: () => false }) } }
+  const context = { workspaceState: { get: (key, fallback) => saved[key] ?? fallback, update: async (key, value) => { saved[key] = value } } }
+  const core = load('core', deps)
+  await core.openRepos(context, '')
+  await core.discoverRepositories([external])
+  const repo = core.repos.find((r) => r.root === external)
+  delayed = deferred()
+  const refreshing = core.refresh(repo)
+  const changes = []
+  core.onRepoChange.event((r) => changes.push(r))
+  await core.closeRepo(repo)
+  assert.equal(sessions.has(repo.tab), false)
+  assert.equal(core.repos.includes(repo), false)
+  delayed.resolve([])
+  await refreshing
+  delayed = undefined
+  assert.deepEqual(changes, [repo], 'late refresh cannot restore a closed repository')
+  await core.discoverRepositories([external])
+  await core.discoverForFile(uri(join(external, 'file.txt')))
+  assert.equal(core.repos.some((r) => r.root === external), false)
+  const nested = core.repos.find((r) => r.root === child)
+  await core.closeRepo(nested)
+  assert.equal(core.repoOf(uri(join(child, 'file.txt'))), undefined, 'closed child files cannot route commands to the parent')
+  await core.discoverRepositories()
+  assert.equal(core.repos.length, 1)
+  const reloaded = load('core', deps)
+  await reloaded.openRepos(context, '')
+  await reloaded.discoverRepositories([external])
+  assert.deepEqual(reloaded.repos.map((r) => r.root), [root])
+  await reloaded.reopenRepo(external)
+  assert.ok(reloaded.repos.some((r) => r.root === external))
+  await reloaded.closeRepo(reloaded.repos.find((r) => r.root === external))
+  await reloaded.closeRepo(reloaded.repos[0])
+  assert.equal(contexts.get('pushright.hasRepo'), false)
+  assert.equal(contexts.get('pushright.hasClosedRepos'), true)
+})
 
 test('SCM graph routes only bounded reads to workspace repositories and disposes listeners', async () => {
   let provider
@@ -120,7 +177,7 @@ test('history context menus resolve their list and stale file requests cannot re
     commands: { registerCommand: (id, fn) => commands.set(id, fn), executeCommand: (...args) => diffs.push(args) },
   }
   const core = {
-    onRepoChange: repoChanged, repoOf: () => repo, rel: (_, u) => u.fsPath, v: {}, attempt: (p) => p,
+    repos: [repo], onRepoChange: repoChanged, repoOf: () => repo, rel: (_, u) => u.fsPath, v: {}, attempt: (p) => p,
     revUri: (_, path, rev) => ({ path, rev }),
     engine: { call: (_, { path }) => { const d = deferred(); pending.set(path, d); return d.promise } },
   }
@@ -139,6 +196,11 @@ test('history context menus resolve their list and stale file requests cannot re
   const count = pending.size
   repoChanged.fire(repo)
   assert.equal(pending.size, count)
+  core.repos.length = 0
+  repoChanged.fire(repo)
+  pending.get('a.txt').resolve(a)
+  await new Promise(setImmediate)
+  assert.deepEqual(list.items, [], 'closing the repository clears history and rejects a late result')
 })
 
 test('line history follows selection without focus, coalesces reads and rejects stale results', async () => {
@@ -157,7 +219,7 @@ test('line history follows selection without focus, coalesces reads and rejects 
     workspace: { onDidChangeTextDocument: changed.event, onDidSaveTextDocument: saved.event },
     commands: { registerCommand: (id, fn) => commands.set(id, fn), executeCommand: (...args) => executed.push(args) },
   }
-  const core = { onRepoChange: repoChanged, repoOf: () => repo, rel: () => 'a.txt', v: { lineHistoryLoading: 'loading' }, t: { errors: { PR_LINE_HISTORY_CHANGED: 'changed' } }, errorText: String,
+  const core = { repos: [repo], onRepoChange: repoChanged, repoOf: () => repo, rel: () => 'a.txt', v: { lineHistoryLoading: 'loading' }, t: { errors: { PR_LINE_HISTORY_CHANGED: 'changed' } }, errorText: String,
     engine: { call: (cmd, args) => { const job = deferred(); calls.push({ cmd, args, job }); return job.promise } },
   }
   const context = { subscriptions: [] }
@@ -218,19 +280,21 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
 })
 
 test('SCM separates repositories, stops on failed saves and uses selections after formatting', async () => {
-  const commands = new Map(), providers = new Map(), calls = [], writes = []
+  const commands = new Map(), providers = new Map(), calls = [], writes = [], controls = []
   const repos = [{ tab: 0, root: '/one', name: 'one', status: [] }, { tab: 1, root: '/two', name: 'two', status: [] }]
   const selection = (line) => ({ start: { line, character: 0 }, end: { line, character: 1 } })
   const editor = { document: { uri: uri('/one/file'), isDirty: true, lineCount: 2, save: async () => false }, selections: [selection(0)] }
   const event = () => ({ dispose() {} })
   const vscode = {
     EventEmitter: Event, Uri: { file: uri },
-    scm: { createSourceControl: () => ({ createResourceGroup: () => ({}), inputBox: {} }) },
+    FileType: { File: 1 }, FileChangeType: { Changed: 1 }, FileSystemError: { NoPermissions: () => new Error('readonly') },
+    scm: { createSourceControl: () => { const control = { createResourceGroup: () => ({}), inputBox: {}, dispose() { this.disposed = true } }; controls.push(control); return control } },
     commands: { registerCommand: (id, fn) => commands.set(id, fn) },
     window: { activeTextEditor: editor, onDidChangeWindowState: event },
     workspace: {
       textDocuments: [], createFileSystemWatcher: () => ({ onDidChange: event, onDidCreate: event, onDidDelete: event }),
-      registerTextDocumentContentProvider: (scheme, provider) => providers.set(scheme, provider),
+      onDidCloseTextDocument: new Event().event,
+      registerFileSystemProvider: (scheme, provider, options) => { assert.equal(options.isReadonly, true); providers.set(scheme, provider) },
     },
   }
   vscode.window.registerFileDecorationProvider = event
@@ -238,6 +302,7 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
   const core = {
     repos, onRepoChange: new Event(), REV: 'rev', v: {}, t: { identityMissing: '' }, help: {},
     repoOf: () => repos[0], rel: () => 'file', revOf: () => '', errorText: String, attempt: (p) => p,
+    revUri: () => uri('/one/file').with({ scheme: 'rev', query: '{"rev":""}' }),
     engine: { call: async (cmd) => { calls.push(cmd); return diff } },
     write: async (repo, cmd, args) => { writes.push([repo.tab, cmd, args]); return null },
   }
@@ -250,10 +315,35 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
   await commands.get('pushright.stageSelection')()
   assert.deepEqual(writes[0][2].lines, [1])
   core.engine.call = async () => null
-  const content = providers.get('rev').provideTextDocumentContent
-  assert.equal(await content({ query: '{}' }), '')
+  const provider = providers.get('rev')
+  const original = core.revUri()
+  assert.equal((await provider.readFile(original)).toString(), '')
+  assert.equal(await controls[0].quickDiffProvider.provideOriginalResource(editor.document.uri), undefined)
+  core.onRepoChange.fire(repos[0])
   core.engine.call = async () => { throw new Error('PR_FILE_TOO_LARGE') }
-  await assert.rejects(content({ query: '{}' }), /PR_FILE_TOO_LARGE/)
+  await assert.rejects(provider.readFile(original), /PR_FILE_TOO_LARGE/)
+  let reads = 0
+  core.engine.call = async () => { reads++; return '原文\n' }
+  await Promise.all([controls[0].quickDiffProvider.provideOriginalResource(editor.document.uri), provider.stat(original), provider.readFile(original)])
+  assert.equal(reads, 1, 'quick diff, metadata and content share one read, including retries after an error')
+  assert.equal((await provider.stat(original)).size, Buffer.byteLength('原文\n'))
+  assert.equal((await provider.readFile(original)).toString(), '原文\n')
+  const oldTime = (await provider.stat(original)).mtime
+  const events = []
+  provider.onDidChangeFile((event) => events.push(...event))
+  vscode.workspace.textDocuments.push({ uri: original })
+  core.onRepoChange.fire(repos[0])
+  core.engine.call = async () => { reads++; return '暂存后\n' }
+  assert.equal((await provider.readFile(original)).toString(), '暂存后\n')
+  assert.equal(reads, 2)
+  assert.ok((await provider.stat(original)).mtime > oldTime)
+  assert.deepEqual(events, [{ type: 1, uri: original }])
+  for (const action of ['createDirectory', 'writeFile', 'delete', 'rename']) assert.throws(() => provider[action](original), /readonly/)
+  core.closeRepo = async (repo) => { repos.splice(repos.indexOf(repo), 1); core.onRepoChange.fire(repo) }
+  await commands.get('pushright.closeRepository')(controls[1])
+  assert.equal(controls[1].disposed, true, 'repository context menu closes its target, not the active editor repository')
+  assert.equal(controls[0].disposed, undefined)
+  assert.equal(repos.length, 1)
 })
 
 test('local files expand lazily and tracking commands distinguish local rules, shared rules and deletion', async () => {

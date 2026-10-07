@@ -1,4 +1,6 @@
 {
+  "command.closeRepository": "Close Repository",
+  "command.reopenRepository": "Reopen Closed Repository…",
   "view.localFiles": "PushRight Local Files",
   "command.ignoreLocal": "Ignore Locally",
   "command.ignoreShared": "Add to .gitignore",

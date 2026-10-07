@@ -1,7 +1,7 @@
 {
   "name": "pushright",
   "private": true,
-  "version": "0.2.3",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p extension/tsconfig.json",
     "ext:build": "cargo build --release -p sidecar && node -e \"fs.mkdirSync('extension/bin',{recursive:true});fs.copyFileSync('target/release/pushright-engine.exe','extension/bin/pushright-engine.exe');fs.copyFileSync('THIRD_PARTY_NOTICES.txt','extension/THIRD_PARTY_NOTICES.txt');fs.copyFileSync('src-tauri/icons/128x128.png','extension/icon.png')\" && vite build -c extension/vite.webview.mts && vite build -c extension/vite.host.mts",
     "ext:smoke": "node tests/vscode-smoke.mjs",
-    "ext:package": "npm run ext:build && cd extension && npx --yes @vscode/vsce package --target win32-x64 --no-dependencies --pre-release --skip-license"
+    "ext:package": "npm run ext:build && cd extension && npx --yes @vscode/vsce package --target win32-x64 --no-dependencies --skip-license"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",

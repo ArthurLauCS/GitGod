@@ -6,6 +6,8 @@
 
 PushRight brings Git source control, blame, history and a commit graph into VS Code. It makes push destinations explicit and defaults every Pull to **Rebase instead of merge**. English and Simplified Chinese are included; the extension follows VS Code's display language.
 
+**[Download VSIX · Windows x64 · 1.0.0](https://github.com/ArthurLauCS/PushRight/releases/download/v1.0.0/pushright-win32-x64-1.0.0.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0)
+
 ## Requirements
 
 - Windows 10 / 11 x64, VS Code 1.90 or newer, and Git on PATH.
@@ -30,6 +32,7 @@ Pull asks every time, with **Rebase instead of merge** checked. Keep it checked 
 - New folders list their untracked files individually, so you can inspect and stage each file before committing. Ignored files stay excluded.
 - Run **PushRight: Open Commit Graph**, or use the sidebar graph's title button, to browse branches, commits and file differences in an editor tab. If the sidebar graph was hidden, enable **PushRight Graph** in Source Control's **Views** menu.
 - Change the commit name and email for the current repository.
+- Right-click a repository and choose **Close Repository** to keep its files open without rediscovering it on file switches, refreshes or reloads. Use **PushRight: Reopen Closed Repository…** to restore it.
 
 On first use, PushRight offers to turn off built-in Git, so push and pull go through its checks. This is optional. Extensions that depend on built-in Git may stop working when it is disabled. If you keep GitLens enabled, turn off duplicate blame annotations in one extension.
 
@@ -48,7 +51,7 @@ Right-click a file in Explorer to choose:
 
 Ignore rules do not hide changes to tracked files. Stop-tracking refuses to discard independently staged contents. To undo an ignore rule, edit the corresponding `.gitignore` or `.git/info/exclude`; force-tracking a file does not remove its rule.
 
-## Preview limits
+## Current limits
 
 - PR / Issue and hosting-provider collaboration are not included yet. PushRight does not replace those parts of GitLens or GitHub Pull Requests.
 - Submodules must already be initialized. Ignored directory trees are not scanned for repositories in the background; open a file inside one or add it as a workspace folder.
@@ -58,10 +61,11 @@ Ignore rules do not hide changes to tracked files. Stop-tracking refuses to disc
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/vscode-v0.2.4), then use **Extensions: Install from VSIX** in VS Code, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.0.0), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
 
 ```sh
-code --install-extension pushright-win32-x64-0.2.4.vsix
+code --install-extension pushright-win32-x64-1.0.0.vsix
+cursor --install-extension pushright-win32-x64-1.0.0.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.

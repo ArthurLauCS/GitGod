@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import * as vscode from 'vscode'
-import { activeRepo, ago, attempt, date, engine, errorText, fileUri, onRepoChange, rel, repoOf, REV, revOf, revUri, short, t, v, type Repo } from './core'
+import { activeRepo, ago, attempt, date, engine, errorText, fileUri, onRepoChange, rel, repoOf, repos, REV, revOf, revUri, short, t, v, type Repo } from './core'
 
 /** 与 crates/engine/src/history.rs 的 Commit 对应 */
 interface Commit {
@@ -69,7 +69,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
     const head = repo.refs.head_id
     if (files.repo === repo && files.path === path && fileHead === head) return
     const items = (await attempt(engine.call<Commit[]>('file_history', { tab: repo.tab, path, limit: LIMIT }))) ?? []
-    if (request !== fileRequest) return
+    if (request !== fileRequest || !repos.includes(repo)) return
     fileHead = head
     files.set(repo, path, items, basename(path))
   }
@@ -148,7 +148,7 @@ export function registerHistory(context: vscode.ExtensionContext) {
       const items = await vscode.window.withProgress({ location: { viewId: 'pushright.lineHistory' } }, () =>
         engine.call<Commit[]>('line_history', { tab: repo.tab, path, start, end, limit: LIMIT }),
       )
-      if (request !== lineRequest) return
+      if (request !== lineRequest || !repos.includes(repo)) return
       lineKey = key
       lines.set(repo, path, items, description)
     } catch (error) {
@@ -183,12 +183,12 @@ export function registerHistory(context: vscode.ExtensionContext) {
       { title: v.searchTitle },
     )
     const query = kind && (await vscode.window.showInputBox({ title: `${v.searchTitle} · ${kind.label}` }))
-    if (!query) return
+    if (!query || !repos.includes(repo)) return
     await vscode.commands.executeCommand('pushright.search.focus')
     const items = await vscode.window.withProgress({ location: { viewId: 'pushright.search' } }, () =>
       attempt(engine.call<Commit[]>('search', { tab: repo.tab, kind: kind.by, query, limit: LIMIT })),
     )
-    found.set(repo, '', items ?? [], `${kind.label}: ${query}`)
+    if (repos.includes(repo)) found.set(repo, '', items ?? [], `${kind.label}: ${query}`)
   }
 
   /** 当前文件与某个分支、标签或提交对比。 */
@@ -232,6 +232,11 @@ export function registerHistory(context: vscode.ExtensionContext) {
     lines.view.onDidChangeVisibility(followLines),
     { dispose: () => { clearTimeout(lineTimer); ++lineRequest; lineAgain = false } },
     files.view.onDidChangeVisibility(follow),
+    onRepoChange.event((repo) => {
+      if (repos.includes(repo)) return
+      if (lines.repo === repo) { ++lineRequest; clearTimeout(lineTimer); lineAgain = false; lineKey = '' }
+      for (const list of [files, lines, found]) if (list.repo === repo) list.set(undefined, '', [], '')
+    }),
     // 有了新提交后文件历史要重取
     onRepoChange.event((repo) => files.repo === repo && files.view.visible && loadFile(repo, files.path)),
     onRepoChange.event((repo) => { if (lines.repo === repo && lineHead !== repo.refs.head_id) followLines() }),
