@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import * as api from './api'
+  import { BRANCH_NAME } from './branch-name'
   import ContextMenu, { type Item } from './ContextMenu.svelte'
   import Detail from './Detail.svelte'
   import Dialog from './Dialog.svelte'
@@ -282,12 +283,25 @@
     const v = await ask({
       title: t.newBranch,
       explain: explain.create_branch,
+      message: t.branchRule,
       fields: [
-        { key: 'name', label: t.branchName, type: 'text' },
+        { key: 'name', label: t.branchName, type: 'text', pattern: BRANCH_NAME },
+        {
+          key: 'start',
+          label: t.branchFrom,
+          type: 'select',
+          value: start,
+          options: [
+            { value: start, label: start === 'HEAD' ? `${t.currentBranch} (${head ?? t.detached})` : start.slice(0, 7) },
+            ...refs.refs
+              .filter((r) => /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD') && (start !== 'HEAD' || r.name !== refs.head))
+              .map((r) => ({ value: short(r.name), label: short(r.name) })),
+          ],
+        },
         { key: 'checkout', label: t.checkoutAfterCreate, type: 'checkbox', value: true },
       ],
     })
-    if (v) exec({ op: 'create_branch', name: v.name as string, start, checkout: v.checkout as boolean })
+    if (v) exec({ op: 'create_branch', name: v.name as string, start: v.start as string, checkout: v.checkout as boolean })
   }
 
   async function stash() {
@@ -434,8 +448,9 @@
     const v = await ask({
       title: t.newWorktree,
       explain: explain.worktree,
+      message: existing ? undefined : t.branchRule,
       fields: [
-        ...(existing ? [] : [{ key: 'branch', label: t.branchName, type: 'text' as const }]),
+        ...(existing ? [] : [{ key: 'branch', label: t.branchName, type: 'text' as const, pattern: BRANCH_NAME }]),
         { key: 'path', label: t.worktreePath, type: 'text', value: `${path}-${existing ? start.replace(/[\\/]/g, '-') : 'worktree'}` },
       ],
     })

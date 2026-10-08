@@ -3,7 +3,7 @@ import * as vscode from 'vscode'
 import type { Detail } from '../../src/lib/api'
 import { engine, onPrefsChange, onRepoChange, repos, revUri, store, stored } from './core'
 import { setupWebview } from './webview'
-import { fetch, pull, push } from './sync'
+import { fetch, pickScope, pull, push } from './sync'
 
 /** 原生历史图仍需要 proposed API；使用稳定的 WebviewView 放在相同的 SCM 容器内。 */
 export function registerGraphView(context: vscode.ExtensionContext) {
@@ -43,9 +43,13 @@ export function registerGraphView(context: vscode.ExtensionContext) {
             } else {
               const repo = repos.find((r) => r.tab === m.args?.tab)
               if (!repo) throw new Error('PR_TAB_CLOSED')
-              if (m.cmd === 'graph_scope' && typeof m.args.scope === 'string' && (['auto', 'all'].includes(m.args.scope) || repo.refs.refs.some((r) => r.name === m.args.scope && /^refs\/(heads|remotes)\//.test(r.name)))) {
-                scopes[repo.root] = m.args.scope
-                await context.workspaceState.update('graphScopes', scopes)
+              if (m.cmd === 'graph_scope') {
+                // 范围在主机的选择框里选，Webview 不能指定任意引用。
+                const scope = await pickScope(repo)
+                if (scope) {
+                  scopes[repo.root] = scope
+                  await context.workspaceState.update('graphScopes', scopes)
+                }
               } else if (m.cmd === 'graph_sync' && ['fetch', 'pull', 'push'].includes(m.args.action)) {
                 if (m.args.action === 'push') await push(repo, true)
                 else await (m.args.action === 'pull' ? pull : fetch)(repo)

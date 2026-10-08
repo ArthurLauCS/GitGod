@@ -246,6 +246,8 @@ export const messages = {
   stashPop: 'Pop',
   stashDrop: 'Drop…',
   branchName: 'Branch name',
+  branchRule: 'Branch name rule: fix|feat_S|C|SC_lowerCamelCase, e.g. feat_S_userLogin (S server, C client, SC both).',
+  branchFrom: 'Check out from',
   tagName: 'Tag name',
   tagMessage: 'Message (leave empty for a lightweight tag)',
   checkoutAfterCreate: 'Check out after creating',

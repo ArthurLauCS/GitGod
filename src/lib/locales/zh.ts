@@ -258,6 +258,8 @@ export const messages = {
   stashPop: '应用并删除',
   stashDrop: '删除…',
   branchName: '分支名',
+  branchRule: '分支名规则：fix|feat_S|C|SC_小驼峰，例如 feat_S_userLogin（S 后端，C 前端，SC 前后端）。',
+  branchFrom: '签出自',
   tagName: '标签名',
   tagMessage: '说明（留空则创建轻量标签）',
   checkoutAfterCreate: '创建后检出',

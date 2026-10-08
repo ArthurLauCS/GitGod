@@ -90,7 +90,8 @@ test('SCM graph routes only bounded reads to workspace repositories and disposes
   const core = { repos, onRepoChange: changed, onPrefsChange: prefs, revUri: (repo, path, rev, empty) => ({ root: repo.root, path, rev, empty }), engine: { call: async (...args) => { calls.push(args); return args[0] === 'detail' ? detail : [] } } }
   const vscode = { window: { registerWebviewViewProvider: (id, p) => { assert.equal(id, 'pushright.graph'); provider = p } }, commands: { registerCommand: () => ({ dispose() {} }), executeCommand: (...args) => diffs.push(args) } }
   const syncs = [], saved = {}
-  load('graph-view', { vscode, './core': core, './sync': { fetch: (r) => syncs.push(['fetch', r.tab]), pull: (r) => syncs.push(['pull', r.tab]), push: (r, same) => syncs.push(['push', r.tab, same]) }, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [], workspaceState: { get: (_, fallback) => fallback, update: (key, value) => saved[key] = value } })
+  let picked = 'all'
+  load('graph-view', { vscode, './core': core, './sync': { pickScope: async () => picked, fetch: (r) => syncs.push(['fetch', r.tab]), pull: (r) => syncs.push(['pull', r.tab]), push: (r, same) => syncs.push(['push', r.tab, same]) }, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [], workspaceState: { get: (_, fallback) => fallback, update: (key, value) => saved[key] = value } })
   provider.resolveWebviewView(view)
   const send = async (cmd, args = {}) => { await Promise.all(messages.fire({ id: 1, cmd, args })); return posted.at(-1) }
   assert.deepEqual((await send('graph_repos')).value, repos.map((r) => ({ ...r, scope: 'auto' })))
@@ -118,11 +119,13 @@ test('SCM graph routes only bounded reads to workspace repositories and disposes
   assert.equal(diffs.at(-1)[1].empty, true)
   assert.equal((await send('open_commit_file', { tab: 0, id: 'commit', path: '../../secret' })).ok, false)
   assert.equal(diffs.length, 4, 'paths absent from the commit cannot open')
-  await send('graph_scope', { tab: 1, scope: 'all' })
+  await send('graph_scope', { tab: 1, scope: '--all' })
   await send('load_graph', { tab: 1, full: false })
   assert.deepEqual(calls.at(-1), ['load_graph', { tab: 1, full: false, scope: 'all' }])
   assert.equal(saved.graphScopes['/repo1'], 'all')
-  assert.equal((await send('graph_scope', { tab: 0, scope: '--all' })).ok, false)
+  picked = undefined
+  await send('graph_scope', { tab: 1 })
+  assert.equal(saved.graphScopes['/repo1'], 'all', 'the host picker chooses the scope; cancelling keeps it')
   for (const action of ['fetch', 'pull', 'push']) await send('graph_sync', { tab: 1, action })
   assert.deepEqual(syncs, [['fetch', 1], ['pull', 1], ['push', 1, true]])
   assert.equal((await send('graph_sync', { tab: 1, action: 'reset' })).ok, false)
@@ -290,7 +293,7 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
   const vscode = { window: { showQuickPick: async (items) => { prompts.push(items); return items[0] }, showInformationMessage: async () => t.push } }
   const { splitUpstream } = await import('../src/lib/push-target.ts')
   const core = { headBranch: () => 'feature/x', run: (_, op) => sent.push(op), t, v, help: { push: { what: '' } } }
-  const { push } = load('sync', { vscode, './core': core, '../../src/lib/push-target': { splitUpstream }, '../../src/lib/ref-order': refOrder })
+  const { push } = load('sync', { vscode, './core': core, '../../src/lib/push-target': { splitUpstream }, '../../src/lib/ref-order': refOrder, '../../src/lib/branch-name': {} })
   await push(repo)
   assert.equal(prompts[0][0].label, 'origin/feature/x')
   assert.deepEqual(sent, [{ op: 'push', branch: 'feature/x', force: false, remote: 'origin', remote_branch: 'feature/x', set_upstream: true }])
@@ -308,16 +311,25 @@ test('branch picker keeps local refs before remote refs and uses per-repository 
     { name: 'refs/remotes/origin/old' }, { name: 'refs/heads/old' }, { name: 'refs/remotes/origin/recent' }, { name: 'refs/heads/recent' }, { name: 'refs/heads/main' },
   ] } }
   saved.recentRefs = refOrder.writeRecentRefs(null, repo.root, ['refs/remotes/origin/recent', 'refs/heads/recent'])
-  const vscode = { window: { showQuickPick: async (items) => { shown.push(items); return items[0] } } }
+  let choose = 1, typed
+  const vscode = { window: { showQuickPick: async (items) => { shown.push(items); return items[choose] }, showInputBox: async ({ validateInput }) => { assert.ok(validateInput('feature/x')); assert.equal(validateInput(typed), undefined); return typed } } }
   const core = {
-    activeRepo: () => repo, help: { checkout: { short: '' } }, t: { checkoutRemote: 'remote', opNames: { checkout: 'checkout' } }, v: {}, short: (name) => name.replace(/^refs\/(heads|remotes)\//, ''),
-    stored: () => saved, store: async (key, value) => { saved[key] = value }, run: (_, op) => sent.push(op),
+    activeRepo: () => repo, help: { checkout: { short: '' } }, t: { checkoutRemote: 'remote', branchRule: 'rule', opNames: { checkout: 'checkout' } }, v: {}, short: (name) => name.replace(/^refs\/(heads|remotes)\//, ''),
+    stored: () => saved, store: async (key, value) => { saved[key] = value }, run: (_, op) => sent.push(op), headBranch: () => 'main', ago: (time) => `at ${time}`,
+    engine: { call: async (cmd) => { assert.equal(cmd, 'branch_tips'); return [{ name: 'refs/heads/recent', short_id: 'abc1234', author: 'alice', time: 5, subject: 'latest' }] } },
   }
-  const { checkout } = load('sync', { vscode, './core': core, '../../src/lib/push-target': {}, '../../src/lib/ref-order': refOrder })
+  const { checkout, pickScope } = load('sync', { vscode, './core': core, '../../src/lib/push-target': {}, '../../src/lib/ref-order': refOrder, '../../src/lib/branch-name': await import('../src/lib/branch-name.ts') })
   await checkout(repo)
-  assert.deepEqual(shown[0].map((item) => item.ref), ['refs/heads/recent', 'refs/heads/old', 'refs/remotes/origin/recent', 'refs/remotes/origin/old'])
+  assert.deepEqual(shown[0].slice(1).map((item) => item.ref), ['refs/heads/recent', 'refs/heads/old', 'refs/remotes/origin/recent', 'refs/remotes/origin/old'])
+  assert.deepEqual([shown[0][1].description, shown[0][1].detail], ['at 5', 'alice · abc1234 · latest'], 'each branch shows its latest commit')
   assert.deepEqual(sent, [{ op: 'checkout', target: 'recent' }])
   assert.equal(refOrder.readRecentRefs(saved.recentRefs, repo.root)[0], 'refs/heads/recent')
+  choose = 0; typed = 'feat_S_userLogin'
+  await checkout(repo)
+  assert.deepEqual(sent.at(-1), { op: 'create_branch', name: 'feat_S_userLogin', start: 'HEAD', checkout: true }, 'new branches default to the current commit')
+  choose = 3
+  assert.equal(await pickScope(repo), 'refs/heads/recent', 'the graph scope picker lists the checked-out branch first, after Auto and All')
+  assert.equal(shown.at(-1)[2].ref, 'refs/heads/main')
 })
 
 test('SCM separates repositories, stops on failed saves and uses selections after formatting', async () => {

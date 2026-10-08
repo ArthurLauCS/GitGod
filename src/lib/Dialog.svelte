@@ -4,12 +4,14 @@
   export interface Field {
     key: string
     label: string
-    type: 'text' | 'checkbox' | 'radio'
+    type: 'text' | 'checkbox' | 'radio' | 'select'
     value?: string | boolean
-    /** radio 的选项；radio 没有默认值时必须选一个才能确认 */
+    /** radio / select 的选项；radio 没有默认值时必须选一个才能确认 */
     options?: { value: string; label: string }[]
     /** 文本框是否允许留空 */
     optional?: boolean
+    /** 文本必须匹配才能确认；规则说明放在 message 里 */
+    pattern?: RegExp
   }
   export interface Spec {
     title: string
@@ -39,7 +41,7 @@
   let resolve: (v: Values | null) => void = () => {}
 
   const ready = $derived(
-    (spec?.fields ?? []).every((f) => f.type === 'checkbox' || f.optional || (values[f.key] ?? '') !== ''),
+    (spec?.fields ?? []).every((f) => f.type === 'checkbox' || f.optional || ((values[f.key] ?? '') !== '' && (!f.pattern || f.pattern.test(values[f.key] as string)))),
   )
 
   /** 弹出对话框；确认返回各字段的值，取消返回 null */
@@ -79,6 +81,12 @@
         {#if f.type === 'text'}
           <!-- svelte-ignore a11y_autofocus -->
           <label class="text">{f.label}<input class="field" type="text" bind:value={values[f.key]} autofocus spellcheck="false" /></label>
+        {:else if f.type === 'select'}
+          <label class="text">{f.label}
+            <select class="field" bind:value={values[f.key]}>
+              {#each f.options ?? [] as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+            </select>
+          </label>
         {:else if f.type === 'checkbox'}
           <label class="check"><input type="checkbox" bind:checked={values[f.key] as boolean} />{f.label}</label>
         {:else}
@@ -149,7 +157,8 @@
     color: var(--muted);
     font-size: var(--fs-sm);
   }
-  .text input {
+  .text input,
+  .text select {
     height: 32px;
     color: var(--text);
     font-size: var(--fs-md);

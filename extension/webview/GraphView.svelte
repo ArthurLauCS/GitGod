@@ -18,7 +18,7 @@
   let scope = $state('auto')
   let busy = $state(false)
   const head = $derived(repo?.refs.head?.replace(/^refs\/heads\//, '') ?? repo?.refs.head_id?.slice(0, 7) ?? '')
-  const branches = $derived(repo?.refs.refs.filter((r) => /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD')) ?? [])
+  const scopeLabel = $derived(scope === 'auto' ? t.vscode.graphAuto : scope === 'all' ? t.vscode.graphAll : scope.replace(/^refs\/(heads|remotes)\//, ''))
   let loadedKey = ''
   let running = false
   let again = false
@@ -69,7 +69,7 @@
 
   async function changeScope() {
     busy = true
-    try { await invoke('graph_scope', { tab: repo!.tab, scope }); await refresh() }
+    try { await invoke('graph_scope', { tab: repo!.tab }); await refresh() }
     catch (e) { error = errorText(String(e)) }
     finally { busy = false }
   }
@@ -107,13 +107,7 @@
     <span title={t.vscode.graphCurrentBranch(head)}>{head}</span>
   </div>
   <div class="toolbar">
-    <select aria-label={t.vscode.graphScope} bind:value={scope} onchange={changeScope} disabled={!repo || busy || loading} title={scope === 'auto' ? t.vscode.graphAutoHint : scope}>
-      <option value="auto">{t.vscode.graphAuto}</option>
-      <option value="all">{t.vscode.graphAll}</option>
-      {#each branches as branch (branch.name)}
-        <option value={branch.name}>{branch.name.replace(/^refs\/(heads|remotes)\//, '')}</option>
-      {/each}
-    </select>
+    <button class="scope" aria-label={t.vscode.graphScope} onclick={changeScope} disabled={!repo || busy || loading} title={scope === 'auto' ? t.vscode.graphAutoHint : scope}>{scopeLabel}</button>
     <button class="action" disabled={!repo || busy} title={`${t.fetch} · ${repo?.name ?? ''}`} aria-label={t.fetch} onclick={() => sync('fetch')}>⟳</button>
     <button class="action" disabled={!repo || busy || !repo.refs.head} title={`${t.pull} · ${head}`} aria-label={t.pull} onclick={() => sync('pull')}>↓<small>{repo?.refs.ahead_behind?.[1] || ''}</small></button>
     <button class="action" disabled={!repo || busy || !repo.refs.head} title={t.vscode.graphPushSame(head)} aria-label={t.vscode.graphPushSame(head)} onclick={() => sync('push')}>↑<small>{repo?.refs.ahead_behind?.[0] || ''}</small></button>
@@ -151,7 +145,9 @@
     font-size: var(--fs-md);
   }
   .toolbar { display: flex; gap: 4px; align-items: center; padding: 2px 4px; }
-  select { min-width: 0; flex: 1; height: 22px; padding: 0 2px; font: inherit; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); }
+  select, .scope { min-width: 0; flex: 1; height: 22px; padding: 0 2px; font: inherit; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); }
+  .scope { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; cursor: pointer; }
+  .scope:disabled { opacity: .45; cursor: default; }
   .toolbar span { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--muted); }
   .action { height: 22px; min-width: 24px; padding: 0 4px; border: 0; border-radius: 3px; font-size: 16px; color: var(--text); background: transparent; cursor: pointer; }
   .action:hover { background: var(--hover); }

@@ -118,6 +118,7 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
         "conflict_resolve" => out(conflict::resolve(repo, &arg::<String>(a, "path")?, &arg::<Vec<conflict::Side>>(a, "choices")?)?),
         "conflict_take" => out(conflict::take(repo, &arg::<String>(a, "path")?, arg(a, "theirs")?)?),
         // 以下命令只有扩展使用
+        "branch_tips" => out(refs::branch_tips(repo)?),
         "repositories" => out(local_files::repositories(repo)?),
         "ignored" => out(local_files::ignored(repo, &arg::<String>(a, "path")?)?),
         "is_tracked" => out(local_files::tracked(repo, &arg::<String>(a, "path")?)?),

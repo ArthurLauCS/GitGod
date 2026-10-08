@@ -50,6 +50,9 @@ fn graph_rows_refs_and_detail() {
     let id_of = |name: &str| r.refs.iter().find(|x| x.name == name).map(|x| x.id.as_str());
     assert_eq!(id_of("refs/heads/feat"), Some(rows[2].id.as_str()));
     assert_eq!(id_of("refs/tags/v1"), Some(rows[0].id.as_str()));
+    let tips = refs::branch_tips(&repo).unwrap();
+    assert_eq!(tips.iter().map(|t| (t.name.as_str(), t.subject.as_str(), t.author.as_str(), t.time)).collect::<Vec<_>>(), [("refs/heads/feat", "B", "t", 1_700_000_002), ("refs/heads/main", "M", "t", 1_700_000_004)]);
+    assert!(rows[2].id.starts_with(&tips[0].short_id));
 
     let merge = detail::detail(&repo, &rows[0].id).unwrap();
     assert_eq!(merge.message, "M\n\n正文");

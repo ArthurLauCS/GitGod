@@ -50,6 +50,17 @@ pub struct Worktree {
     pub time: i64,
 }
 
+/// 分支选择器里每个分支下面显示的最新提交
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Tip {
+    /// 完整引用名
+    pub name: String,
+    pub short_id: String,
+    pub author: String,
+    pub time: i64,
+    pub subject: String,
+}
+
 /// 本地分支相对各自上游的同步状态
 #[derive(Serialize, Debug, PartialEq)]
 pub struct Track {
@@ -215,6 +226,18 @@ pub fn worktrees(repo: &Repo) -> Result<Vec<Worktree>> {
         }
     });
     Ok(list)
+}
+
+/// 本地和远程分支各自的最新提交；只在打开分支选择器时取，不拖慢 `list`。
+pub fn branch_tips(repo: &Repo) -> Result<Vec<Tip>> {
+    let out = repo.git(&["for-each-ref", "--format=%(refname)%00%(objectname:short)%00%(authorname)%00%(committerdate:unix)%00%(subject)", "refs/heads", "refs/remotes"])?;
+    Ok(String::from_utf8_lossy(&out)
+        .lines()
+        .filter_map(|l| {
+            let mut f = l.splitn(5, ' ');
+            Some(Tip { name: f.next()?.into(), short_id: f.next()?.into(), author: f.next()?.into(), time: f.next()?.parse().ok()?, subject: f.next()?.into() })
+        })
+        .collect())
 }
 
 /// 所有有上游的本地分支的同步状态。分支多时要算一两秒（内核仓库 1000 个分支 1.5 秒），界面应当异步取。

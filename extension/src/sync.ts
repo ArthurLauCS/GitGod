@@ -1,7 +1,8 @@
 import * as vscode from 'vscode'
+import { BRANCH_NAME } from '../../src/lib/branch-name'
 import { splitUpstream } from '../../src/lib/push-target'
 import { orderRefs, readRecentRefs, rememberRef, writeRecentRefs } from '../../src/lib/ref-order'
-import { activeRepo, headBranch, help, run, short, store, stored, t, v, type Repo } from './core'
+import { activeRepo, ago, engine, headBranch, help, run, short, store, stored, t, v, type Repo } from './core'
 
 const upstreamOf = (repo: Repo) => repo.refs.refs.find((r) => r.name === repo.refs.head)?.upstream
 
@@ -69,18 +70,54 @@ export async function fetch(repo = activeRepo()) {
   if (repo) await run(repo, { op: 'fetch' })
 }
 
+type Tip = { name: string; short_id: string; author: string; time: number; subject: string }
+
+/** 顶部选择框里的分支项：本地在前、各自按最近使用排序，每项下面一行是该分支的最新提交。 */
+async function branchItems(repo: Repo, withHead: boolean) {
+  const recent = readRecentRefs(stored().recentRefs, repo.root)
+  const tips = new Map((await engine.call<Tip[]>('branch_tips', { tab: repo.tab })).map((tip) => [tip.name, tip]))
+  const candidates = repo.refs.refs.filter((r) => (withHead || r.name !== repo.refs.head) && /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD'))
+  const group = (prefix: string) => orderRefs(candidates.filter((r) => r.name.startsWith(prefix)), recent, repo.refs.head)
+  return [...group('refs/heads/'), ...group('refs/remotes/')].map((r) => {
+    const tip = tips.get(r.name)
+    return {
+      label: short(r.name),
+      description: tip && ago(tip.time),
+      detail: tip && `${tip.author} · ${tip.short_id} · ${tip.subject}`,
+      ref: r.name,
+    }
+  })
+}
+
 export async function checkout(repo = activeRepo()) {
   if (!repo) return
-  const recent = readRecentRefs(stored().recentRefs, repo.root)
-  const candidates = repo.refs.refs.filter((r) => r.name !== repo.refs.head && /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD'))
-  const local = orderRefs(candidates.filter((r) => r.name.startsWith('refs/heads/')), recent)
-  const remote = orderRefs(candidates.filter((r) => r.name.startsWith('refs/remotes/')), recent)
-  const items = [...local, ...remote]
-    .map((r) => ({ label: short(r.name), description: r.name.startsWith('refs/remotes/') ? t.checkoutRemote : '', ref: r.name }))
-  const pick = await vscode.window.showQuickPick(items, { title: t.opNames.checkout, placeHolder: help.checkout.short })
+  const create = { label: `$(plus) ${t.newBranch}…`, ref: '' }
+  const pick = await vscode.window.showQuickPick([create, ...await branchItems(repo, false)], { title: t.opNames.checkout, placeHolder: help.checkout.short, matchOnDetail: true })
   if (!pick) return
-  await store('recentRefs', writeRecentRefs(stored().recentRefs, repo.root, rememberRef(recent, pick.ref)))
+  if (pick === create) return createBranch(repo)
+  await store('recentRefs', writeRecentRefs(stored().recentRefs, repo.root, rememberRef(readRecentRefs(stored().recentRefs, repo.root), pick.ref)))
   await run(repo, pick.ref.startsWith('refs/remotes/') ? { op: 'track', remote_branch: pick.label } : { op: 'checkout', target: pick.label })
+}
+
+/** 先按命名规则输入分支名，再选从哪里签出；默认是当前所在的提交。 */
+async function createBranch(repo: Repo) {
+  const name = await vscode.window.showInputBox({
+    title: t.newBranch,
+    prompt: t.branchRule,
+    placeHolder: 'feat_S_userLogin',
+    ignoreFocusOut: true,
+    validateInput: (value) => (BRANCH_NAME.test(value) ? undefined : t.branchRule),
+  })
+  if (!name) return
+  const here = { label: `${t.currentBranch} (${headBranch(repo) ?? t.detached})`, ref: 'HEAD' }
+  const from = await vscode.window.showQuickPick([here, ...await branchItems(repo, false)], { title: `${name} · ${t.branchFrom}`, matchOnDetail: true, ignoreFocusOut: true })
+  if (from) await run(repo, { op: 'create_branch', name, start: from === here ? 'HEAD' : from.label, checkout: true })
+}
+
+/** 提交图显示哪个分支：与切换分支用同一个选择框，但只筛选，不检出。 */
+export async function pickScope(repo: Repo) {
+  const fixed = [{ label: v.graphAuto, detail: v.graphAutoHint, ref: 'auto' }, { label: v.graphAll, ref: 'all' }]
+  return (await vscode.window.showQuickPick([...fixed, ...await branchItems(repo, true)], { title: `${repo.name} · ${v.graphScope}`, matchOnDetail: true }))?.ref
 }
 
 /** 合并 / 变基停在冲突上时：继续或中止。 */

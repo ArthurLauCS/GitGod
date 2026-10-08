@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.2
+
+- Show each branch's latest commit (author, short ID, subject and age) in the branch picker.
+- Choose the commit graph's branch from the same top picker instead of a dropdown.
+- Create branches from the branch picker and the graph dialog: names follow `fix|feat_S|C|SC_lowerCamelCase` and the starting branch can be chosen.
+
+分支选择框在每个分支下显示最新提交；提交图显示的分支改在顶部选择框中选择；新建分支时提示并校验命名规则 `fix|feat_S|C|SC_小驼峰`，可选择从哪个分支签出。
+
 ## 1.1.1
 
 - Sort branches by recent use, with local branches before remote branches in the editor picker.
