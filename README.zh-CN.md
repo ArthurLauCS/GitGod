@@ -4,9 +4,9 @@
 
 面向多分支日常工作的 Git 桌面可视化客户端，使用 Svelte、Tauri 和 Rust 构建。
 
-**1.1.1 正式版**新增分支最近使用排序、扩展本地分支优先排序，以及批量仅本机忽略。详见[发行说明](docs/RELEASE_1.1.1.md)。
+**1.1.2 正式版**新增扩展分支最新提交预览、提交图顶部选择框，以及新建分支命名校验与起点选择。详见[发行说明](docs/RELEASE_1.1.2.md)。
 
-当前版本为 **v1.1.1 正式版（MIT 许可）**，提供 Windows x64 安装包。首次启动默认英文，内置完整英文和简体中文语言包，可在右上角切换，选择会保存在本机。界面、提示、操作说明和应用自身的错误均提供双语；仓库内容和 Git / 系统原始输出保持原文，系统原生对话框使用系统语言。
+当前版本为 **v1.1.2 正式版（MIT 许可）**，提供 Windows x64 安装包。首次启动默认英文，内置完整英文和简体中文语言包，可在右上角切换，选择会保存在本机。界面、提示、操作说明和应用自身的错误均提供双语；仓库内容和 Git / 系统原始输出保持原文，系统原生对话框使用系统语言。
 
 本次发布同步更新桌面客户端与编辑器扩展，两者共用新增仓库工具。扩展自带引擎，无须先安装桌面版。
 
@@ -14,16 +14,18 @@
 
 截图来自桌面程序，使用虚构作者和本地示例仓库。
 
+本版源码：[ZIP](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.2.zip) · [tar.gz](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.2.tar.gz)。
+
 ## 下载与安装
 
-**[下载桌面安装包](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/PushRight_1.1.1_x64-setup.exe)** · **[下载 VSIX（VS Code / Cursor）](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/pushright-win32-x64-1.1.1.vsix)** · [SHA256 校验值](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/SHA256SUMS.txt)
+**[下载桌面安装包](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/PushRight_1.1.2_x64-setup.exe)** · **[下载 VSIX（VS Code / Cursor）](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/pushright-win32-x64-1.1.2.vsix)** · [SHA256 校验值](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/SHA256SUMS.txt)
 
-从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases) 下载 `PushRight_1.1.1_x64-setup.exe`，运行安装程序。
+从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases) 下载 `PushRight_1.1.2_x64-setup.exe`，运行安装程序。
 
 - 支持 Windows 10 / 11 x64；本次发布在 Windows x64 上构建和验证。
 - 需要安装 [Git for Windows](https://git-scm.com/downloads/win)，并确保 `git` 在 PATH 中可用。
 - 需要 Microsoft Edge WebView2 Runtime；缺少时安装程序会尝试联网安装。
-- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\PushRight_1.1.1_x64-setup.exe -Algorithm SHA256` 核对文件。
+- 安装包尚未进行代码签名，Windows 可能显示未知发布者提示。Release 附有 `SHA256SUMS.txt`，可用 PowerShell 的 `Get-FileHash .\PushRight_1.1.2_x64-setup.exe -Algorithm SHA256` 核对文件。
 
 安装器支持英文和简体中文，应用语言独立选择。产品此前名为 GitGod；PushRight 保留应用数据标识以兼容已有设置。旧版 GitGod 可能作为独立安装保留，不会被自动删除。
 
@@ -35,6 +37,8 @@ git config --global user.email "you@example.com"
 ```
 
 PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败，先在终端完成相应仓库的 Git 认证。应用本身不提供账号登录或交互式终端提示。
+
+新建分支对话框中的名称须符合 `(fix|feat)_(S|C|SC)_小驼峰`，例如 `feat_S_userLogin` 或 `fix_SC_branchPicker`；最后一段须以小写英文字母开头，且仅包含英文字母和数字。桌面新建分支对话框和扩展选择框可选择起始分支；桌面新建工作树对话框也会校验新分支名。已有分支名称不受影响。
 
 ## 使用
 
@@ -101,14 +105,14 @@ PushRight 使用系统 Git 的凭据管理器或 SSH 配置；遇到认证失败
 
 ## VS Code / Cursor 扩展
 
-扩展 **1.1.1** 包含提交内文件列表与原生差异、Auto / 全部分支 / 指定分支筛选、图内同名推送、子仓库识别、分支最近使用排序，以及批量本机忽略和跟踪管理。
+扩展 **1.1.2** 包含提交内文件列表与原生差异、Auto / 全部分支 / 指定分支筛选、图内同名推送、子仓库识别、分支最近使用排序，以及批量本机忽略和跟踪管理。
 
-同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 正式版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.1) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
+同一套引擎和界面可以在 VS Code 里运行。从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) 安装 Windows x64 正式版，或从 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2) 下载 VSIX。使用条件和边界见[扩展说明](extension/README.zh-CN.md)。也可从源码构建：
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-1.1.1.vsix
+code --install-extension extension/pushright-win32-x64-1.1.2.vsix
 ```
 
 - **源代码管理面板**：已暂存、未暂存和冲突的文件；按文件或按选中的行暂存、取消暂存、丢弃；提交和修补上次提交；行号旁的改动标记和资源管理器角标。首次使用时 PushRight 会说明关闭 VS Code 自带 Git 的后果，由你决定是否关闭。

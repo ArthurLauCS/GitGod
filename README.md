@@ -6,9 +6,9 @@
 
 A Git desktop client built with Svelte, Tauri and Rust. PushRight makes push destinations explicit, recommends a remote branch with the same name, and defaults Pull to **Rebase instead of merge**.
 
-Version **1.1.1** sorts branches by recent use, keeps local branches ahead of remote branches in the editor picker, and supports batch local-ignore. See the [release notes](docs/RELEASE_1.1.1.md).
+Version **1.1.2** shows the latest commit in the editor branch picker, adds a searchable graph branch picker, and validates names when creating branches. See the [release notes](docs/RELEASE_1.1.2.md).
 
-**v1.1.1 (MIT licensed)** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+**v1.1.2 (MIT licensed)** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
 
 The desktop client and editor extension share the new repository tools. The extension includes its own engine and does not require the desktop installation.
 
@@ -16,17 +16,19 @@ The desktop client and editor extension share the new repository tools. The exte
 
 Screenshots show the actual desktop app with a local demo repository and fictional identities.
 
+Source code for this release is available as [ZIP](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.2.zip) or [tar.gz](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.2.tar.gz).
+
 ## Download and install
 
-**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/PushRight_1.1.1_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/pushright-win32-x64-1.1.1.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/SHA256SUMS.txt)
+**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/PushRight_1.1.2_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/pushright-win32-x64-1.1.2.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/SHA256SUMS.txt)
 
-Download `PushRight_1.1.1_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.1).
+Download `PushRight_1.1.2_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2).
 
 - Windows 10 / 11 x64; built and checked on Windows x64.
 - Install [Git for Windows](https://git-scm.com/downloads/win) and make `git` available on PATH.
 - Microsoft Edge WebView2 Runtime is required; the installer attempts an online installation if missing.
 - The installer offers English and Simplified Chinese. App language is selected independently.
-- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.1.1_x64-setup.exe -Algorithm SHA256`.
+- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.1.2_x64-setup.exe -Algorithm SHA256`.
 
 Previously named GitGod. PushRight retains the application data identifier for settings compatibility. The old GitGod installation may remain separately installed; it is not removed automatically.
 
@@ -38,6 +40,8 @@ git config --global user.email "you@example.com"
 ```
 
 PushRight uses system Git credentials or SSH configuration. Complete authentication in a terminal first if needed; the app does not provide account sign-in or interactive terminal prompts.
+
+New branch names in the creation dialogs must match `(fix|feat)_(S|C|SC)_lowerCamelCase`, for example `feat_S_userLogin` or `fix_SC_branchPicker`. The suffix starts with a lowercase letter and contains only ASCII letters and digits. The desktop new-branch dialog and editor picker let you choose a starting branch; the desktop new-worktree dialog also validates new branch names. Existing branch names are unaffected.
 
 ## Usage
 
@@ -106,14 +110,14 @@ App text, tooltips, explanations and app-generated errors are translated. Reposi
 
 ## VS Code / Cursor extension
 
-Extension **1.1.1** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, branch recency ordering, and batch local ignore / tracking controls.
+Extension **1.1.2** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, branch recency ordering, and batch local ignore / tracking controls.
 
-The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.1). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
+The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-1.1.1.vsix
+code --install-extension extension/pushright-win32-x64-1.1.2.vsix
 ```
 
 - **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.

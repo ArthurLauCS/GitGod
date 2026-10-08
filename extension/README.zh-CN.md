@@ -6,9 +6,9 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
-**1.1.1 正式版**为 Windows 本地工作区增加分支最近使用排序与批量仅本机忽略。
+**1.1.2 正式版**新增分支最新提交预览、提交图顶部选择框，以及新建分支命名校验与起点选择。
 
-**[下载 VSIX · Windows x64 · 1.1.1](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.1/pushright-win32-x64-1.1.1.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.1)
+**[下载 VSIX · Windows x64 · 1.1.2](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/pushright-win32-x64-1.1.2.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2)
 
 ## 使用条件
 
@@ -21,6 +21,10 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 例如本地 `feature/login` 错误跟踪 `origin/main`，PushRight 会提示名称不一致，推荐 `origin/feature/login`，由你明确选择目标。推送使用指定的远程和分支 refspec；强制推送使用 `--force-with-lease` 并再次确认。
 
 每次 Pull 都会显示选择框，默认勾选 **Rebase instead of merge**。团队要求线性拉取历史时保持勾选。不会自动贮藏本地改动，请先提交或贮藏；遇到冲突后可解决并继续，或中止。
+
+新建分支名称须符合 `(fix|feat)_(S|C|SC)_小驼峰`，例如 `feat_S_userLogin`；最后一段以小写英文字母开头，且仅包含英文字母和数字。在分支选择框中选择“新建分支…”后输入名称，并选择起始分支。已有分支名称不受影响。
+
+分支选择框中本地分支优先，组内按最近使用排序；每项显示最新提交的作者、短 ID、标题和时间，可输入提交内容搜索。点击提交图顶部分支按钮，选择 Auto、全部或指定分支，仅改变图的范围，不切换检出分支。
 
 ## 已有能力
 
@@ -67,11 +71,11 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.1) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.1.vsix
-cursor --install-extension pushright-win32-x64-1.1.1.vsix
+code --install-extension pushright-win32-x64-1.1.2.vsix
+cursor --install-extension pushright-win32-x64-1.1.2.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。
