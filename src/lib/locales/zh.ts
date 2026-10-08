@@ -19,6 +19,7 @@ export const messages = {
     recover: '恢复为新分支',
     rebase: '交互式变基',
     base: '保留此基点提交；编辑它之后的提交',
+    selectRevision: '选择分支或标签…',
     loadPlan: '加载提交',
     applyPlan: '执行变基计划',
     rebaseWarning: '此操作会重写当前分支。请先提交或贮藏本地改动。开始前会创建 pushright-backup 备份分支；发生冲突后可解决并继续，或中止。edit 步骤会暂停，供你修补该提交。',

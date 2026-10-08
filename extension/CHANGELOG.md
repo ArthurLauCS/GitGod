@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1
+
+- Sort branches by recent use, with local branches before remote branches in the editor picker.
+- Allow locally ignoring multiple selected untracked files in one operation.
+- Open stash contents without applying them, including files saved with `git stash -u`.
+- Replace unreliable revision datalist choices with clickable selectors in compare and interactive rebase tools.
+
+分支按最近使用排序，扩展的本地分支优先于远程分支；支持批量将选中的未跟踪文件设为仅本机忽略；贮藏无需应用即可查看；修复比较版本与交互式变基的版本下拉选项无法点击。
+
 ## 1.1.0
 
 - Add repository comparisons, reviewed-file markers, remote management, interactive rebase and reflog recovery to the full graph interface.

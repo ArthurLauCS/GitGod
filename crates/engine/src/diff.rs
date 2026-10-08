@@ -150,6 +150,22 @@ pub fn commit(repo: &Repo, id: &str, path: &str) -> Result<Diff> {
     Ok(diff)
 }
 
+fn stash_part(repo: &Repo, id: &str, path: &str) -> Result<String> {
+    let oid = ObjectId::from_hex(id.as_bytes()).map_err(err)?;
+    let gix = repo.gix();
+    let commit = gix.find_commit(oid).map_err(err)?;
+    if let Some(untracked) = commit.decode().map_err(err)?.parents().nth(2) {
+        let untracked = untracked.to_string();
+        if repo.git(&["cat-file", "-e", &format!("{untracked}:{path}")]).is_ok() { return Ok(untracked); }
+    }
+    Ok(oid.to_string())
+}
+
+/// 贮藏里的单文件改动；`-u` 保存的文件从贮藏的未跟踪父提交读取。
+pub fn stash(repo: &Repo, id: &str, path: &str) -> Result<Diff> {
+    commit(repo, &stash_part(repo, id, path)?, path)
+}
+
 pub fn between(repo: &Repo, left: &str, right: &str, path: &str, old_path: Option<&str>) -> Result<Diff> {
     let left = crate::tools::revision(repo, left)?;
     let right = crate::tools::revision(repo, right)?;
@@ -198,9 +214,15 @@ fn images(repo: &Repo, left: Option<&str>, right: Option<&str>, old: &str, path:
 pub fn page(repo: &Repo, mode: &str, left: &str, right: &str, path: &str, old_path: Option<&str>, skip: usize) -> Result<Diff> {
     if mode == "untracked" { return untracked_page(repo, path, skip); }
     let mut args = vec!["--literal-pathspecs", "diff", "-M", "--no-color", "--no-ext-diff", "--no-textconv"];
+    let resolved_stash;
     match mode {
         "compare" => { crate::ops::safe(left)?; crate::ops::safe(right)?; args.extend([left, right]); }
         "commit" => { crate::ops::safe(right)?; args = vec!["--literal-pathspecs", "show", "--format=", "--no-color", "--no-ext-diff", "--no-textconv", "--diff-merges=first-parent", right]; }
+        "stash" => {
+            crate::ops::safe(right)?;
+            resolved_stash = stash_part(repo, right, path)?;
+            args = vec!["--literal-pathspecs", "show", "--format=", "--no-color", "--no-ext-diff", "--no-textconv", "--diff-merges=first-parent", &resolved_stash];
+        }
         "staged" => args.push("--cached"),
         "unstaged" => {},
         _ => return Err("PR_INVALID_NAME".into()),

@@ -20,6 +20,7 @@ export const messages = {
     recover: 'Recover as a new branch',
     rebase: 'Interactive rebase',
     base: 'Keep this base commit; edit commits after it',
+    selectRevision: 'Choose a branch or tag…',
     loadPlan: 'Load commits',
     applyPlan: 'Apply rebase plan',
     rebaseWarning: 'This rewrites the current branch. Commit or stash local changes first. A pushright-backup branch is created before starting. On conflicts, resolve and Continue, or Abort. An edit step pauses so you can amend the commit.',

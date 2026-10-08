@@ -87,6 +87,7 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
         "remotes" => out(refs::remotes(repo)?),
         "tracking" => out(refs::tracking(repo)?),
         "detail" => out(detail::detail(repo, &arg::<String>(a, "id")?)?),
+        "stash_detail" => out(detail::stash(repo, &arg::<String>(a, "name")?)?),
         "status" => out(status::status(repo)?),
         "stage" => out(status::stage(repo, &arg::<Vec<String>>(a, "paths")?)?),
         "unstage" => out(status::unstage(repo, &arg::<Vec<String>>(a, "paths")?)?),
@@ -96,6 +97,7 @@ fn call(tabs: &Tabs, cmd: &str, a: &Value) -> Result<Value> {
         "set_commit_identity" => out(identity::set(repo, &arg::<String>(a, "name")?, &arg::<String>(a, "email")?)?),
         "diff_worktree" => out(diff::worktree(repo, &arg::<String>(a, "path")?, arg(a, "staged")?, arg(a, "untracked")?)?),
         "diff_commit" => out(diff::commit(repo, &arg::<String>(a, "id")?, &arg::<String>(a, "path")?)?),
+        "stash_diff" => out(diff::stash(repo, &arg::<String>(a, "id")?, &arg::<String>(a, "path")?)?),
         "apply_lines" => out(diff::apply_lines(
             repo,
             &arg::<String>(a, "path")?,

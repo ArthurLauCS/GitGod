@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { splitUpstream } from '../../src/lib/push-target'
-import { activeRepo, headBranch, help, run, short, t, v, type Repo } from './core'
+import { orderRefs, readRecentRefs, rememberRef, writeRecentRefs } from '../../src/lib/ref-order'
+import { activeRepo, headBranch, help, run, short, store, stored, t, v, type Repo } from './core'
 
 const upstreamOf = (repo: Repo) => repo.refs.refs.find((r) => r.name === repo.refs.head)?.upstream
 
@@ -70,11 +71,15 @@ export async function fetch(repo = activeRepo()) {
 
 export async function checkout(repo = activeRepo()) {
   if (!repo) return
-  const items = repo.refs.refs
-    .filter((r) => r.name !== repo.refs.head && /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD'))
+  const recent = readRecentRefs(stored().recentRefs, repo.root)
+  const candidates = repo.refs.refs.filter((r) => r.name !== repo.refs.head && /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD'))
+  const local = orderRefs(candidates.filter((r) => r.name.startsWith('refs/heads/')), recent)
+  const remote = orderRefs(candidates.filter((r) => r.name.startsWith('refs/remotes/')), recent)
+  const items = [...local, ...remote]
     .map((r) => ({ label: short(r.name), description: r.name.startsWith('refs/remotes/') ? t.checkoutRemote : '', ref: r.name }))
   const pick = await vscode.window.showQuickPick(items, { title: t.opNames.checkout, placeHolder: help.checkout.short })
   if (!pick) return
+  await store('recentRefs', writeRecentRefs(stored().recentRefs, repo.root, rememberRef(recent, pick.ref)))
   await run(repo, pick.ref.startsWith('refs/remotes/') ? { op: 'track', remote_branch: pick.label } : { op: 'checkout', target: pick.label })
 }
 

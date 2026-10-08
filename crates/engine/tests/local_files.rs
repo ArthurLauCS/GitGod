@@ -1,6 +1,6 @@
 mod common;
 use common::{git, init};
-use engine::{local_files as local, status, Repo};
+use engine::{detail, diff, local_files as local, refs, status, Repo};
 use std::fs;
 
 #[test]
@@ -47,5 +47,25 @@ fn ignore_track_and_nested_repositories_preserve_local_content() {
     assert_eq!(local::repositories(&repo).unwrap(), [child.to_string_lossy()]);
     git(&dir, 0, &["add", "nested/repo"]);
     assert_eq!(local::repositories(&repo).unwrap(), [child.to_string_lossy()]);
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn stash_detail_includes_tracked_and_untracked_files() {
+    let dir = init("stash-detail");
+    let repo = Repo::open(&dir).unwrap();
+    fs::write(dir.join("tracked.txt"), "before\n").unwrap();
+    git(&dir, 0, &["add", "."]);
+    git(&dir, 1, &["commit", "-q", "-m", "root"]);
+    fs::write(dir.join("tracked.txt"), "after\n").unwrap();
+    fs::write(dir.join("untracked.txt"), "new\n").unwrap();
+    git(&dir, 2, &["stash", "push", "-q", "-u", "-m", "both"]);
+
+    let stash = refs::stashes(&repo).unwrap().remove(0);
+    let shown = detail::stash(&repo, &stash.name).unwrap();
+    assert!(shown.files.iter().any(|file| file.path == "tracked.txt" && file.status == 'M'));
+    assert!(shown.files.iter().any(|file| file.path == "untracked.txt" && file.status == 'A'));
+    let patch = diff::stash(&repo, &shown.id, "untracked.txt").unwrap();
+    assert_eq!(patch.hunks[0].lines[0].text, "new");
     fs::remove_dir_all(dir).unwrap();
 }

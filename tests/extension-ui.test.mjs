@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import ts from 'typescript'
+import * as refOrder from '../src/lib/ref-order.ts'
 
 // Exercise host handlers without launching VS Code; the smoke test covers the actual host.
 const require = createRequire(import.meta.url)
@@ -289,7 +290,7 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
   const vscode = { window: { showQuickPick: async (items) => { prompts.push(items); return items[0] }, showInformationMessage: async () => t.push } }
   const { splitUpstream } = await import('../src/lib/push-target.ts')
   const core = { headBranch: () => 'feature/x', run: (_, op) => sent.push(op), t, v, help: { push: { what: '' } } }
-  const { push } = load('sync', { vscode, './core': core, '../../src/lib/push-target': { splitUpstream } })
+  const { push } = load('sync', { vscode, './core': core, '../../src/lib/push-target': { splitUpstream }, '../../src/lib/ref-order': refOrder })
   await push(repo)
   assert.equal(prompts[0][0].label, 'origin/feature/x')
   assert.deepEqual(sent, [{ op: 'push', branch: 'feature/x', force: false, remote: 'origin', remote_branch: 'feature/x', set_upstream: true }])
@@ -299,6 +300,24 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
   await push(repo, true)
   assert.equal(sent.length, 2)
   assert.equal(sent[1].remote_branch, 'feature/x', 'graph push cannot choose the mismatched upstream')
+})
+
+test('branch picker keeps local refs before remote refs and uses per-repository recency', async () => {
+  const shown = [], sent = [], saved = {}
+  const repo = { root: '/repo', refs: { head: 'refs/heads/main', refs: [
+    { name: 'refs/remotes/origin/old' }, { name: 'refs/heads/old' }, { name: 'refs/remotes/origin/recent' }, { name: 'refs/heads/recent' }, { name: 'refs/heads/main' },
+  ] } }
+  saved.recentRefs = refOrder.writeRecentRefs(null, repo.root, ['refs/remotes/origin/recent', 'refs/heads/recent'])
+  const vscode = { window: { showQuickPick: async (items) => { shown.push(items); return items[0] } } }
+  const core = {
+    activeRepo: () => repo, help: { checkout: { short: '' } }, t: { checkoutRemote: 'remote', opNames: { checkout: 'checkout' } }, v: {}, short: (name) => name.replace(/^refs\/(heads|remotes)\//, ''),
+    stored: () => saved, store: async (key, value) => { saved[key] = value }, run: (_, op) => sent.push(op),
+  }
+  const { checkout } = load('sync', { vscode, './core': core, '../../src/lib/push-target': {}, '../../src/lib/ref-order': refOrder })
+  await checkout(repo)
+  assert.deepEqual(shown[0].map((item) => item.ref), ['refs/heads/recent', 'refs/heads/old', 'refs/remotes/origin/recent', 'refs/remotes/origin/old'])
+  assert.deepEqual(sent, [{ op: 'checkout', target: 'recent' }])
+  assert.equal(refOrder.readRecentRefs(saved.recentRefs, repo.root)[0], 'refs/heads/recent')
 })
 
 test('SCM separates repositories, stops on failed saves and uses selections after formatting', async () => {
@@ -378,7 +397,7 @@ test('local files expand lazily and tracking commands distinguish local rules, s
     window: { createTreeView: (_, { treeDataProvider }) => { provider = treeDataProvider; return { visible: true, onDidChangeVisibility: new Event().event } },
       showInformationMessage: async (...args) => { prompts.push(args); return accept ? args[2] : undefined }, showWarningMessage: (message) => prompts.push(message) },
   }
-  const core = { repos: [repo], onRepoChange: new Event(), attempt: (p) => p, rel: () => 'skills/a.md', repoOf: () => repo,
+  const core = { repos: [repo], onRepoChange: new Event(), attempt: (p) => p, rel: (_, u) => u.fsPath.endsWith('b.md') ? 'skills/deep/b.md' : 'skills/a.md', repoOf: () => repo,
     discoverForFile: (uri) => discoveries.push(uri.fsPath), fileUri: (_, p) => uri(`${repo.root}/${p}`),
     engine: { call: async (cmd, args) => { reads.push([cmd, args]); return cmd === 'is_tracked' ? tracked : ['cache/'] } },
     write: async (...args) => writes.push(args),
@@ -412,5 +431,12 @@ test('local files expand lazily and tracking commands distinguish local rules, s
   assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: true }])
   await commands.get('pushright.untrackFile')({ repo, entry: { path: 'skills/a.md' }, resourceUri: file })
   assert.deepEqual(writes.at(-1), [repo, 'track_file', { path: 'skills/a.md', track: false }], 'SCM resource arguments use their URI, not the local-tree node shape')
-  assert.ok(discoveries.every((p) => p === file.fsPath))
+  tracked = false
+  const second = uri('/parent/child/skills/deep/b.md')
+  await commands.get('pushright.ignoreLocal')(file, [file, second])
+  assert.deepEqual(writes.slice(-2).map(([, cmd, args]) => [cmd, args]), [
+    ['ignore_file', { path: 'skills/a.md', shared: false }],
+    ['ignore_file', { path: 'skills/deep/b.md', shared: false }],
+  ])
+  assert.deepEqual(new Set(discoveries), new Set([file.fsPath, second.fsPath]))
 })

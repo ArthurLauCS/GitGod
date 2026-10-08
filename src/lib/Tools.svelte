@@ -84,11 +84,10 @@
     {/each}
   </nav>
   {#if error}<p class="error">{error}</p>{/if}
-  <datalist id={`revisions-${tab}`}>{#each refs.refs as ref (ref.name)}<option value={ref.name}>{ref.name}</option>{/each}</datalist>
   {#if section === 'compare'}
     <form onsubmit={(e) => { e.preventDefault(); run(async () => { comparison = await api.compare(tab, left, right, commonBase) }) }}>
-      <label>{t.tools.left}<input class="field" bind:value={left} list={`revisions-${tab}`} required /></label>
-      <label>{t.tools.right}<input class="field" bind:value={right} list={`revisions-${tab}`} required /></label>
+      <label>{t.tools.left}<span class="revision"><input class="field" bind:value={left} required /><select class="field" aria-label={t.tools.left} value="" onchange={(e) => { if (e.currentTarget.value) left = e.currentTarget.value; e.currentTarget.value = '' }}><option value="">{t.tools.selectRevision}</option>{#each refs.refs as ref (ref.name)}<option value={ref.name}>{ref.name}</option>{/each}</select></span></label>
+      <label>{t.tools.right}<span class="revision"><input class="field" bind:value={right} required /><select class="field" aria-label={t.tools.right} value="" onchange={(e) => { if (e.currentTarget.value) right = e.currentTarget.value; e.currentTarget.value = '' }}><option value="">{t.tools.selectRevision}</option>{#each refs.refs as ref (ref.name)}<option value={ref.name}>{ref.name}</option>{/each}</select></span></label>
       <label class="check"><input type="checkbox" bind:checked={commonBase} />{t.tools.commonBase}</label>
       <button class="btn primary" disabled={disabled}>{t.tools.compare}</button>
     </form>
@@ -118,7 +117,7 @@
   {:else}
     <p>{t.tools.rebaseWarning}</p>
     <form onsubmit={(e) => { e.preventDefault(); run(async () => { plan = await api.rebasePlan(tab, base) }) }}>
-      <label>{t.tools.base}<input class="field" bind:value={base} list={`revisions-${tab}`} required /></label>
+      <label>{t.tools.base}<span class="revision"><input class="field" bind:value={base} required /><select class="field" aria-label={t.tools.base} value="" onchange={(e) => { if (e.currentTarget.value) base = e.currentTarget.value; e.currentTarget.value = '' }}><option value="">{t.tools.selectRevision}</option>{#each refs.refs as ref (ref.name)}<option value={ref.name}>{ref.name}</option>{/each}</select></span></label>
       <button class="btn" disabled={disabled || !!refs.in_progress}>{t.tools.loadPlan}</button>
     </form>
     {#if plan}
@@ -154,6 +153,9 @@
   .comparison { flex: 1; min-height: 300px; display: flex; flex-direction: column; }
   .comparison :global(section) { height: 100% !important; flex: 1; min-height: 0; }
   .actions select { width: auto; }
+  .revision { display: flex; gap: 4px; }
+  .revision input { min-width: 0; flex: 1; }
+  .revision select { width: 42%; min-width: 120px; }
   textarea { min-height: 64px; }
   code { user-select: text; }
 </style>

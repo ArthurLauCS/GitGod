@@ -162,6 +162,7 @@ export const refs = (tab: number) => invoke<Refs>('refs', { tab })
 export const stashes = (tab: number) => invoke<Stash[]>('stashes', { tab })
 export const worktrees = (tab: number) => invoke<Worktree[]>('worktrees', { tab })
 export const detail = (tab: number, id: string) => invoke<Detail>('detail', { tab, id })
+export const stashDetail = (tab: number, name: string) => invoke<Detail>('stash_detail', { tab, name })
 export const status = (tab: number) => invoke<Entry[]>('status', { tab })
 export const stage = (tab: number, paths: string[]) => invoke<void>('stage', { tab, paths })
 export const unstage = (tab: number, paths: string[]) => invoke<void>('unstage', { tab, paths })
@@ -173,6 +174,7 @@ export const setCommitIdentity = (tab: number, name: string, email: string) =>
 export const diffWorktree = (tab: number, path: string, staged: boolean, untracked: boolean) =>
   invoke<Diff>('diff_worktree', { tab, path, staged, untracked })
 export const diffCommit = (tab: number, id: string, path: string) => invoke<Diff>('diff_commit', { tab, id, path })
+export const stashDiff = (tab: number, id: string, path: string) => invoke<Diff>('stash_diff', { tab, id, path })
 export const applyLines = (tab: number, path: string, staged: boolean, hunk: number, header: string, lines: number[]) =>
   invoke<void>('apply_lines', { tab, path, staged, hunk, header, lines })
 export const op = (tab: number, op: Op) => invoke<Log>('op', { tab, op })

@@ -3,6 +3,9 @@ import * as vscode from 'vscode'
 import { attempt, discoverForFile, engine, fileUri, onRepoChange, rel, repoOf, repos, v, write, type Repo } from './core'
 
 type Item = { repo: Repo; kind: 'repo' | 'untracked' | 'ignored'; path: string; directory: boolean }
+type CommandArg = vscode.Uri | Item | { resourceUri: vscode.Uri }
+
+const flatten = (args: unknown[]): CommandArg[] => args.flatMap((arg) => Array.isArray(arg) ? flatten(arg) : arg ? [arg as CommandArg] : [])
 
 export function registerLocalFiles(context: vscode.ExtensionContext) {
   const changed = new vscode.EventEmitter<void>()
@@ -39,23 +42,34 @@ export function registerLocalFiles(context: vscode.ExtensionContext) {
     },
   }
   const view = vscode.window.createTreeView('pushright.localFiles', { treeDataProvider: provider })
-  const command = (id: string, action: 'local' | 'shared' | 'track' | 'untrack') => vscode.commands.registerCommand(`pushright.${id}`, async (arg?: vscode.Uri | Item | { resourceUri: vscode.Uri }) => {
-    const uri = arg && 'resourceUri' in arg ? arg.resourceUri : arg && 'repo' in arg ? fileUri(arg.repo, arg.path) : arg as vscode.Uri | undefined ?? vscode.window.activeTextEditor?.document.uri
-    if (!uri || uri.scheme !== 'file') return
-    await discoverForFile(uri)
-    const repo = repoOf(uri)
-    if (!repo) return void vscode.window.showWarningMessage(v.noRepo)
-    const path = rel(repo, uri)
-    if (!path) return
-    const tracked = await attempt(engine.call<boolean>('is_tracked', { tab: repo.tab, path }))
-    if (tracked === undefined) return
-    if ((action === 'local' || action === 'shared') && tracked) return void vscode.window.showWarningMessage(v.ignoreTracked)
-    if (action === 'untrack' && !tracked) return void vscode.window.showInformationMessage(v.alreadyUntracked)
+  const command = (id: string, action: 'local' | 'shared' | 'track' | 'untrack') => vscode.commands.registerCommand(`pushright.${id}`, async (...raw: unknown[]) => {
+    const supplied = flatten(raw)
+    const args = supplied.length ? supplied : [vscode.window.activeTextEditor?.document.uri].filter(Boolean) as CommandArg[]
+    const targets: { repo: Repo; path: string }[] = []
+    const seen = new Set<string>()
+    for (const arg of args) {
+      const uri = 'resourceUri' in arg ? arg.resourceUri : 'repo' in arg ? fileUri(arg.repo, arg.path) : arg
+      if (!uri || uri.scheme !== 'file' || seen.has(uri.fsPath)) continue
+      seen.add(uri.fsPath)
+      await discoverForFile(uri)
+      const repo = repoOf(uri)
+      if (!repo) { vscode.window.showWarningMessage(v.noRepo); continue }
+      const path = rel(repo, uri)
+      if (!path) continue
+      const tracked = await attempt(engine.call<boolean>('is_tracked', { tab: repo.tab, path }))
+      if (tracked === undefined) return
+      if ((action === 'local' || action === 'shared') && tracked) { vscode.window.showWarningMessage(v.ignoreTracked); continue }
+      if (action === 'untrack' && !tracked) { vscode.window.showInformationMessage(v.alreadyUntracked); continue }
+      targets.push({ repo, path })
+    }
+    if (!targets.length) return
     const [title, hint] = { local: [v.ignoreLocal, v.ignoreLocalHint], shared: [v.ignoreShared, v.ignoreSharedHint], track: [v.trackFile, v.trackHint], untrack: [v.untrackFile, v.untrackHint] }[action]
-    const detail = `${repo.root}\n${path}\n\n${hint}`
+    const detail = `${targets.map(({ repo, path }) => `${repo.root}\n${path}`).join('\n\n')}\n\n${hint}`
     if (!(await vscode.window.showInformationMessage(title, { modal: true, detail }, title))) return
-    if (action === 'local' || action === 'shared') await write(repo, 'ignore_file', { path, shared: action === 'shared' })
-    else await write(repo, 'track_file', { path, track: action === 'track' })
+    for (const { repo, path } of targets) {
+      if (action === 'local' || action === 'shared') await write(repo, 'ignore_file', { path, shared: action === 'shared' })
+      else await write(repo, 'track_file', { path, track: action === 'track' })
+    }
     changed.fire()
   })
   context.subscriptions.push(view, changed, onRepoChange.event(() => { if (view.visible) changed.fire() }), view.onDidChangeVisibility(() => changed.fire()),

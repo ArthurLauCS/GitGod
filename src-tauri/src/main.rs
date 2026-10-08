@@ -148,6 +148,16 @@ fn diff_commit(state: State, tab: u32, id: String, path: String) -> Result<Diff>
 }
 
 #[tauri::command(async)]
+fn stash_detail(state: State, tab: u32, name: String) -> Result<Detail> {
+    detail::stash(&session(&state, tab)?.repo, &name)
+}
+
+#[tauri::command(async)]
+fn stash_diff(state: State, tab: u32, id: String, path: String) -> Result<Diff> {
+    diff::stash(&session(&state, tab)?.repo, &id, &path)
+}
+
+#[tauri::command(async)]
 fn apply_lines(state: State, tab: u32, path: String, staged: bool, hunk: usize, header: String, lines: Vec<usize>) -> Result<()> {
     diff::apply_lines(&session(&state, tab)?.repo, &path, staged, hunk, &header, &lines)
 }
@@ -226,7 +236,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             create_repo, compare, diff_between, diff_page, remote_details, reflog, rebase_plan, rebase_run,
             initial_repos, open_repo, close_repo, load_graph, rows, row_of, refs, stashes, worktrees, detail, status, stage, unstage,
-            commit, last_message, commit_identity, set_commit_identity, diff_worktree, diff_commit, apply_lines, op, remotes, tracking, discard_lines, conflict_read, conflict_resolve, conflict_take
+            commit, last_message, commit_identity, set_commit_identity, diff_worktree, diff_commit, stash_detail, stash_diff, apply_lines, op, remotes, tracking, discard_lines, conflict_read, conflict_resolve, conflict_take
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

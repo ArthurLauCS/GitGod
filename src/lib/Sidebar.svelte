@@ -1,14 +1,17 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { Refs, Stash, Track, Worktree } from './api'
   import Icon from './Icon.svelte'
   import { layout } from './layout.svelte'
   import { t } from './i18n.svelte'
+  import { orderRefs, readRecentRefs, rememberRef, writeRecentRefs } from './ref-order'
 
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
   type View = 'history' | 'changes' | 'worktrees' | 'tools'
 
   let {
     refs,
+    repo,
     stashes,
     worktrees,
     tracks,
@@ -17,10 +20,13 @@
     onview,
     onjump,
     onactivate,
+    onstash,
     onmenu,
     onworktree,
   }: {
     refs: Refs
+    /** 仓库路径，用于隔离各仓库的最近查看分支。 */
+    repo: string
     stashes: Stash[]
     worktrees: Worktree[]
     /** 各本地分支与上游的同步状态，键是完整引用名 */
@@ -32,6 +38,8 @@
     onjump: (id: string) => void
     /** 双击：name 是引用全名或贮藏名 */
     onactivate: (kind: Kind, name: string) => void
+    /** 单击贮藏：查看内容，不改变工作区。 */
+    onstash: (name: string) => void
     onmenu: (e: MouseEvent, kind: Kind, name: string, id: string) => void
     /** 双击工作树：在页签中打开 */
     onworktree: (path: string) => void
@@ -41,13 +49,18 @@
   const elsewhere = $derived(new Set(worktrees.filter((w) => !w.current && w.branch).map((w) => w.branch)))
 
   let filter = $state('')
+  let recent = $state(untrack(() => readRecentRefs(localStorage.getItem('recentRefs'), repo)))
+
+  function viewRef(name: string, id: string) {
+    recent = rememberRef(recent, name)
+    localStorage.setItem('recentRefs', writeRecentRefs(localStorage.getItem('recentRefs'), repo, recent))
+    onjump(id)
+  }
 
   const group = (prefix: string) =>
-    refs.refs
+    orderRefs(refs.refs
       .filter((r) => r.name.startsWith(prefix) && r.name.toLowerCase().includes(filter.toLowerCase()))
-      .map((r) => ({ ...r, label: r.name.slice(prefix.length) }))
-      // 当前分支排最前
-      .sort((a, b) => +(b.name === refs.head) - +(a.name === refs.head))
+      .map((r) => ({ ...r, label: r.name.slice(prefix.length) })), recent, refs.head)
   const branches = $derived(group('refs/heads/'))
   const remotes = $derived(group('refs/remotes/'))
   const tags = $derived(group('refs/tags/'))
@@ -74,7 +87,7 @@
           <button
             class:head={r.name === refs.head}
             title={r.label}
-            onclick={() => onjump(r.id)}
+            onclick={() => viewRef(r.name, r.id)}
             ondblclick={() => onactivate(kind, r.name)}
             oncontextmenu={(e) => onmenu(e, kind, r.name, r.id)}
           >
@@ -96,7 +109,7 @@
     <details>
       <summary>{t.stashes}<span class="count">{stashes.length}</span></summary>
       {#each stashes as s (s.name)}
-        <button title={s.subject} ondblclick={() => onactivate('stash', s.name)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
+        <button title={s.subject} onclick={() => onstash(s.name)} ondblclick={() => onactivate('stash', s.name)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
           <span class="name">{s.subject}</span>
         </button>
       {/each}

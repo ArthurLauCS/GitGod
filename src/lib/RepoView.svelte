@@ -66,6 +66,8 @@
   let tracks = $state.raw(new Map<string, api.Track>())
   let selectedRow = $state<number | null>(null)
   let detail = $state.raw<api.Detail | null>(null)
+  let detailMode = $state<'commit' | 'stash'>('commit')
+  let detailRequest = 0
   let graph = $state<Graph>()
   let dialog = $state<Dialog>()
   let menu = $state<ContextMenu>()
@@ -117,9 +119,20 @@
   }
 
   async function select(row: number, id: string) {
+    const request = ++detailRequest
     selectedRow = row
+    detailMode = 'commit'
     const d = await guard(api.detail(tab, id))
-    if (d && selectedRow === row) detail = d
+    if (d && request === detailRequest) detail = d
+  }
+
+  async function viewStash(name: string) {
+    const request = ++detailRequest
+    view = 'history'
+    selectedRow = null
+    detailMode = 'stash'
+    const d = await guard(api.stashDetail(tab, name))
+    if (d && request === detailRequest) detail = d
   }
 
   async function jump(id: string) {
@@ -629,6 +642,7 @@
   <main>
     <Sidebar
       {refs}
+      repo={path}
       {stashes}
       {worktrees}
       {tracks}
@@ -637,6 +651,7 @@
       onview={(v) => (view = v)}
       onjump={jump}
       onactivate={activate}
+      onstash={viewStash}
       onmenu={(e, kind, name) => refMenu(e, kind, name)}
       onworktree={onopen}
     />
@@ -659,7 +674,9 @@
           <p class="none">{t.noCommits}</p>
         {/if}
         <Splitter key="detail" dir="y" min={120} max={640} invert />
-        <Detail {detail} onjump={jump} reviewKey={`review:${JSON.stringify([path, detail?.id])}`} fetchDiff={(id, path) => api.diffCommit(tab, id, path)} fetchPage={(id, path, skip) => api.diffPage(tab, 'commit', '', id, path, skip)} />
+        <Detail {detail} onjump={jump} reviewKey={`review:${JSON.stringify([path, detailMode, detail?.id])}`}
+          fetchDiff={(id, path) => detailMode === 'stash' ? api.stashDiff(tab, id, path) : api.diffCommit(tab, id, path)}
+          fetchPage={(id, path, skip) => api.diffPage(tab, detailMode, '', id, path, skip)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
         <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} rebasing={refs.in_progress === 'rebase'} reload={refresh} oncommitted={committed} {discard} {discardLines} />
