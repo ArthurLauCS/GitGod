@@ -100,18 +100,20 @@ pub(crate) fn tips(gix: &gix::Repository) -> Result<Vec<ObjectId>> {
 /// Auto 包含 HEAD、上游和基准远程分支；筛选改变遍历起点，不改变检出的分支。
 pub(crate) fn graph_tips(repo: &Repo, scope: &str) -> Result<Vec<ObjectId>> {
     if scope == "all" { return tips(&repo.gix()); }
-    let refs = list(repo)?;
     if scope != "auto" {
+        let refs = list_with(repo, false)?;
         let r = refs.refs.iter().find(|r| r.name == scope).ok_or("PR_GRAPH_REF_GONE")?;
         return Ok(vec![ObjectId::from_hex(r.id.as_bytes()).map_err(err)?]);
     }
-    let mut ids = refs.head_id.into_iter().collect::<Vec<_>>();
-    if let Some(head) = refs.head.as_deref() {
-        let upstream = refs.refs.iter().find(|r| r.name == head).and_then(|r| r.upstream.as_deref());
-        ids.extend(refs.refs.iter().filter(|r| Some(r.name.as_str()) == upstream).map(|r| r.id.clone()));
-        let branch = head.trim_start_matches("refs/heads/");
-        let configured = repo.git(&["config", "--get", &format!("branch.{branch}.vscode-merge-base")]).ok()
-            .map(|b| format!("refs/remotes/{}", String::from_utf8_lossy(&b).trim()));
+    let head = repo.gix().head_name().map_err(err)?.map(|n| n.as_bstr().to_string());
+    let Some(head) = head.as_deref() else { return Ok(repo.gix().head_id().ok().map(|id| id.detach()).into_iter().collect()) };
+    let branch = head.trim_start_matches("refs/heads/");
+    // 引用、配置、远程、reflog 各是一个 git 进程，并行跑
+    let (refs, configured, remotes, from_reflog) = std::thread::scope(|s| {
+        let refs = s.spawn(|| list_with(repo, false));
+        let configured = s.spawn(|| repo.git(&["config", "--get", &format!("branch.{branch}.vscode-merge-base")]).ok()
+            .map(|b| format!("refs/remotes/{}", String::from_utf8_lossy(&b).trim())));
+        let remotes = s.spawn(|| remotes(repo));
         // 与原生 Git 一样，优先找创建分支时的来源；只接受仍存在的远程分支。
         let from_reflog = repo.git(&["reflog", "show", "--format=%gs", "--max-count=2", "--grep-reflog=^branch: Created from ", head]).ok()
             .and_then(|out| {
@@ -123,9 +125,15 @@ pub(crate) fn graph_tips(repo: &Repo, scope: &str) -> Result<Vec<ObjectId>> {
                 let out = repo.git(&["reflog", "show", "--format=%gs", "--fixed-strings", &format!("--grep-reflog= to {branch}"), "HEAD"]).ok()?;
                 String::from_utf8_lossy(&out).lines().filter_map(|line| line.strip_prefix("checkout: moving from ")?.strip_suffix(&format!(" to {branch}"))).last().map(str::to_owned)
             });
+        (refs.join().unwrap(), configured.join().unwrap(), remotes.join().unwrap(), from_reflog)
+    });
+    let (refs, remotes) = (refs?, remotes?);
+    let mut ids = refs.head_id.into_iter().collect::<Vec<_>>();
+    {
+        let upstream = refs.refs.iter().find(|r| r.name == head).and_then(|r| r.upstream.as_deref());
+        ids.extend(refs.refs.iter().filter(|r| Some(r.name.as_str()) == upstream).map(|r| r.id.clone()));
         let from_reflog = from_reflog.as_ref().and_then(|name| refs.refs.iter().find(|r| r.name == *name || r.name == format!("refs/heads/{name}") || r.name == format!("refs/remotes/{name}")))
             .and_then(|r| if r.name.starts_with("refs/remotes/") { Some(r) } else { refs.refs.iter().find(|up| Some(&up.name) == r.upstream.as_ref()) });
-        let remotes = remotes(repo)?;
         let remote = remotes.iter().filter(|r| upstream.is_some_and(|u| u.starts_with(&format!("refs/remotes/{r}/"))))
             .max_by_key(|r| r.len()).or_else(|| remotes.iter().find(|r| *r == "origin")).or_else(|| remotes.first());
         let base = configured.as_ref().and_then(|name| refs.refs.iter().find(|r| &r.name == name))
@@ -140,18 +148,26 @@ pub(crate) fn graph_tips(repo: &Repo, scope: &str) -> Result<Vec<ObjectId>> {
 }
 
 pub fn list(repo: &Repo) -> Result<Refs> {
+    list_with(repo, true)
+}
+
+/// 提交图只要引用本身，不需要领先/落后计数。
+fn list_with(repo: &Repo, count: bool) -> Result<Refs> {
     let gix = repo.gix();
-    // 上游信息走 CLI：gix 的配置是打开仓库时的快照，push -u 之后不会更新
-    let out = repo.git(&["for-each-ref", "--format=%(refname)%00%(upstream)", "refs/heads"])?;
+    let head = gix.head_name().map_err(err)?.map(|n| n.as_bstr().to_string());
+    // 上游信息走 CLI：gix 的配置是打开仓库时的快照，push -u 之后不会更新。计数与它并行跑，没有上游时计数命令自己会失败
+    let (out, ahead_behind) = std::thread::scope(|s| {
+        let ahead_behind = (count && head.is_some()).then(|| s.spawn(|| {
+            let out = repo.git(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).ok()?;
+            let out = String::from_utf8_lossy(&out);
+            let mut n = out.split_whitespace().map(|n| n.parse().ok());
+            Some((n.next()??, n.next()??))
+        }));
+        (repo.git(&["for-each-ref", "--format=%(refname)%00%(upstream)", "refs/heads"]), ahead_behind.and_then(|t| t.join().unwrap()))
+    });
+    let out = out?;
     let out = String::from_utf8_lossy(&out);
     let upstreams: HashMap<_, _> = out.lines().filter_map(|l| l.split_once('\0')).filter(|(_, u)| !u.is_empty()).collect();
-    let head = gix.head_name().map_err(err)?.map(|n| n.as_bstr().to_string());
-    let ahead_behind = head.as_deref().filter(|h| upstreams.contains_key(h)).and_then(|_| {
-        let out = repo.git(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).ok()?;
-        let out = String::from_utf8_lossy(&out);
-        let mut n = out.split_whitespace().map(|n| n.parse().ok());
-        Some((n.next()??, n.next()??))
-    });
     let dir = gix.git_dir();
     let in_progress = [
         ("merge", "MERGE_HEAD"),
@@ -234,7 +250,7 @@ pub fn branch_tips(repo: &Repo) -> Result<Vec<Tip>> {
     Ok(String::from_utf8_lossy(&out)
         .lines()
         .filter_map(|l| {
-            let mut f = l.splitn(5, ' ');
+            let mut f = l.splitn(5, '\0');
             Some(Tip { name: f.next()?.into(), short_id: f.next()?.into(), author: f.next()?.into(), time: f.next()?.parse().ok()?, subject: f.next()?.into() })
         })
         .collect())

@@ -45,15 +45,19 @@
         // Auto 随 HEAD/上游切换；所有引用的提交集合没变，也可能需要换一份子图。
         const current = scope === 'auto' ? `${next.refs.head}:${next.refs.refs.find((r) => r.name === next.refs.head)?.upstream}` : ''
         const key = `${next.tab}:${scope}:${current}:${graphKey(next.refs)}`
+        // 同一个仓库重载时留着旧图直接换成完整的新图：先清空或先退回首屏都会闪一下、丢滚动位置。
+        const first = next.tab !== repo?.tab || !count
         repo = next
         if (key === loadedKey) continue
         loading = true
         error = ''
-        count = 0
         selectedRow = null
-        count = await invoke<number>('load_graph', { tab: next.tab, full: false })
-        version++
-        if (count >= 2000) {
+        if (first) {
+          count = 0
+          count = await invoke<number>('load_graph', { tab: next.tab, full: false })
+          version++
+        }
+        if (!first || count >= 2000) {
           count = await invoke<number>('load_graph', { tab: next.tab, full: true })
           version++
         }
@@ -113,7 +117,7 @@
     <button class="action" disabled={!repo || busy || !repo.refs.head} title={t.vscode.graphPushSame(head)} aria-label={t.vscode.graphPushSame(head)} onclick={() => sync('push')}>↑<small>{repo?.refs.ahead_behind?.[0] || ''}</small></button>
   </div>
   {#if error}<p role="alert">{error} <button onclick={refresh}>{t.vscode.graphRetry}</button></p>{/if}
-  {#if loading}<p role="status">{t.loadingHistory}</p>{/if}
+  {#if loading && !count}<p role="status">{t.loadingHistory}</p>{/if}
   {#if repo && count}
     {#key repo.tab}
       <Graph compact {fetchRows} {fetchFiles} onfile={openFile} {count} {version} {badges} headId={repo.refs.head_id} {selectedRow} onselect={(row) => selectedRow = row} onmenu={(e) => e.preventDefault()} />

@@ -6,9 +6,9 @@
 
 PushRight brings Git source control, blame, history and a commit graph into VS Code. It makes push destinations explicit and defaults every Pull to **Rebase instead of merge**. English and Simplified Chinese are included; the extension follows VS Code's display language.
 
-**1.1.3** keeps branch lists in a fixed order and marks the checked-out branch with a tick; the graph sidebar highlights the selected row.
+**1.1.4** fixes duplicate quick-diff commands across repositories, reduces refresh work, and keeps the graph visible while reloading; the compact graph also shows commit authors.
 
-**[Download VSIX · Windows x64 · 1.1.3](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.3/pushright-win32-x64-1.1.3.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.3)
+**[Download VSIX · Windows x64 · 1.1.4](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.4/pushright-win32-x64-1.1.4.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.4)
 
 ## Requirements
 
@@ -72,11 +72,11 @@ Ignore rules do not hide changes to tracked files. Stop-tracking refuses to disc
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.3), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.4), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.3.vsix
-cursor --install-extension pushright-win32-x64-1.1.3.vsix
+code --install-extension pushright-win32-x64-1.1.4.vsix
+cursor --install-extension pushright-win32-x64-1.1.4.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.

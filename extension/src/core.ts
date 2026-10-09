@@ -65,6 +65,7 @@ async function discover(extra: string[]) {
     seen.add(fold(path))
     try {
       let repo = repos.find((r) => fold(r.root) === fold(path))
+      let loading: Promise<void> | undefined
       if (!repo) {
         const [tab, actual] = await engine.call<[number, string, number]>('open_repo', { path })
         const root = vscode.Uri.file(actual).fsPath
@@ -78,10 +79,12 @@ async function discover(extra: string[]) {
             refs: { head: null, head_id: null, ahead_behind: null, in_progress: null, refs: [] },
           }
           repos.push(repo)
-          await refresh(repo)
+          loading = refresh(repo)
         }
       }
-      if (repos.includes(repo)) queue.push(...await engine.call<string[]>('repositories', { tab: repo.tab }))
+      // 读状态和找子仓库互不依赖，一起跑
+      const [nested] = await Promise.all([engine.call<string[]>('repositories', { tab: repo.tab }), loading])
+      if (repos.includes(repo)) queue.push(...nested)
     } catch {
       // 工作区本身可能是装着多个仓库的容器；只扫描它的直接子目录。
       if (vscode.workspace.workspaceFolders?.some((f) => fold(f.uri.fsPath) === fold(path))) {
@@ -126,29 +129,37 @@ export async function discoverForFile(uri: vscode.Uri) {
   }
 }
 
-const refreshing = new WeakMap<Repo, { again: boolean }>()
+const refreshing = new WeakMap<Repo, { again: boolean; git: boolean; notify: boolean }>()
 
-/** 重新读取引用和工作区状态。进行中又被调用时，结束后再读一次，期间的多次调用合并。 */
-export async function refresh(repo: Repo) {
+/**
+ * 重新读取引用和工作区状态。进行中又被调用时，结束后再读一次，期间的多次调用合并。
+ * `git` 为 false 表示只有工作区文件变了：引用、身份、远程不会变，只重读状态（少开 8 个 git 进程）；
+ * `notify` 为 false 时状态没变就不通知，免得保存文件、切回窗口让各个视图白白重画。
+ */
+export async function refresh(repo: Repo, git = true, notify = git) {
   if (!repos.includes(repo)) return
   const running = refreshing.get(repo)
-  if (running) return void (running.again = true)
-  const state = { again: false }
+  if (running) return void Object.assign(running, { again: true, git: running.git || git, notify: running.notify || notify })
+  const state = { again: false, git, notify }
   refreshing.set(repo, state)
   do {
-    state.again = false
+    ;({ git, notify } = state)
+    Object.assign(state, { again: false, git: false, notify: false })
     const a = { tab: repo.tab }
+    const before = notify || JSON.stringify(repo.status)
     try {
-      ;[repo.refs, repo.status, repo.identity, repo.remotes] = await Promise.all([
-        engine.call<Refs>('refs', a),
-        engine.call<Entry[]>('status', a),
-        engine.call<Identity>('commit_identity', a).catch(() => null),
-        engine.call<string[]>('remotes', a),
-      ])
+      if (git) {
+        ;[repo.refs, repo.status, repo.identity, repo.remotes] = await Promise.all([
+          engine.call<Refs>('refs', a),
+          engine.call<Entry[]>('status', a),
+          engine.call<Identity>('commit_identity', a).catch(() => null),
+          engine.call<string[]>('remotes', a),
+        ])
+      } else repo.status = await engine.call<Entry[]>('status', a)
     } catch (e) {
       log.appendLine(errorText(e))
     }
-    if (repos.includes(repo)) onRepoChange.fire(repo)
+    if (repos.includes(repo) && (notify || JSON.stringify(repo.status) !== before)) onRepoChange.fire(repo)
   } while (state.again && repos.includes(repo))
   refreshing.delete(repo)
 }

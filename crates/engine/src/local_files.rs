@@ -89,9 +89,13 @@ pub fn track(repo: &Repo, path: &str, track: bool) -> Result<()> {
 
 /// Gitlink（含嵌套子模块）和未跟踪的嵌套仓库；普通新文件不需要扫描目录树。
 pub fn repositories(repo: &Repo) -> Result<Vec<String>> {
-    let staged = repo.git(&["ls-files", "--stage", "-z"])?;
-    let mut children = paths(&staged).into_iter().filter_map(|r| r.strip_prefix("160000 ").and_then(|r| r.split_once('\t')).map(|(_, p)| p.to_owned())).collect::<Vec<_>>();
-    children.extend(paths(&repo.git(&["ls-files", "--others", "--exclude-standard", "-z"])?).into_iter().filter(|p| p.ends_with('/')));
+    // 两个 git 进程并行跑
+    let (staged, others) = std::thread::scope(|s| {
+        let others = s.spawn(|| repo.git(&["ls-files", "--others", "--exclude-standard", "-z"]));
+        (repo.git(&["ls-files", "--stage", "-z"]), others.join().unwrap())
+    });
+    let mut children = paths(&staged?).into_iter().filter_map(|r| r.strip_prefix("160000 ").and_then(|r| r.split_once('\t')).map(|(_, p)| p.to_owned())).collect::<Vec<_>>();
+    children.extend(paths(&others?).into_iter().filter(|p| p.ends_with('/')));
     children.retain(|p| repo.path.join(p).join(".git").exists());
     children.sort();
     children.dedup();

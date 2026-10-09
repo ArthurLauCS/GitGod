@@ -23,6 +23,46 @@ class Event {
 const deferred = () => { let resolve; const promise = new Promise((r) => resolve = r); return { promise, resolve } }
 const uri = (fsPath) => ({ fsPath, scheme: 'file', toString() { return `${this.scheme}:${this.fsPath}?${this.query ?? ''}` }, with: (other) => ({ ...uri(fsPath), ...other }) })
 
+test('file-only refreshes read status alone and stay quiet until it changes', async () => {
+  const calls = []
+  let status = []
+  const engine = { call: async (cmd) => { calls.push(cmd); return cmd === 'open_repo' ? [0, resolve('quiet-repo-test'), 1] : cmd === 'refs' ? { head_id: 'head', refs: [] } : cmd === 'status' ? status : [] } }
+  const vscode = { EventEmitter: Event, env: { language: 'en' }, Uri: { file: uri }, window: { createOutputChannel: () => ({ appendLine() {} }) },
+    workspace: { workspaceFolders: [{ uri: uri(resolve('quiet-repo-test')) }] }, commands: { executeCommand() {} } }
+  const locale = { messages: { vscode: {} }, explanations: {} }
+  const core = load('core', { vscode, './engine': { startEngine: () => engine }, '../../src/lib/locales/en': locale, '../../src/lib/locales/zh': locale })
+  await core.openRepos({ workspaceState: { get: (_, fallback) => fallback, update: async () => {} } }, '')
+  const [repo] = core.repos
+  let fired = 0
+  core.onRepoChange.event(() => fired++)
+  calls.length = 0
+  await core.refresh(repo, false)
+  assert.deepEqual([calls, fired], [['status'], 0], 'saving a file whose status is unchanged redraws nothing')
+  status = [{ path: 'a.txt', unstaged: 'M' }]
+  await core.refresh(repo, false)
+  assert.equal(fired, 1, 'a status change is announced')
+  await core.refresh(repo, false, true)
+  assert.equal(fired, 2, 'created and deleted files are announced even when status is unchanged')
+  calls.length = 0
+  await core.refresh(repo)
+  assert.deepEqual([calls.sort(), fired], [['commit_identity', 'refs', 'remotes', 'status'], 3], 'a .git change rereads everything and always notifies')
+  const reading = deferred(), resume = deferred(), call = engine.call
+  let paused = false
+  engine.call = async (cmd) => {
+    if (cmd === 'status' && !paused) { paused = true; reading.resolve(); await resume.promise }
+    return call(cmd)
+  }
+  calls.length = 0
+  const pending = core.refresh(repo, false)
+  await reading.promise
+  await core.refresh(repo)
+  await core.refresh(repo, false)
+  resume.resolve()
+  await pending
+  assert.deepEqual(calls.sort(), ['commit_identity', 'refs', 'remotes', 'status', 'status'], 'a queued full refresh survives later file-only events')
+  assert.equal(fired, 4, 'the queued full refresh notifies even when status is unchanged')
+})
+
 test('closed repositories stay closed across discovery, pending refreshes and reloads until explicitly reopened', async () => {
   const root = resolve('repo-close-test'), child = join(root, 'child'), external = resolve('external-repo-test')
   const saved = {}, sessions = new Map(), contexts = new Map()
@@ -345,7 +385,7 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
   const vscode = {
     EventEmitter: Event, Uri: { file: uri },
     FileType: { File: 1 }, FileChangeType: { Changed: 1 }, FileSystemError: { NoPermissions: () => new Error('readonly') },
-    scm: { createSourceControl: () => { const control = { createResourceGroup: () => ({}), inputBox: {}, dispose() { this.disposed = true } }; controls.push(control); return control } },
+    scm: { createSourceControl: (id, label, rootUri) => { const control = { id, label, rootUri, createResourceGroup: () => ({}), inputBox: {}, dispose() { this.disposed = true } }; controls.push(control); return control } },
     commands: { registerCommand: (id, fn) => commands.set(id, fn) },
     window: { activeTextEditor: editor, onDidChangeWindowState: event },
     workspace: {
@@ -365,6 +405,7 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
     write: async (repo, cmd, args) => { writes.push([repo.tab, cmd, args]); return null },
   }
   load('scm', { vscode, './core': core, './sync': { statusCommands: () => [] } }).registerScm({ subscriptions: [] })
+  assert.deepEqual(controls.map(({ id, label, rootUri }) => [id, label, rootUri.fsPath]), [['pushright', 'PushRight', '/one'], ['pushright', 'PushRight', '/two']], 'shared provider IDs use one quick-diff menu label while roots distinguish repositories')
   await commands.get('pushright.stage')({ repo: repos[0], entry: { path: 'a' } }, { repo: repos[1], entry: { path: 'b' } })
   assert.deepEqual(writes.splice(0), [[0, 'stage', { paths: ['a'] }], [1, 'stage', { paths: ['b'] }]])
   await commands.get('pushright.stageSelection')()

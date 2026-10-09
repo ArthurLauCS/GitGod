@@ -106,7 +106,8 @@ pub fn show(repo: &Repo, rev: &str, path: &str) -> Result<Option<String>> {
 
 pub fn show_limit(repo: &Repo, rev: &str, path: &str, limit: usize) -> Result<Option<String>> {
     let Some(bytes) = blob(repo, rev, path, limit)? else { return Ok(None) };
-    if bytes.contains(&0) { return Err("PR_NOT_TEXT_FILE".into()); }
+    // 与 Git 判断二进制的规则一致：只看前 8000 字节里有没有 NUL，后面夹着一个 NUL 的源码仍按文本打开
+    if bytes[..bytes.len().min(8000)].contains(&0) { return Err("PR_NOT_TEXT_FILE".into()); }
     Ok(Some(decode(&bytes)))
 }
 

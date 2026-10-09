@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.4
+
+- Fix duplicate quick-diff visibility commands when multiple repositories are open.
+- Read status alone for working-file changes and avoid redraws when status is unchanged; parallelize independent Git reads.
+- Keep existing graph rows visible while refreshing and show authors in the compact graph.
+- Inspect the first 8000 bytes for NUL when detecting binary revision contents.
+
+修复多仓库 quick-diff 重复注册，减少重复读取与重绘，提交图刷新时保留旧行并显示作者，调整历史文件的二进制识别范围。
+
 ## 1.1.3
 
 - Keep branch lists in a fixed order so clicking a branch does not move it away from the pointer.

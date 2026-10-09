@@ -59,6 +59,7 @@ fn revision_contents_are_bounded_and_binary_is_not_presented_as_text() {
     std::fs::write(dir.join("exact.txt"), vec![b'x'; limit]).unwrap();
     std::fs::write(dir.join("large.txt"), vec![b'x'; limit + 1]).unwrap();
     std::fs::write(dir.join("binary.dat"), b"a\0b").unwrap();
+    std::fs::write(dir.join("late-nul.txt"), [vec![b'x'; 8000], b"\0tail".to_vec()].concat()).unwrap();
     git(&dir, 0, &["add", "."]);
     git(&dir, 1, &["commit", "-q", "-m", "contents"]);
     let repo = Repo::open(&dir).unwrap();
@@ -66,6 +67,7 @@ fn revision_contents_are_bounded_and_binary_is_not_presented_as_text() {
         assert_eq!(history::show(&repo, rev, "exact.txt").unwrap().unwrap().len(), limit);
         assert_eq!(history::show(&repo, rev, "large.txt").unwrap_err(), "PR_FILE_TOO_LARGE");
         assert_eq!(history::show(&repo, rev, "binary.dat").unwrap_err(), "PR_NOT_TEXT_FILE");
+        assert_eq!(history::show(&repo, rev, "late-nul.txt").unwrap().unwrap().len(), 8005, "Git treats a NUL past the first 8000 bytes as text");
     }
     assert_eq!(history::show(&repo, "HEAD^", "exact.txt").unwrap(), None);
 }

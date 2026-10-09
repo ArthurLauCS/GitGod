@@ -22,11 +22,13 @@ pub fn read(repo: &Repo) -> Result<Identity> {
         let end = out.rfind('>')?;
         Some(out[..=end].to_owned())
     };
-    Ok(Identity {
-        name: config("user.name")?,
-        email: config("user.email")?,
-        author: actual("GIT_AUTHOR_IDENT"),
-        committer: actual("GIT_COMMITTER_IDENT"),
+    // 四个 git 进程并行跑：Windows 上每次启动约 45 毫秒
+    std::thread::scope(|s| {
+        let name = s.spawn(|| config("user.name"));
+        let email = s.spawn(|| config("user.email"));
+        let author = s.spawn(|| actual("GIT_AUTHOR_IDENT"));
+        let committer = actual("GIT_COMMITTER_IDENT");
+        Ok(Identity { name: name.join().unwrap()?, email: email.join().unwrap()?, author: author.join().unwrap(), committer })
     })
 }
 

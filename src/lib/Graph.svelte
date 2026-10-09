@@ -75,6 +75,8 @@
   let loaded = $state(0)
 
   const chunks = new Map<number, Row[]>()
+  /** 重新加载后、新行到达前先显示的旧行，免得整屏空白闪一下 */
+  let stale = new Map<number, Row[]>()
   const pending = new Set<number>()
   let gen = 0
   let seenVersion = -1
@@ -91,7 +93,7 @@
   const first = $derived(Math.floor(top / ROW_H))
   const visible = $derived(Math.ceil(height / ROW_H) + 1)
 
-  const rowAt = (r: number) => chunks.get(Math.floor(r / CHUNK))?.[r % CHUNK]
+  const rowAt = (r: number) => (chunks.get(Math.floor(r / CHUNK)) ?? stale.get(Math.floor(r / CHUNK)))?.[r % CHUNK]
 
   const windowRows = $derived.by(() => {
     loaded
@@ -112,6 +114,7 @@
     if (version !== seenVersion) {
       seenVersion = version
       gen++
+      stale = new Map([...stale, ...chunks])
       chunks.clear()
       pending.clear()
       expanded = new Map()
@@ -127,6 +130,7 @@
         pending.delete(c)
         if (chunks.size > 256) chunks.clear()
         chunks.set(c, rows)
+        if (!pending.size) stale.clear()
         loaded++
       })
     }
@@ -324,6 +328,7 @@
                 </span>
               {/if}
               <span>{row.subject}</span>
+              {#if compact}<span class="muted by">{row.author}</span>{/if}
             </span>
             {#if !compact}<button
               class="author"
@@ -474,6 +479,14 @@
   .subject > span:last-child {
     flex: 1;
     min-width: 0;
+  }
+  /* 紧凑模式：标题按内容占宽，作者跟在后面用剩下的地方，窄的时候先省略作者 */
+  .compact .subject > span:nth-last-child(2) {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .compact .by {
+    margin-left: 4px;
   }
   .badge {
     margin-right: 8px;

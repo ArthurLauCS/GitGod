@@ -162,10 +162,11 @@ export function registerScm(context: vscode.ExtensionContext) {
   /** 每个仓库里有改动的文件：小写路径 → 状态 */
   const changed = new Map<Repo, Map<string, Entry>>()
   const groups = new Map<Repo, Record<'conflicts' | 'staged' | 'changes', vscode.SourceControlResourceGroup>>()
-  const timers = new Map<Repo, ReturnType<typeof setTimeout>>()
+  const timers = new Map<Repo, { timer: ReturnType<typeof setTimeout>; git: boolean; notify: boolean }>()
 
   const addControl = (repo: Repo) => {
-    const control = vscode.scm.createSourceControl('pushright', `PushRight · ${repo.name}`, vscode.Uri.file(repo.root))
+    // VS Code 按名称去重菜单、按标识生成命令；同标识须同名，仓库名由根目录显示。
+    const control = vscode.scm.createSourceControl('pushright', 'PushRight', vscode.Uri.file(repo.root))
     control.acceptInputCommand = { command: 'pushright.commit', title: t.commit, arguments: [control] }
     control.quickDiffProvider = {
       // 暂存区里没有这个文件（未跟踪、被忽略）时不显示行号旁的改动标记
@@ -188,7 +189,7 @@ export function registerScm(context: vscode.ExtensionContext) {
     contents.delete(repo)
     revisionTime = Math.max(Date.now(), revisionTime + 1)
     if (!repos.includes(repo)) {
-      clearTimeout(timers.get(repo))
+      clearTimeout(timers.get(repo)?.timer)
       timers.delete(repo)
       controls.get(repo)?.dispose()
       controls.delete(repo)
@@ -215,15 +216,19 @@ export function registerScm(context: vscode.ExtensionContext) {
   }
   repos.forEach(update)
 
-  // 文件或 .git 有变化时刷新，300 毫秒内的连续变化合并成一次
-  const schedule = (uri: vscode.Uri) => {
+  // 文件或 .git 有变化时刷新，300 毫秒内的连续变化合并成一次。
+  // 只有 .git 里的变化才重读引用等全部数据；文件内容变化只重读状态，状态没变就不通知；增删文件照常通知（被忽略的文件不在状态里）。
+  const schedule = (added: boolean) => (uri: vscode.Uri) => {
     const repo = repoOf(uri)
+    const git = /[\\/]\.git[\\/]/.test(uri.fsPath) || uri.fsPath.endsWith('.gitmodules')
     if (!repo || /[\\/]\.git[\\/].*\.lock$/.test(uri.fsPath)) return
     // 子模块的 Git 元数据在父仓库 .git/modules 下；那里变化时也刷新子仓库。
     const affected = /[\\/]\.git[\\/]/.test(uri.fsPath) ? repos.filter((r) => r === repo || r.root.startsWith(repo.root + (process.platform === 'win32' ? '\\' : '/'))) : [repo]
     for (const r of affected) {
-      clearTimeout(timers.get(r))
-      timers.set(r, setTimeout(async () => { if (uri.fsPath.endsWith('.gitmodules')) await discoverRepositories(); await refresh(r) }, 300))
+      const last = timers.get(r)
+      clearTimeout(last?.timer)
+      const next = { git: git || !!last?.git, notify: git || added || !!last?.notify, timer: setTimeout(async () => { timers.delete(r); if (uri.fsPath.endsWith('.gitmodules')) await discoverRepositories(); await refresh(r, next.git, next.notify) }, 300) }
+      timers.set(r, next)
     }
   }
   const watcher = vscode.workspace.createFileSystemWatcher('**')
@@ -239,8 +244,8 @@ export function registerScm(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     revChanged, decorationsChanged, watcher,
     onRepoChange.event(update),
-    watcher.onDidChange(schedule), watcher.onDidCreate(schedule), watcher.onDidDelete(schedule),
-    vscode.window.onDidChangeWindowState((state) => state.focused && repos.forEach(refresh)),
+    watcher.onDidChange(schedule(false)), watcher.onDidCreate(schedule(true)), watcher.onDidDelete(schedule(true)),
+    vscode.window.onDidChangeWindowState((state) => state.focused && repos.forEach((repo) => refresh(repo, false))),
     // 文件模型由 VS Code 统一复用，避免虚拟文本提供器重新创建仍被 diff 引用的模型。
     vscode.workspace.registerFileSystemProvider(REV, {
       onDidChangeFile: revChanged.event,
@@ -286,7 +291,7 @@ export function registerScm(context: vscode.ExtensionContext) {
     command('commit', (arg) => ((repo) => repo && commit(repo, false))(target(arg))),
     command('commitAmend', (arg) => ((repo) => repo && commit(repo, true))(target(arg))),
     command('editIdentity', (arg) => ((repo) => repo && editIdentity(repo))(target(arg))),
-    command('refresh', async () => { await discoverRepositories(); await Promise.all(repos.map(refresh)) }),
+    command('refresh', async () => { await discoverRepositories(); await Promise.all(repos.map((repo) => refresh(repo))) }),
     command('closeRepository', async (arg) => {
       const repo = repoArg(arg) ?? (await vscode.window.showQuickPick(repos.map((repo) => ({ label: repo.name, description: repo.root, repo })), { title: v.closeRepository }))?.repo
       if (repo) await attempt(closeRepo(repo))
