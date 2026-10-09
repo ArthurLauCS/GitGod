@@ -1,8 +1,7 @@
 import * as vscode from 'vscode'
 import { BRANCH_NAME } from '../../src/lib/branch-name'
 import { splitUpstream } from '../../src/lib/push-target'
-import { orderRefs, readRecentRefs, rememberRef, writeRecentRefs } from '../../src/lib/ref-order'
-import { activeRepo, ago, engine, headBranch, help, run, short, store, stored, t, v, type Repo } from './core'
+import { activeRepo, ago, engine, headBranch, help, run, short, t, v, type Repo } from './core'
 
 const upstreamOf = (repo: Repo) => repo.refs.refs.find((r) => r.name === repo.refs.head)?.upstream
 
@@ -72,17 +71,16 @@ export async function fetch(repo = activeRepo()) {
 
 type Tip = { name: string; short_id: string; author: string; time: number; subject: string }
 
-/** 顶部选择框里的分支项：本地在前、各自按最近使用排序，每项下面一行是该分支的最新提交。 */
+/** 顶部选择框里的分支项：本地在前、顺序固定，当前分支带对钩，每项下面一行是该分支的最新提交。 */
 async function branchItems(repo: Repo, withHead: boolean) {
-  const recent = readRecentRefs(stored().recentRefs, repo.root)
   const tips = new Map((await engine.call<Tip[]>('branch_tips', { tab: repo.tab })).map((tip) => [tip.name, tip]))
   const candidates = repo.refs.refs.filter((r) => (withHead || r.name !== repo.refs.head) && /^refs\/(heads|remotes)\//.test(r.name) && !r.name.endsWith('/HEAD'))
-  const group = (prefix: string) => orderRefs(candidates.filter((r) => r.name.startsWith(prefix)), recent, repo.refs.head)
+  const group = (prefix: string) => candidates.filter((r) => r.name.startsWith(prefix))
   return [...group('refs/heads/'), ...group('refs/remotes/')].map((r) => {
     const tip = tips.get(r.name)
     return {
       label: short(r.name),
-      description: tip && ago(tip.time),
+      description: `${r.name === repo.refs.head ? '$(check) ' : ''}${tip ? ago(tip.time) : ''}`,
       detail: tip && `${tip.author} · ${tip.short_id} · ${tip.subject}`,
       ref: r.name,
     }
@@ -95,7 +93,6 @@ export async function checkout(repo = activeRepo()) {
   const pick = await vscode.window.showQuickPick([create, ...await branchItems(repo, false)], { title: t.opNames.checkout, placeHolder: help.checkout.short, matchOnDetail: true })
   if (!pick) return
   if (pick === create) return createBranch(repo)
-  await store('recentRefs', writeRecentRefs(stored().recentRefs, repo.root, rememberRef(readRecentRefs(stored().recentRefs, repo.root), pick.ref)))
   await run(repo, pick.ref.startsWith('refs/remotes/') ? { op: 'track', remote_branch: pick.label } : { op: 'checkout', target: pick.label })
 }
 

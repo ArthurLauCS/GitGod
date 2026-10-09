@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.3
+
+- Keep branch lists in a fixed order so clicking a branch does not move it away from the pointer.
+- Highlight the selected branch, tag or stash in the graph sidebar and tick the checked-out branch.
+- Keep local branches before remote branches in editor pickers, without recent-use reordering.
+
+分支列表不再按最近使用重排；点击后的行保持原位并高亮，当前分支显示对钩，扩展选择框仍保持本地分支优先。
+
 ## 1.1.2
 
 - Show each branch's latest commit (author, short ID, subject and age) in the branch picker.

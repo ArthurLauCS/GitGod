@@ -657,7 +657,6 @@
   <main>
     <Sidebar
       {refs}
-      repo={path}
       {stashes}
       {worktrees}
       {tracks}

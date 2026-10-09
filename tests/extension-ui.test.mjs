@@ -4,7 +4,6 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import ts from 'typescript'
-import * as refOrder from '../src/lib/ref-order.ts'
 
 // Exercise host handlers without launching VS Code; the smoke test covers the actual host.
 const require = createRequire(import.meta.url)
@@ -293,7 +292,7 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
   const vscode = { window: { showQuickPick: async (items) => { prompts.push(items); return items[0] }, showInformationMessage: async () => t.push } }
   const { splitUpstream } = await import('../src/lib/push-target.ts')
   const core = { headBranch: () => 'feature/x', run: (_, op) => sent.push(op), t, v, help: { push: { what: '' } } }
-  const { push } = load('sync', { vscode, './core': core, '../../src/lib/push-target': { splitUpstream }, '../../src/lib/ref-order': refOrder, '../../src/lib/branch-name': {} })
+  const { push } = load('sync', { vscode, './core': core, '../../src/lib/push-target': { splitUpstream }, '../../src/lib/branch-name': {} })
   await push(repo)
   assert.equal(prompts[0][0].label, 'origin/feature/x')
   assert.deepEqual(sent, [{ op: 'push', branch: 'feature/x', force: false, remote: 'origin', remote_branch: 'feature/x', set_upstream: true }])
@@ -305,31 +304,36 @@ test('push mismatch recommends an explicit same-name destination; cancel sends n
   assert.equal(sent[1].remote_branch, 'feature/x', 'graph push cannot choose the mismatched upstream')
 })
 
-test('branch picker keeps local refs before remote refs and uses per-repository recency', async () => {
+test('branch picker keeps local refs before remote refs in a stable order and ticks the checked-out branch', async () => {
   const shown = [], sent = [], saved = {}
   const repo = { root: '/repo', refs: { head: 'refs/heads/main', refs: [
     { name: 'refs/remotes/origin/old' }, { name: 'refs/heads/old' }, { name: 'refs/remotes/origin/recent' }, { name: 'refs/heads/recent' }, { name: 'refs/heads/main' },
   ] } }
-  saved.recentRefs = refOrder.writeRecentRefs(null, repo.root, ['refs/remotes/origin/recent', 'refs/heads/recent'])
-  let choose = 1, typed
+  let choose = 2, typed
   const vscode = { window: { showQuickPick: async (items) => { shown.push(items); return items[choose] }, showInputBox: async ({ validateInput }) => { assert.ok(validateInput('feature/x')); assert.equal(validateInput(typed), undefined); return typed } } }
   const core = {
     activeRepo: () => repo, help: { checkout: { short: '' } }, t: { checkoutRemote: 'remote', branchRule: 'rule', opNames: { checkout: 'checkout' } }, v: {}, short: (name) => name.replace(/^refs\/(heads|remotes)\//, ''),
     stored: () => saved, store: async (key, value) => { saved[key] = value }, run: (_, op) => sent.push(op), headBranch: () => 'main', ago: (time) => `at ${time}`,
     engine: { call: async (cmd) => { assert.equal(cmd, 'branch_tips'); return [{ name: 'refs/heads/recent', short_id: 'abc1234', author: 'alice', time: 5, subject: 'latest' }] } },
   }
-  const { checkout, pickScope } = load('sync', { vscode, './core': core, '../../src/lib/push-target': {}, '../../src/lib/ref-order': refOrder, '../../src/lib/branch-name': await import('../src/lib/branch-name.ts') })
+  const { checkout, pickScope } = load('sync', { vscode, './core': core, '../../src/lib/push-target': {}, '../../src/lib/branch-name': await import('../src/lib/branch-name.ts') })
   await checkout(repo)
-  assert.deepEqual(shown[0].slice(1).map((item) => item.ref), ['refs/heads/recent', 'refs/heads/old', 'refs/remotes/origin/recent', 'refs/remotes/origin/old'])
-  assert.deepEqual([shown[0][1].description, shown[0][1].detail], ['at 5', 'alice · abc1234 · latest'], 'each branch shows its latest commit')
+  assert.deepEqual(shown[0].slice(1).map((item) => item.ref), ['refs/heads/old', 'refs/heads/recent', 'refs/remotes/origin/old', 'refs/remotes/origin/recent'])
+  assert.deepEqual([shown[0][2].description, shown[0][2].detail], ['at 5', 'alice · abc1234 · latest'], 'each branch shows its latest commit')
   assert.deepEqual(sent, [{ op: 'checkout', target: 'recent' }])
-  assert.equal(refOrder.readRecentRefs(saved.recentRefs, repo.root)[0], 'refs/heads/recent')
   choose = 0; typed = 'feat_S_userLogin'
   await checkout(repo)
   assert.deepEqual(sent.at(-1), { op: 'create_branch', name: 'feat_S_userLogin', start: 'HEAD', checkout: true }, 'new branches default to the current commit')
   choose = 3
-  assert.equal(await pickScope(repo), 'refs/heads/recent', 'the graph scope picker lists the checked-out branch first, after Auto and All')
-  assert.equal(shown.at(-1)[2].ref, 'refs/heads/main')
+  assert.equal(await pickScope(repo), 'refs/heads/recent', 'the graph scope picker keeps the same order after Auto and All')
+  assert.deepEqual([shown.at(-1)[4].ref, shown.at(-1)[4].description], ['refs/heads/main', '$(check) '], 'the checked-out branch stays in place and carries the tick')
+  const order = shown.at(-1).map((item) => item.ref)
+  repo.refs.head = 'refs/heads/recent'
+  await pickScope(repo)
+  assert.deepEqual(shown.at(-1).map((item) => item.ref), order, 'changing HEAD must not move the branch under the pointer')
+  assert.equal(shown.at(-1)[3].description, '$(check) at 5')
+  assert.equal(shown.at(-1)[4].description, '')
+  assert.deepEqual(saved, {}, 'clicking a branch must not persist recent-use ordering')
 })
 
 test('SCM separates repositories, stops on failed saves and uses selections after formatting', async () => {

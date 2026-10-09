@@ -1,17 +1,14 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
   import type { Refs, Stash, Track, Worktree } from './api'
   import Icon from './Icon.svelte'
   import { layout } from './layout.svelte'
   import { t } from './i18n.svelte'
-  import { orderRefs, readRecentRefs, rememberRef, writeRecentRefs } from './ref-order'
 
   type Kind = 'branch' | 'remote' | 'tag' | 'stash'
   type View = 'history' | 'changes' | 'worktrees' | 'tools'
 
   let {
     refs,
-    repo,
     stashes,
     worktrees,
     tracks,
@@ -25,8 +22,6 @@
     onworktree,
   }: {
     refs: Refs
-    /** 仓库路径，用于隔离各仓库的最近查看分支。 */
-    repo: string
     stashes: Stash[]
     worktrees: Worktree[]
     /** 各本地分支与上游的同步状态，键是完整引用名 */
@@ -49,18 +44,13 @@
   const elsewhere = $derived(new Set(worktrees.filter((w) => !w.current && w.branch).map((w) => w.branch)))
 
   let filter = $state('')
-  let recent = $state(untrack(() => readRecentRefs(localStorage.getItem('recentRefs'), repo)))
-
-  function viewRef(name: string, id: string) {
-    recent = rememberRef(recent, name)
-    localStorage.setItem('recentRefs', writeRecentRefs(localStorage.getItem('recentRefs'), repo, recent))
-    onjump(id)
-  }
+  /** 单击选中的引用或贮藏：只高亮，不改变列表顺序。 */
+  let selected = $state('')
 
   const group = (prefix: string) =>
-    orderRefs(refs.refs
+    refs.refs
       .filter((r) => r.name.startsWith(prefix) && r.name.toLowerCase().includes(filter.toLowerCase()))
-      .map((r) => ({ ...r, label: r.name.slice(prefix.length) })), recent, refs.head)
+      .map((r) => ({ ...r, label: r.name.slice(prefix.length) }))
   const branches = $derived(group('refs/heads/'))
   const remotes = $derived(group('refs/remotes/'))
   const tags = $derived(group('refs/tags/'))
@@ -86,11 +76,13 @@
         {#each items as r (r.name)}
           <button
             class:head={r.name === refs.head}
+            class:on={r.name === selected}
             title={r.label}
-            onclick={() => viewRef(r.name, r.id)}
+            onclick={() => { selected = r.name; onjump(r.id) }}
             ondblclick={() => onactivate(kind, r.name)}
             oncontextmenu={(e) => onmenu(e, kind, r.name, r.id)}
           >
+            {#if r.name === refs.head}<span class="tick">✓</span>{/if}
             <span class="name">{r.label}</span>
             {#if elsewhere.has(r.name)}<span class="sub" title={t.inOtherWorktreeMark}><Icon name="windows" size={12} /></span>{/if}
             {#if tracks.get(r.name)}
@@ -109,7 +101,7 @@
     <details>
       <summary>{t.stashes}<span class="count">{stashes.length}</span></summary>
       {#each stashes as s (s.name)}
-        <button title={s.subject} onclick={() => onstash(s.name)} ondblclick={() => onactivate('stash', s.name)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
+        <button class:on={s.name === selected} title={s.subject} onclick={() => { selected = s.name; onstash(s.name) }} ondblclick={() => onactivate('stash', s.name)} oncontextmenu={(e) => onmenu(e, 'stash', s.name, s.id)}>
           <span class="name">{s.subject}</span>
         </button>
       {/each}
@@ -235,6 +227,13 @@
   }
   details button:hover {
     background: var(--hover);
+  }
+  details button.on {
+    background: var(--accent-soft);
+  }
+  .tick {
+    width: 16px;
+    margin: 0 -8px 0 -16px;
   }
   details button:active:enabled {
     transform: none;

@@ -6,9 +6,9 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
-**1.1.2 正式版**新增分支最新提交预览、提交图顶部选择框，以及新建分支命名校验与起点选择。
+**1.1.3 正式版**修复分支栏点击后位置跳动：列表顺序固定、选中项高亮，当前分支以对钩标记。
 
-**[下载 VSIX · Windows x64 · 1.1.2](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/pushright-win32-x64-1.1.2.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2)
+**[下载 VSIX · Windows x64 · 1.1.3](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.3/pushright-win32-x64-1.1.3.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.3)
 
 ## 使用条件
 
@@ -24,7 +24,7 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 新建分支名称须符合 `(fix|feat)_(S|C|SC)_小驼峰`，例如 `feat_S_userLogin`；最后一段以小写英文字母开头，且仅包含英文字母和数字。在分支选择框中选择“新建分支…”后输入名称，并选择起始分支。已有分支名称不受影响。
 
-分支选择框中本地分支优先，组内按最近使用排序；每项显示最新提交的作者、短 ID、标题和时间，可输入提交内容搜索。点击提交图顶部分支按钮，选择 Auto、全部或指定分支，仅改变图的范围，不切换检出分支。
+分支选择框中本地分支优先，顺序固定，当前分支带对钩；每项显示最新提交的作者、短 ID、标题和时间，可输入提交内容搜索。点击提交图顶部分支按钮，选择 Auto、全部或指定分支，仅改变图的范围，不切换检出分支。
 
 ## 已有能力
 
@@ -71,11 +71,11 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.3) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.2.vsix
-cursor --install-extension pushright-win32-x64-1.1.2.vsix
+code --install-extension pushright-win32-x64-1.1.3.vsix
+cursor --install-extension pushright-win32-x64-1.1.3.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。

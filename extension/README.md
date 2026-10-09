@@ -6,9 +6,9 @@
 
 PushRight brings Git source control, blame, history and a commit graph into VS Code. It makes push destinations explicit and defaults every Pull to **Rebase instead of merge**. English and Simplified Chinese are included; the extension follows VS Code's display language.
 
-**1.1.2** shows branch-tip commits, provides a searchable graph branch picker, and validates names and offers a starting branch when creating branches.
+**1.1.3** keeps branch lists in a fixed order and marks the checked-out branch with a tick; the graph sidebar highlights the selected row.
 
-**[Download VSIX · Windows x64 · 1.1.2](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.2/pushright-win32-x64-1.1.2.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2)
+**[Download VSIX · Windows x64 · 1.1.3](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.3/pushright-win32-x64-1.1.3.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.3)
 
 ## Requirements
 
@@ -25,7 +25,7 @@ Pull asks every time, with **Rebase instead of merge** checked. Keep it checked 
 
 New branch names in the creation dialogs must match `(fix|feat)_(S|C|SC)_lowerCamelCase`, for example `feat_S_userLogin` or `fix_SC_branchPicker`. The suffix starts with a lowercase letter and contains only ASCII letters and digits. The desktop new-branch dialog and editor picker let you choose a starting branch; the desktop new-worktree dialog also validates new branch names. Existing branch names are unaffected.
 
-The branch picker lists local branches before remote branches and orders each group by recent use. Each branch shows its latest commit author, short ID, subject and age; typing can search commit details. Use the graph's top branch button to select Auto, All or a branch without checking it out.
+The branch picker lists local branches before remote branches in a fixed order and ticks the checked-out branch. Each branch shows its latest commit author, short ID, subject and age; typing can search commit details. Use the graph's top branch button to select Auto, All or a branch without checking it out.
 
 ## Source control and history
 
@@ -72,11 +72,11 @@ Ignore rules do not hide changes to tracked files. Stop-tracking refuses to disc
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.2), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.3), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.2.vsix
-cursor --install-extension pushright-win32-x64-1.1.2.vsix
+code --install-extension pushright-win32-x64-1.1.3.vsix
+cursor --install-extension pushright-win32-x64-1.1.3.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.
