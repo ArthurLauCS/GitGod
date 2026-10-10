@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import { authorColor, authorKey } from '../../src/lib/author'
-import { ago, authorStyles, cfg, date, onPrefsChange, onRepoChange, rel, repoOf, repos, revUri, setAuthorStyle, t, v, type Repo } from './core'
+import { ago, authorStyles, cfg, date, onPrefsChange, onRepoChange, rel, repoOf, repos, REV, revOf, revUri, setAuthorStyle, t, v, type Repo } from './core'
 import { isUncommitted, runBlame, type Blame, type BlameCommit } from './git-blame'
 
 /** 作者色，与 src/app.css 的 --author-0..9 一致（tests/author-palette.test.mjs 核对） */
@@ -67,18 +67,21 @@ export function registerBlame(context: vscode.ExtensionContext) {
   }
 
   function request(doc: vscode.TextDocument) {
-    const repo = doc.uri.scheme === 'file' ? repoOf(doc.uri) : undefined
+    const repo = repoOf(doc.uri)
+    if (doc.uri.scheme === REV && JSON.parse(doc.uri.query).empty) return
+    const rev = revOf(doc.uri)
     const key = doc.uri.toString()
     const old = cache.get(key)
     if (!repo || old?.version === doc.version) return
     old?.cancel()
     const entry: Entry = { repo, version: doc.version, blame: { lines: [], done: false }, cancel: () => {} }
     cache.set(key, entry)
-    entry.cancel = runBlame(repo.root, rel(repo, doc.uri), doc.isDirty ? doc.getText() : undefined, (blame) => {
+    const contents = rev === '' || doc.isDirty ? doc.getText() : undefined
+    entry.cancel = runBlame(repo.root, rel(repo, doc.uri), contents, (blame) => {
       entry.blame = blame
       for (const editor of vscode.window.visibleTextEditors) if (editor.document === doc) render(editor, true)
       if (blame.done) lensChanged.fire()
-    })
+    }, rev)
   }
 
   function drop(filter: (uri: vscode.Uri, entry: Entry) => boolean) {
@@ -276,12 +279,20 @@ export function registerBlame(context: vscode.ExtensionContext) {
       request(editor.document)
       render(editor, true)
     }),
+    vscode.window.onDidChangeVisibleTextEditors((editors) => {
+      for (const editor of editors) {
+        request(editor.document)
+        render(editor, true)
+      }
+    }),
     vscode.window.onDidChangeTextEditorSelection((e) => render(e.textEditor, false)),
     vscode.workspace.onDidChangeTextDocument((e) => {
-      const editor = vscode.window.activeTextEditor
-      if (!e.contentChanges.length || editor?.document !== e.document) return
+      if (!e.contentChanges.length) return
+      const editors = vscode.window.visibleTextEditors.filter((editor) => editor.document === e.document)
+      if (!editors.length) return
       // 行号已经对不上了：先清掉，停手 600 毫秒后重算
-      render(editor, true)
+      for (const editor of editors) render(editor, true)
+      if (e.document.uri.scheme === REV) return request(e.document)
       clearTimeout(editTimer)
       editTimer = setTimeout(() => request(e.document), 600)
     }),

@@ -23,6 +23,91 @@ class Event {
 const deferred = () => { let resolve; const promise = new Promise((r) => resolve = r); return { promise, resolve } }
 const uri = (fsPath) => ({ fsPath, scheme: 'file', toString() { return `${this.scheme}:${this.fsPath}?${this.query ?? ''}` }, with: (other) => ({ ...uri(fsPath), ...other }) })
 
+test('diff editors show current-line blame on both sides and reload inactive index snapshots', () => {
+  const active = new Event(), visible = new Event(), selection = new Event(), changed = new Event(), closed = new Event()
+  const repoChanged = new Event(), prefs = new Event(), theme = new Event(), config = new Event()
+  const repo = { root: '/repo', refs: { head_id: 'head' } }, requests = [], types = []
+  const status = { show() {}, hide() {} }
+  const document = (rev, text = 'unchanged\nchanged\n', empty = false) => ({
+    uri: rev === undefined ? uri('/repo/a.txt') : uri('/repo/a.txt').with({ scheme: 'pushright-rev', query: JSON.stringify({ rev, empty }) }),
+    version: 1, isDirty: false, lineCount: 3, getText: () => text,
+  })
+  const editor = (doc) => ({ document: doc, selection: { active: { line: 1 } }, decorations: new Map(), setDecorations(type, value) { this.decorations.set(type, value) } })
+  const left = editor(document('before')), right = editor(document('after'))
+  const vscode = {
+    EventEmitter: Event, Range: class { constructor(line) { this.start = { line } } }, ThemeColor: class {},
+    MarkdownString: class { appendMarkdown() {} appendText() {} },
+    StatusBarAlignment: { Right: 1 }, SymbolKind: {},
+    Uri: { parse: (key) => ({ toString: () => key }) },
+    window: {
+      visibleTextEditors: [], activeTextEditor: undefined,
+      createTextEditorDecorationType: () => { const type = {}; types.push(type); return type }, createStatusBarItem: () => status,
+      onDidChangeActiveTextEditor: active.event, onDidChangeVisibleTextEditors: visible.event,
+      onDidChangeTextEditorSelection: selection.event, onDidChangeActiveColorTheme: theme.event,
+    },
+    workspace: { onDidChangeTextDocument: changed.event, onDidCloseTextDocument: closed.event, onDidChangeConfiguration: config.event },
+    languages: { registerCodeLensProvider() {} }, commands: { registerCommand() {} },
+  }
+  const commits = {
+    original: { id: 'a'.repeat(40), author: 'alice', author_email: 'alice@example.com', subject: 'original', time: 1, path: 'a.txt' },
+    added: { id: 'b'.repeat(40), author: 'bob', author_email: 'bob@example.com', subject: 'added', time: 2, path: 'a.txt' },
+    pending: { id: '0'.repeat(40), author: '', subject: '', time: 0, path: 'a.txt' },
+  }
+  const core = {
+    REV: 'pushright-rev', revOf: (u) => u.scheme === 'pushright-rev' ? JSON.parse(u.query).rev : undefined,
+    repoOf: () => repo, rel: () => 'a.txt', repos: [repo], onRepoChange: repoChanged, onPrefsChange: prefs,
+    cfg: (key) => key === 'blame.line.format' ? '${author}: ${subject}' : true,
+    authorStyles: () => ({}), ago: () => 'ago', date: () => 'date', v: { uncommitted: 'Uncommitted' }, t: { authorStyle: () => 'Style' },
+  }
+  const { registerBlame } = load('blame', {
+    vscode, './core': core, '../../src/lib/author': { authorKey: (c) => c.author_email },
+    './git-blame': {
+      isUncommitted: (c) => /^0+$/.test(c.id),
+      runBlame: (root, path, contents, progress, rev) => {
+        const request = { root, path, contents, rev, cancelled: false }
+        requests.push(request)
+        progress({ done: true, lines: [commits.original, rev === 'before' ? commits.original : rev === 'after' ? commits.added : commits.pending] })
+        return () => { request.cancelled = true }
+      },
+    },
+  })
+  registerBlame({ subscriptions: [] })
+  const show = (...editors) => { vscode.window.visibleTextEditors = editors; visible.fire(editors) }
+  const annotation = (e) => e.decorations.get(types[0])[0]?.renderOptions.after.contentText
+  vscode.window.activeTextEditor = right
+  show(left, right)
+  assert.deepEqual(requests.map((r) => [r.rev, r.contents]), [['before', undefined], ['after', undefined]])
+  assert.equal(annotation(left), 'alice: original', 'deleted line keeps its original commit')
+  assert.equal(annotation(right), 'bob: added', 'added line uses the right-hand commit')
+  left.selection.active.line = 0
+  selection.fire({ textEditor: left })
+  assert.equal(annotation(left), 'alice: original', 'unchanged line is also annotated')
+  const reopened = editor(left.document)
+  show(reopened, right)
+  assert.equal(requests.length, 2, 'a new editor reuses the document cache')
+  assert.equal(annotation(reopened), 'alice: original', 'cached blame is rendered in the new editor')
+
+  const index = editor(document('')), working = editor(document(undefined, 'unsaved\n'))
+  working.document.isDirty = true
+  vscode.window.activeTextEditor = working
+  show(index, working)
+  assert.deepEqual(requests.slice(-2).map((r) => [r.rev, r.contents]), [['', 'unchanged\nchanged\n'], [undefined, 'unsaved\n']])
+  assert.equal(annotation(index), 'Uncommitted')
+  assert.equal(annotation(working), 'Uncommitted')
+  index.document.version++
+  index.document.getText = () => 'updated index\n'
+  changed.fire({ document: index.document, contentChanges: [{}] })
+  assert.equal(requests.at(-1).contents, 'updated index\n', 'inactive index document is refreshed after staging')
+  assert.equal(requests[2].cancelled, true)
+
+  const blank = editor(document('after', '', true))
+  show(blank)
+  assert.equal(requests.length, 5, 'empty side of an added/deleted file does not run blame')
+  assert.equal(annotation(blank), undefined)
+  closed.fire(index.document)
+  assert.equal(requests.at(-1).cancelled, true)
+})
+
 test('file-only refreshes read status alone and stay quiet until it changes', async () => {
   const calls = []
   let status = []

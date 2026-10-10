@@ -25,7 +25,7 @@ function fixture() {
   return dir
 }
 
-const blame = (dir, path, contents) => new Promise((resolve) => runBlame(dir, path, contents, (b) => b.done && resolve(b)))
+const blame = (dir, path, contents, rev) => new Promise((resolve) => runBlame(dir, path, contents, (b) => b.done && resolve(b), rev))
 
 test('push target: upstream is split by known remotes, including remotes with slashes', () => {
   assert.deepEqual(splitUpstream('refs/remotes/origin/feature/login', ['origin']), { remote: 'origin', branch: 'feature/login' })
@@ -61,8 +61,45 @@ test('blame can be cancelled and reports nothing for untracked files', async () 
   runBlame(dir, 'b.txt', undefined, () => calls++)()
   writeFileSync(join(dir, 'untracked.txt'), 'x\n')
   runBlame(dir, 'untracked.txt', undefined, () => calls++)
+  runBlame(dir, 'b.txt', undefined, () => calls++, '--help')
   await new Promise((resolve) => setTimeout(resolve, 1500))
   assert.equal(calls, 0)
+})
+
+test('diff blame uses each historical side, including deleted paths and added or removed lines', { timeout: 10000 }, async () => {
+  const dir = fixture()
+  const git = (...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' }).trim()
+  const before = git('rev-parse', 'HEAD')
+  writeFileSync(join(dir, 'b.txt'), 'one\nnew line\nTHREE\n')
+  git('commit', '-q', '-am', 'replace two')
+  const after = git('rev-parse', 'HEAD')
+  git('rm', '-q', 'b.txt')
+  git('commit', '-q', '-m', 'delete file')
+
+  const left = await blame(dir, 'b.txt', undefined, before)
+  const right = await blame(dir, 'b.txt', undefined, after)
+  assert.deepEqual(left.lines.map((c) => c.subject), ['add file', 'add file', 'shout three'])
+  assert.deepEqual(right.lines.map((c) => c.subject), ['add file', 'replace two', 'shout three'])
+  assert.equal(right.lines[1].id, after, 'added line belongs to the compared commit, not current HEAD')
+  const renamed = await blame(dir, 'a.txt', undefined, `${before}~1`)
+  assert.deepEqual(renamed.lines.map((c) => c.id), left.lines.map((c) => c.id))
+})
+
+test('index blame uses the displayed snapshot rather than later working-tree or unsaved edits', { timeout: 10000 }, async () => {
+  const dir = fixture()
+  const indexText = 'one\nstaged line\ntwo\nTHREE\n'
+  writeFileSync(join(dir, 'b.txt'), indexText)
+  execFileSync('git', ['-C', dir, 'add', 'b.txt'])
+  writeFileSync(join(dir, 'b.txt'), 'disk edit\n')
+  const index = await blame(dir, 'b.txt', indexText)
+  assert.deepEqual(index.lines.map((c) => isUncommitted(c) ? null : c.author), ['alice', null, 'alice', 'bob'])
+  const unsaved = await blame(dir, 'b.txt', 'one\nunsaved line\nTHREE\n')
+  assert.deepEqual(unsaved.lines.map((c) => isUncommitted(c) ? null : c.author), ['alice', null, 'bob'])
+  writeFileSync(join(dir, 'new.txt'), 'new file\n')
+  execFileSync('git', ['-C', dir, 'add', 'new.txt'])
+  const added = await blame(dir, 'new.txt', 'new file\n')
+  assert.equal(added.lines.length, 1)
+  assert.ok(isUncommitted(added.lines[0]), 'a newly staged file is also annotated')
 })
 
 test('blame preserves Unicode paths for opening historical files', async () => {

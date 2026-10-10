@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.5
+
+- Show current-line blame on both sides of diffs, including added, deleted and unchanged lines. Use each side's revision or index snapshot; uncommitted additions are labeled as uncommitted.
+
+修复 diff 两侧的行末提交信息：新增、删除和未修改行均按各自版本显示归属，尚未提交的新增行显示“尚未提交”。
+
 ## 1.1.4
 
 - Fix duplicate quick-diff visibility commands when multiple repositories are open.

@@ -58,13 +58,15 @@ export function blameParser(blame: Blame) {
 }
 
 /**
- * 在 `root` 里对 `path` 做 blame。`contents` 是编辑器里尚未保存的内容，不给则用磁盘上的文件。
+ * `rev` 指定历史版本；不传时使用 `contents`（编辑器/暂存区快照）或工作区文件。
  * 每解析完一批区段调用一次 `onProgress`。返回的函数用来中途取消。
  */
-export function runBlame(root: string, path: string, contents: string | undefined, onProgress: (blame: Blame) => void): () => void {
+export function runBlame(root: string, path: string, contents: string | undefined, onProgress: (blame: Blame) => void, rev?: string): () => void {
+  if (rev?.startsWith('-')) return () => {}
   const blame: Blame = { lines: [], done: false }
   const args = ['-C', root, '-c', 'core.quotepath=false', 'blame', '--incremental']
-  if (contents !== undefined) args.push('--contents', '-')
+  if (rev) args.push(rev)
+  else if (contents !== undefined) args.push('--contents', '-')
   const proc = spawn('git', [...args, '--', path], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
   proc.on('error', () => {})
   proc.stdin.on('error', () => {})
