@@ -1,4 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
+import type { DiffColors } from './diff-colors'
+
+export const saveDiffColors = (colors: DiffColors | null) => invoke<void>('set_diff_colors', { colors })
 
 export interface Row {
   id: string

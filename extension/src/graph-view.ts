@@ -32,7 +32,10 @@ export function registerGraphView(context: vscode.ExtensionContext) {
         setupWebview(context, webview, 'sidebar.js'),
         onRepoChange.event(changed),
         view.onDidChangeVisibility(changed),
-        onPrefsChange.event(() => webview.postMessage({ store: 'prefs', value: stored().prefs ?? '{}' })),
+        onPrefsChange.event(() => {
+          webview.postMessage({ store: 'prefs', value: stored().prefs ?? '{}' })
+          webview.postMessage({ store: 'diffColors', value: stored().diffColors ?? 'null' })
+        }),
         webview.onDidReceiveMessage(async (m) => {
           if (m.store === 'prefs') return void await store(m.store, m.value)
           if (!m.cmd) return

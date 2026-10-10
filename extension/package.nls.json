@@ -1,4 +1,5 @@
 {
+  "command.diffColors": "Diff Colors…",
   "command.closeRepository": "Close Repository",
   "command.reopenRepository": "Reopen Closed Repository…",
   "view.localFiles": "PushRight Local Files",

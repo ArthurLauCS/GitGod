@@ -2,7 +2,7 @@
   "name": "pushright",
   "displayName": "PushRight",
   "description": "%description%",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "publisher": "AthurLau",
   "private": true,
   "icon": "icon.png",
@@ -30,6 +30,7 @@
   ],
   "contributes": {
     "commands": [
+      { "command": "pushright.diffColors", "title": "%command.diffColors%", "category": "PushRight" },
       { "command": "pushright.closeRepository", "title": "%command.closeRepository%", "category": "PushRight", "enablement": "pushright.hasRepo" },
       { "command": "pushright.repositorySettings", "title": "%command.repositorySettings%", "category": "PushRight", "enablement": "pushright.hasRepo" },
       { "command": "pushright.reopenRepository", "title": "%command.reopenRepository%", "category": "PushRight", "enablement": "pushright.hasClosedRepos" },
@@ -387,6 +388,11 @@
           "command": "pushright.repositorySettings",
           "when": "scmProvider == pushright",
           "group": "2_commit@3"
+        },
+        {
+          "command": "pushright.diffColors",
+          "when": "scmProvider == pushright",
+          "group": "2_commit@4"
         },
         {
           "command": "pushright.stageAll",

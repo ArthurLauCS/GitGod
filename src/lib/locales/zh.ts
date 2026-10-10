@@ -1,5 +1,14 @@
 // 全部界面文案集中在此
 export const messages = {
+  diffColors: {
+    title: '差异配色', preset: '配色预设', default: '恢复原配色', custom: '自定义',
+    blueOrange: '蓝 / 橙', purpleGold: '紫 / 金', cyanRose: '青 / 玫红',
+    added: '新增', deleted: '删除', preview: '差异配色预览',
+    hint: '分别选择新增和删除的颜色，保留 + / − 标记辅助区分。设置保存在本机当前应用中。',
+    editorHint: '应用于 PushRight 和所有原生 diff，包括 Review Branch。保存到编辑器用户设置；工作区的覆盖设置可能优先。可用“恢复原配色”撤销这些颜色覆盖。',
+    invalid: '请输入六位 HEX 颜色，例如 #0072b2。',
+    same: '新增和删除颜色相同，建议选择不同颜色以便区分。',
+  },
   autoSyncSettings: '自动刷新与获取',
   autoRefresh: '每分钟刷新仓库数据',
   autoFetch: '打开仓库时及每 10 分钟自动获取（git fetch --all --prune）',

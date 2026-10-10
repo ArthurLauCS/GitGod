@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import { authorColor, authorKey } from '../../src/lib/author'
-import { ago, authorStyles, cfg, date, onPrefsChange, onRepoChange, rel, repoOf, repos, REV, revOf, revUri, setAuthorStyle, t, v, type Repo } from './core'
+import { ago, authorStyles, cfg, date, log, onPrefsChange, onRepoChange, rel, repoOf, repos, REV, revOf, revUri, setAuthorStyle, t, v, type Repo } from './core'
 import { isUncommitted, runBlame, type Blame, type BlameCommit } from './git-blame'
 
 /** 作者色，与 src/app.css 的 --author-0..9 一致（tests/author-palette.test.mjs 核对） */
@@ -81,7 +81,7 @@ export function registerBlame(context: vscode.ExtensionContext) {
       entry.blame = blame
       for (const editor of vscode.window.visibleTextEditors) if (editor.document === doc) render(editor, true)
       if (blame.done) lensChanged.fire()
-    }, rev)
+    }, rev, (message) => log.appendLine(`[Blame] ${repo.root}\n${message}`))
   }
 
   function drop(filter: (uri: vscode.Uri, entry: Entry) => boolean) {

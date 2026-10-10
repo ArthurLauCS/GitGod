@@ -534,8 +534,8 @@
   .file-name { flex: 0 1 auto; }
   .file-path { flex: 1; min-width: 0; color: var(--muted); font-size: var(--fs-sm); }
   .file-status { flex: none; width: 12px; color: var(--yellow); font-size: var(--fs-sm); text-align: center; }
-  .file-status.added { color: var(--green); }
-  .file-status.deleted { color: var(--red); }
+  .file-status.added { color: var(--diff-added); }
+  .file-status.deleted { color: var(--diff-deleted); }
   .file-content button { flex: none; color: var(--text); background: var(--hover); border: 1px solid var(--border-strong); font: inherit; cursor: pointer; }
   .viewport:focus-visible .row.selected { outline: 1px solid var(--accent); outline-offset: -1px; }
 </style>

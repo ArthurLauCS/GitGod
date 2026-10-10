@@ -7,6 +7,8 @@
   import Icon from './lib/Icon.svelte'
   import RepoView from './lib/RepoView.svelte'
   import Dialog from './lib/Dialog.svelte'
+  import DiffColorSettings from './lib/DiffColorSettings.svelte'
+  import { setDiffColors } from './lib/diff-colors.svelte'
   import { theme, toggleTheme } from './lib/theme.svelte'
   import { t, locale, setLocale, errorText, type Locale } from './lib/i18n.svelte'
 
@@ -145,6 +147,10 @@
     {/each}
     <button class="btn quiet icon" class:on={active === null} title={t.newTab} onclick={() => (active = null)}><Icon name="plus" /></button>
     <span class="spacer"></span>
+    <DiffColorSettings editor={!desktop} onsave={async (colors) => {
+      if (!desktop) await api.saveDiffColors(colors)
+      setDiffColors(colors)
+    }} />
     {#if desktop}<button class="btn quiet icon" title={t.autoSyncSettings} onclick={autoSyncSettings}><Icon name="settings" /></button>{/if}
     <select class="field language" aria-label={t.language} title={t.language} value={locale.current} onchange={(e) => setLocale(e.currentTarget.value as Locale)}>
       <option value="en">English</option>

@@ -26,6 +26,8 @@
   --yellow: #e0b35a;
   --red: #ef7b88;
   --on-danger: #1f1e1d;
+  --diff-added: var(--green);
+  --diff-deleted: var(--red);
 
   /* 提交图泳道 */
   --lane-0: #e08363;

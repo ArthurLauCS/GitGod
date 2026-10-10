@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.9
+
+- Add Blue / Orange, Purple / Gold and Cyan / Rose diff presets, custom added/deleted HEX colors, and color pickers with a live preview in the full graph. Retain + / − markers and colored borders in shared diff views.
+- Apply colors to native VS Code / Cursor diffs through user settings. Restore original colors without replacing unrelated settings or later manual edits.
+- Resolve stale Windows path casing against the index or the displayed historical revision before retrying blame. Report Git failures in the PushRight output channel and avoid guessing between case-colliding paths.
+
+新增差异配色预设及新增／删除独立选色、预览和恢复功能，覆盖完整提交图与编辑器原生 diff。修复 Windows 路径大小写不一致造成的 Blame 缺失，并记录 Git 错误。
+
 ## 1.1.8
 
 - Replace comparison and interactive rebase revision dropdowns with editable, searchable pickers in the shared full graph UI.

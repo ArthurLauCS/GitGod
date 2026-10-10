@@ -203,10 +203,10 @@
     color: var(--yellow);
   }
   .sA {
-    color: var(--green);
+    color: var(--diff-added);
   }
   .sD {
-    color: var(--red);
+    color: var(--diff-deleted);
   }
   .sR,
   .sC {

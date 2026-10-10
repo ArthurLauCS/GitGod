@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -25,7 +25,7 @@ function fixture() {
   return dir
 }
 
-const blame = (dir, path, contents, rev) => new Promise((resolve) => runBlame(dir, path, contents, (b) => b.done && resolve(b), rev))
+const blame = (dir, path, contents, rev) => new Promise((resolve, reject) => runBlame(dir, path, contents, (b) => b.done && resolve(b), rev, (message) => reject(new Error(message))))
 
 test('push target: upstream is split by known remotes, including remotes with slashes', () => {
   assert.deepEqual(splitUpstream('refs/remotes/origin/feature/login', ['origin']), { remote: 'origin', branch: 'feature/login' })
@@ -110,6 +110,47 @@ test('blame preserves Unicode paths for opening historical files', async () => {
   git('commit', '-q', '-am', 'Unicode path')
   const result = await blame(dir, '新文件.txt')
   assert.equal(result.lines[0].path, '新文件.txt')
+})
+
+test('Windows blame resolves stale editor casing against the index and each historical revision', { skip: process.platform !== 'win32', timeout: 15000 }, async () => {
+  const dir = fixture()
+  const git = (...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' }).trim()
+  mkdirSync(join(dir, 'Config'))
+  git('mv', 'b.txt', 'Config/武器[1]Config.luau')
+  git('commit', '-q', '-m', 'move config')
+  const before = git('rev-parse', 'HEAD')
+  const stale = 'config/武器[1]config.luau'
+  const saved = await blame(dir, stale)
+  assert.deepEqual(saved.lines.map((c) => c.author), ['alice', 'alice', 'bob'])
+  const snapshot = await blame(dir, stale, 'one\nunsaved\nTHREE\n', '')
+  assert.deepEqual(snapshot.lines.map((c) => isUncommitted(c) ? null : c.author), ['alice', null, 'bob'])
+
+  git('mv', '-f', 'Config/武器[1]Config.luau', 'Config/武器[1]CONFIG.luau')
+  writeFileSync(join(dir, 'Config/武器[1]CONFIG.luau'), 'one\nnew config\nTHREE\n')
+  git('commit', '-q', '-am', 'rename case and edit')
+  const after = git('rev-parse', 'HEAD')
+  git('rm', '-q', 'Config/武器[1]CONFIG.luau')
+  git('commit', '-q', '-m', 'remove config')
+  const left = await blame(dir, stale, undefined, before)
+  const right = await blame(dir, stale, undefined, after)
+  assert.deepEqual(left.lines.map((c) => c.id), saved.lines.map((c) => c.id))
+  assert.equal(right.lines[1].id, after)
+  assert.equal(right.lines[1].path, 'Config/武器[1]CONFIG.luau', 'historical spelling survives even when the file no longer exists')
+})
+
+test('blame reports Git failures and does not guess between case-colliding historical paths', { timeout: 10000 }, async () => {
+  const dir = fixture()
+  await assert.rejects(blame(dir, 'missing.txt'), /git blame.*missing\.txt: fatal:/)
+  await assert.rejects(blame(dir, 'b.txt', undefined, 'missing-revision'), /git blame.*missing-revision.*fatal:/)
+  if (process.platform !== 'win32') return
+  const git = (...args) => execFileSync('git', ['-C', dir, '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' }).trim()
+  const blob = git('rev-parse', 'HEAD:b.txt')
+  git('update-index', '--add', '--cacheinfo', `100644,${blob},Mixed.txt`)
+  git('update-index', '--add', '--cacheinfo', `100644,${blob},mixed.txt`)
+  git('commit', '-q', '-m', 'case collision')
+  await assert.rejects(blame(dir, 'MIXED.txt', undefined, 'HEAD'), /no such path/)
+  const exact = await blame(dir, 'Mixed.txt', undefined, 'HEAD')
+  assert.equal(exact.lines.length, 3, 'an exact match remains usable')
 })
 
 const exe = join(import.meta.dirname, '../target/release/pushright-engine.exe')

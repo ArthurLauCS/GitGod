@@ -6,11 +6,15 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
-**1.1.8 正式版**为完整提交图中的版本比较和交互式变基加入可搜索、按层级分组的版本选择框。当前分支及上游置顶，season、dev 等常用分支紧随其后，仍可直接输入提交号或版本表达式。
+**1.1.9 正式版**新增差异配色预设，支持独立设置新增／删除颜色，应用于 PushRight 和原生 diff；修复 Windows 编辑器保留旧文件名大小写时 Blame 缺失的问题。
 
 中文菜单、弹窗选项和命令面板附加对应 Git 命令。源代码管理中的“仓库设置”可禁用当前仓库的 revert，与桌面版及关联工作树共享；禁用后阻止发起和继续 revert，仍允许中止。默认允许 revert，此设置不限制终端或其他 Git 工具。
 
-**[下载 VSIX · Windows x64 · 1.1.8](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.8/pushright-win32-x64-1.1.8.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.8)
+**[下载 VSIX · Windows x64 · 1.1.9](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.9/pushright-win32-x64-1.1.9.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.9)
+
+## 差异配色
+
+在命令面板或源代码管理菜单运行 **PushRight: 差异配色…**，或点击完整提交图顶部的“差异配色”。提供蓝／橙、紫／金、青／玫红三组预设，也可分别输入新增、删除的 HEX 色值；完整提交图弹窗另有颜色选择器和实时预览。配色同时用于 PushRight 和 VS Code／Cursor 原生 diff（包括 Review Branch），会写入用户级 `workbench.colorCustomizations`，工作区设置可能优先覆盖。“恢复原配色”恢复此前值，同时保留无关设置和之后的手动改色。
 
 ## 使用条件
 
@@ -73,11 +77,11 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.8) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.9) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.8.vsix
-cursor --install-extension pushright-win32-x64-1.1.8.vsix
+code --install-extension pushright-win32-x64-1.1.9.vsix
+cursor --install-extension pushright-win32-x64-1.1.9.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。

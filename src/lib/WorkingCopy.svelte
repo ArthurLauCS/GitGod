@@ -295,9 +295,9 @@
     color: var(--yellow);
   }
   .sA {
-    color: var(--green);
+    color: var(--diff-added);
   }
-  .sD,
+  .sD { color: var(--diff-deleted); }
   .sU {
     color: var(--red);
   }

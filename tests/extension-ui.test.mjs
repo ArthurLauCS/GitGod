@@ -217,6 +217,9 @@ test('SCM graph routes only bounded reads to workspace repositories and disposes
   let picked = 'all'
   load('graph-view', { vscode, './core': core, './sync': { pickScope: async () => picked, fetch: (r) => syncs.push(['fetch', r.tab]), pull: (r) => syncs.push(['pull', r.tab]), push: (r, same) => syncs.push(['push', r.tab, same]) }, './webview': { setupWebview: () => ({ dispose() {} }) } }).registerGraphView({ subscriptions: [], workspaceState: { get: (_, fallback) => fallback, update: (key, value) => saved[key] = value } })
   provider.resolveWebviewView(view)
+  core.stored = () => ({ diffColors: '{"added":"#0072b2","deleted":"#e69f00"}' })
+  prefs.fire()
+  assert.deepEqual(posted.at(-1), { store: 'diffColors', value: core.stored().diffColors }, 'an open sidebar receives color changes')
   const send = async (cmd, args = {}) => { await Promise.all(messages.fire({ id: 1, cmd, args })); return posted.at(-1) }
   assert.deepEqual((await send('graph_repos')).value, repos.map((r) => ({ ...r, scope: 'auto' })))
   await send('rows', { tab: 1, start: 0, count: 128 })
@@ -273,7 +276,11 @@ test('graph keeps its document on theme changes and releases both loaded and lat
   }
   const core = { engine: { call: async (cmd, args) => { calls.push([cmd, args]); return cmd === 'open_repo' ? args.path === 'late' ? late.promise : [7, 'repo', 2] : null } }, panel: {}, stored: () => ({}), repos: [], locale: 'en' }
   const webviews = load('webview', { vscode, './core': core })
-  load('panel', { vscode, './core': core, './webview': webviews }).openPanel({ extensionUri: uri('/extension') }, { id: 'older', root: 'repo' })
+  const colors = []
+  load('panel', { vscode, './core': core, './webview': webviews, './diff-colors': { applyDiffColors: async (_, value) => colors.push(value) } }).openPanel({ extensionUri: uri('/extension') }, { id: 'older', root: 'repo' })
+  await Promise.all(messages.fire({ id: 0, cmd: 'set_diff_colors', args: { colors: null } }))
+  assert.deepEqual(colors, [null])
+  assert.deepEqual(calls, [], 'editor color preferences do not go to the Git engine')
   const html = webview.html
   await Promise.all(messages.fire({ id: 1, cmd: 'open_repo', args: { path: 'repo' } }))
   await Promise.all(messages.fire({ id: 3, cmd: 'refs', args: { tab: 7 } }))

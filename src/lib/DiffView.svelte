@@ -188,6 +188,7 @@
     font-family: var(--font);
   }
   .line {
+    border-left: 3px solid transparent;
     display: flex;
     white-space: pre;
     tab-size: 4;
@@ -209,16 +210,20 @@
     user-select: none;
   }
   .add {
-    background: color-mix(in srgb, var(--green) 14%, transparent);
+    border-left-color: var(--diff-added);
+    background: color-mix(in srgb, var(--diff-added) 22%, transparent);
   }
   .add .sign {
-    color: var(--green);
+    color: var(--text);
+    font-weight: 700;
   }
   .del {
-    background: color-mix(in srgb, var(--red) 14%, transparent);
+    border-left-color: var(--diff-deleted);
+    background: color-mix(in srgb, var(--diff-deleted) 22%, transparent);
   }
   .del .sign {
-    color: var(--red);
+    color: var(--text);
+    font-weight: 700;
   }
   .meta {
     color: var(--muted);

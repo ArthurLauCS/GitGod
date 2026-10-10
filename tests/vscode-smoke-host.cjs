@@ -43,6 +43,26 @@ exports.run = async () => {
     assert.deepEqual(missing, [])
     step(`registers all ${extension.packageJSON.contributes.commands.length} contributed commands`)
 
+    const workbench = vscode.workspace.getConfiguration('workbench')
+    const originalColors = workbench.inspect('colorCustomizations').globalValue
+    const themeColors = { 'editor.background': '#123456', '[Default Dark Modern]': { 'diffEditor.insertedLineBackground': '#11223344' } }
+    await workbench.update('colorCustomizations', themeColors, vscode.ConfigurationTarget.Global)
+    const colorPicker = vscode.commands.executeCommand('pushright.diffColors')
+    await sleep(750)
+    await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem')
+    await colorPicker
+    const appliedColors = vscode.workspace.getConfiguration('workbench').inspect('colorCustomizations').globalValue
+    assert.equal(appliedColors['diffEditor.insertedLineBackground'], '#0072b238')
+    assert.equal(appliedColors['[Default Dark Modern]']['diffEditor.removedLineBackground'], '#e69f0038')
+    const resetColors = vscode.commands.executeCommand('pushright.diffColors')
+    await sleep(750)
+    for (let i = 0; i < 4; i++) await vscode.commands.executeCommand('workbench.action.quickOpenSelectNext')
+    await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem')
+    await resetColors
+    assert.deepEqual(vscode.workspace.getConfiguration('workbench').inspect('colorCustomizations').globalValue, themeColors)
+    await workbench.update('colorCustomizations', originalColors, vscode.ConfigurationTarget.Global)
+    step('diff color command applies blue/orange to native editors and restores prior user and theme settings')
+
     const settings = vscode.commands.executeCommand('pushright.repositorySettings', api.repos[0])
     await sleep(750)
     await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem')
@@ -284,6 +304,22 @@ exports.run = async () => {
     assert.equal(api.repos.some((r) => r.root === sub.root), false)
     assert.ok(api.repos.includes(repo), 'closing a subrepository preserves its parent')
     step('closes external and nested repositories, keeps their files open and supports explicit reopening')
+
+    const configs = ['MeleeConfig.luau', 'GunConfig.luau']
+    for (const name of configs) writeFileSync(join(root, name), 'return { id = 1 }\n')
+    git('add', '--', ...configs)
+    git('-c', 'commit.gpgsign=false', 'commit', '--only', '-m', 'config casing fixture', '--', ...configs)
+    await vscode.commands.executeCommand('pushright.refresh')
+    for (const name of configs) {
+      const stale = vscode.Uri.file(join(root, name[0].toLowerCase() + name.slice(1)))
+      const editor = await vscode.window.showTextDocument(stale)
+      assert.equal(editor.document.uri.fsPath, stale.fsPath, 'host retains the stale spelling')
+      await until('blame with stale config casing', async () => {
+        const lenses = await vscode.commands.executeCommand('vscode.executeCodeLensProvider', editor.document.uri)
+        return lenses?.some((l) => l.command?.command === 'pushright.fileHistory' && /^carol, /.test(l.command.title))
+      })
+    }
+    step('blames MeleeConfig and GunConfig despite lowercase cached editor paths')
   } catch (e) {
     error = e.stack ?? String(e)
   }

@@ -6,11 +6,15 @@
 
 PushRight brings Git source control, blame, history and a commit graph into VS Code. It makes push destinations explicit and defaults every Pull to **Rebase instead of merge**. English and Simplified Chinese are included; the extension follows VS Code's display language.
 
-**1.1.8** adds searchable, grouped revision pickers to the full graph comparison and interactive rebase tools. The current branch and upstream come first, followed by common branches including season and dev. Commit IDs and revision expressions remain supported.
+**1.1.9** adds contrasting diff color presets and independent added/deleted colors for PushRight and native diff editors, plus a fix for missing Windows blame when the editor retains stale file-name casing.
 
 PushRight adds native Git commands to Chinese action labels across menus, dialogs and the command palette. Open **Repository settings** in Source Control to disable revert for the local repository. The setting is shared with the desktop app and linked worktrees; it blocks starting and continuing revert while allowing abort. Revert is allowed by default. Terminal Git and other tools are unaffected.
 
-**[Download VSIX · Windows x64 · 1.1.8](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.8/pushright-win32-x64-1.1.8.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.8)
+**[Download VSIX · Windows x64 · 1.1.9](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.9/pushright-win32-x64-1.1.9.vsix)** · [Release notes and checksums](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.9)
+
+## Diff colors
+
+Run **PushRight: Diff Colors…** from the command palette or Source Control menu, or open **Diff Colors** in the full graph toolbar. Choose Blue / Orange, Purple / Gold, Cyan / Rose, or custom added/deleted HEX colors; the full graph dialog also provides color pickers and a live preview. Applies to PushRight and native VS Code / Cursor diff editors, including Review Branch. This updates user-level `workbench.colorCustomizations`; workspace overrides may take precedence. **Restore original colors** restores the previous values while preserving unrelated settings and later manual edits.
 
 ## Requirements
 
@@ -74,11 +78,11 @@ Ignore rules do not hide changes to tracked files. Stop-tracking refuses to disc
 
 ## Install from VSIX
 
-Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.8), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
+Download the Windows x64 VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.9), then use **Extensions: Install from VSIX** in VS Code or Cursor, or:
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.8.vsix
-cursor --install-extension pushright-win32-x64-1.1.8.vsix
+code --install-extension pushright-win32-x64-1.1.9.vsix
+cursor --install-extension pushright-win32-x64-1.1.9.vsix
 ```
 
 Report problems in [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues), including the version and reproduction steps. Remove credentials and private repository information from logs before sharing.

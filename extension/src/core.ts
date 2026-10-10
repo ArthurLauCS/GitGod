@@ -252,7 +252,7 @@ export async function store(key: string, value: string | null) {
   if (value === null) delete all[key]
   else all[key] = value
   await context.globalState.update('webview', all)
-  if (key === 'prefs') onPrefsChange.fire()
+  if (key === 'prefs' || key === 'diffColors') onPrefsChange.fire()
 }
 
 export function authorStyles(): Record<string, AuthorStyle> {

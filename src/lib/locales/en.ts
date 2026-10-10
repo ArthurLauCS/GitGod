@@ -1,6 +1,15 @@
 import type { messages as zh, explanations as zhHelp } from './zh'
 
 export const messages = {
+  diffColors: {
+    title: 'Diff colors', preset: 'Color preset', default: 'Restore original colors', custom: 'Custom',
+    blueOrange: 'Blue / orange', purpleGold: 'Purple / gold', cyanRose: 'Cyan / rose',
+    added: 'Added', deleted: 'Deleted', preview: 'Diff color preview',
+    hint: 'Choose separate colors for additions and deletions. The + / − markers remain visible. Saved for this app on this device.',
+    editorHint: 'Applies to PushRight and all native diff editors, including Review Branch. Saves to editor user settings; workspace overrides may take precedence. Restore original colors undoes these overrides.',
+    invalid: 'Enter a six-digit HEX color, such as #0072b2.',
+    same: 'Both colors are identical. Choose different colors to make changes easier to distinguish.',
+  },
   autoSyncSettings: 'Automatic refresh and fetch',
   autoRefresh: 'Refresh repository data every minute',
   autoFetch: 'Fetch on opening a repository and every 10 minutes (git fetch --all --prune)',

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { discoverRepositories, engine, panel as hook, refresh, repos, store } from './core'
 import { setupWebview } from './webview'
+import { applyDiffColors } from './diff-colors'
 
 /** 每个窗口各自决定的键，不跨窗口保存：页签来自工作区，主题和语言跟随 VS Code */
 const SESSION = new Set(['tabs', 'recent', 'theme', 'locale'])
@@ -37,6 +38,7 @@ export function openPanel(context: vscode.ExtensionContext, reveal?: { id: strin
     try {
       const value =
         m.cmd === 'initial_repos' ? repos.map((r) => r.root)
+        : m.cmd === 'set_diff_colors' ? await applyDiffColors(context, m.args?.colors)
         : m.cmd === 'pick_folder' ? ((await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, title: m.args.title }))?.[0].fsPath ?? null)
         : await engine.call(m.cmd, m.args)
       if (m.cmd === 'open_repo') {
