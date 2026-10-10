@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import { startAutoSync, type AutoSync } from './auto-sync'
   import * as api from './api'
   import { BRANCH_NAME } from './branch-name'
   import ContextMenu, { type Item } from './ContextMenu.svelte'
@@ -25,6 +26,7 @@
     initialCount,
     active,
     onopen,
+    autoSync,
   }: {
     tab: number
     /** 这个页签的工作区路径 */
@@ -33,12 +35,18 @@
     active: boolean
     /** 在（新）页签中打开另一个仓库或工作树 */
     onopen: (path: string) => void
+    autoSync?: AutoSync
   } = $props()
 
   let count = $state(untrack(() => initialCount))
   let version = $state(0)
   let loadingAll = $state(false)
   let busy = $state(false)
+  let workingBusy = $state(false)
+  let initializing = false
+  let autoFetchError = $state(false)
+  let autoTimer: ReturnType<typeof startAutoSync> | undefined
+  const desktopSync = untrack(() => !!autoSync)
   let error = $state('')
   let refs = $state.raw<api.Refs>({ head: null, head_id: null, ahead_behind: null, in_progress: null, revert_disabled: false, refs: [] })
   let stashes = $state.raw<api.Stash[]>([])
@@ -53,6 +61,7 @@
   let compareVersion = $state(0)
 
   async function rebase(plan: api.RebasePlan) {
+    if (busy || workingBusy) return false
     busy = true
     error = ''
     const log = await guard(api.rebaseRun(tab, plan))
@@ -66,6 +75,7 @@
   function compareWith(id: string) { compareRight = id; ++compareVersion; view = 'tools' }
   let tracks = $state.raw(new Map<string, api.Track>())
   let selectedRow = $state<number | null>(null)
+  let selectedId: string | null = null
   let detail = $state.raw<api.Detail | null>(null)
   let detailMode = $state<'commit' | 'stash'>('commit')
   let detailRequest = 0
@@ -122,6 +132,7 @@
   async function select(row: number, id: string) {
     const request = ++detailRequest
     selectedRow = row
+    selectedId = id
     detailMode = 'commit'
     const d = await guard(api.detail(tab, id))
     if (d && request === detailRequest) detail = d
@@ -131,6 +142,7 @@
     const request = ++detailRequest
     view = 'history'
     selectedRow = null
+    selectedId = null
     detailMode = 'stash'
     const d = await guard(api.stashDetail(tab, name))
     if (d && request === detailRequest) detail = d
@@ -155,19 +167,44 @@
     return () => removeEventListener('pushright:jump', reveal)
   })
 
-  // 回到窗口、切回本页签或执行完操作后：引用指向有变化才重新加载提交图
-  async function refresh() {
+  let refreshing: Promise<void> | undefined
+  let refreshAgain = false
+  let foregroundRefresh = false
+  function refresh(background = false): Promise<void> {
+    foregroundRefresh ||= !background
+    if (refreshing) { refreshAgain = true; return refreshing }
+    refreshing = (async () => {
+      do {
+        refreshAgain = false
+        const preserveSelection = !foregroundRefresh
+        foregroundRefresh = false
+        await refreshNow(preserveSelection)
+      } while (refreshAgain)
+    })().finally(() => { refreshing = undefined })
+    return refreshing
+  }
+
+  // 后台刷新保留正在阅读的提交与页面；引用没变时不重建图。
+  async function refreshNow(background: boolean) {
     if (loadingAll) return
     const before = graphKey(refs)
     const beforeHead = refs.head_id
     await loadSidebar()
+    if (!started) return
     if (graphKey(refs) === before) {
-      if (refs.head_id && refs.head_id !== beforeHead && view === 'history') jump(refs.head_id)
+      if (!background && refs.head_id && refs.head_id !== beforeHead && view === 'history') jump(refs.head_id)
       return
     }
-    selectedRow = null
-    detail = null
+    if (!background) { selectedRow = null; selectedId = null; detail = null }
     await loadAll()
+    if (background) {
+      if (selectedId) {
+        const id = selectedId
+        const row = await guard(api.rowOf(tab, id))
+        if (selectedId === id) selectedRow = row ?? null
+      }
+      return
+    }
     // 正在看本地更改或工作树时不把人拽回提交图
     if (refs.head_id && view === 'history') jump(refs.head_id)
   }
@@ -211,6 +248,7 @@
 
   /** 执行一个写操作，记入命令日志；失败时展开日志。`record` 为 false 时不进撤销列表。返回是否成功。 */
   async function exec(op: api.Op, record = true): Promise<boolean> {
+    if (busy || workingBusy) return false
     busy = true
     error = ''
     const before = refs
@@ -220,6 +258,7 @@
       logs = [...logs, log]
       if (!log.ok) showLog = true
     }
+    if (op.op === 'fetch' && log?.ok) autoFetchError = false
     const ok = log?.ok ?? false
     const ops = ok && record ? undoFor(op, before) : null
     if (ops) undos = [...undos, { title: op.op, ops }]
@@ -247,9 +286,12 @@
   }
 
   async function discardLines(file: string, hunk: number, header: string, lines: number[]) {
+    if (busy || workingBusy) return
     if (!(await ask({ title: t.discardLinesTitle, explain: explain.discard, danger: true, confirm: t.discardLinesConfirm }))) return
+    busy = true
     await guard(api.discardLines(tab, file, hunk, header, lines))
     await refresh()
+    busy = false
   }
 
   const ask = (spec: Parameters<Dialog['ask']>[0]) => dialog!.ask(spec)
@@ -600,6 +642,34 @@
 
   let started = false
   $effect(() => {
+    if (!desktopSync) return
+    const sync = startAutoSync({
+      settings: () => autoSync!,
+      ready: () => !busy && !workingBusy && !initializing && !loadingAll && !refreshing && !document.querySelector('dialog[open]'),
+      refresh: () => refresh(true),
+      fetch: async () => {
+        busy = true
+        try {
+          if (!(await api.remotes(tab)).length) { autoFetchError = false; return }
+          const log = await api.op(tab, { op: 'fetch', background: true })
+          logs = [...logs.slice(-99), log]
+          autoFetchError = !log.ok
+        } finally { busy = false }
+      },
+      error: (e) => {
+        autoFetchError = true
+        logs = [...logs.slice(-99), { command: 'git fetch --all --prune', output: String(e), ok: false }]
+      },
+    })
+    autoTimer = sync
+    return () => { sync.stop(); autoTimer = undefined }
+  })
+  $effect(() => {
+    autoSync?.refresh
+    autoSync?.fetch
+    queueMicrotask(() => void autoTimer?.tick())
+  })
+  $effect(() => {
     if (!active) return
     if (started) {
       untrack(refresh)
@@ -607,10 +677,13 @@
     }
     // 首次激活才加载完整历史，恢复多个页签时不会同时全量加载
     started = true
+    initializing = true
     untrack(async () => {
       await loadSidebar()
       if (refs.head_id) jump(refs.head_id)
       await loadAll()
+      initializing = false
+      autoTimer?.tick()
     })
   })
 </script>
@@ -658,6 +731,7 @@
     </div>
   </header>
   {#if error}<p class="error">{errorText(error)}</p>{/if}
+  {#if autoFetchError}<p class="error">{t.autoFetchFailed}</p>{/if}
   {#if refs.in_progress}
     {@const what = refs.in_progress}
     <p class="progress">
@@ -706,7 +780,7 @@
           fetchPage={(id, path, skip) => api.diffPage(tab, detailMode, '', id, path, skip)} />
       </div>
       <div class="pane" class:hidden={view !== 'changes'}>
-        <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} rebasing={refs.in_progress === 'rebase'} reload={refresh} oncommitted={committed} {discard} {discardLines} />
+        <WorkingCopy {tab} {entries} {identity} {editIdentity} identityBusy={busy} bind:busy={workingBusy} rebasing={refs.in_progress === 'rebase'} reload={refresh} oncommitted={committed} {discard} {discardLines} />
       </div>
       {#if view === 'worktrees'}
         <div class="pane">

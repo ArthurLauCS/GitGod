@@ -53,7 +53,7 @@ pub enum Op {
     /// 在 `path` 新建工作树：检出已有分支，或（给了 `new_branch`）从 `start` 新建分支
     WorktreeAdd { path: String, start: String, new_branch: Option<String> },
     WorktreeRemove { path: String, force: bool },
-    Fetch,
+    Fetch { #[serde(default)] background: bool },
     Pull { rebase: bool },
     Push { remote: String, branch: String, remote_branch: String, force: bool, set_upstream: bool },
     CreateTag { name: String, target: String, message: String },
@@ -139,7 +139,12 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
             args.push(safe(path)?);
         }
         // 多个远程并行获取
-        Op::Fetch => args.extend(["fetch", "--all", "--prune", "--jobs=8"]),
+        Op::Fetch { background } => {
+            if *background { args.extend(["-c", "credential.interactive=never"]); }
+            args.extend(["fetch", "--all", "--prune", "--jobs=8"]);
+            // 后台获取不能覆盖用户手动 fetch/pull 留下的 FETCH_HEAD。
+            if *background { args.push("--no-write-fetch-head"); }
+        }
         Op::Pull { rebase } => {
             // A pull must not rewrite other local branches or hide uncommitted work.
             args.extend(["-c", "rebase.updateRefs=false", "pull", if *rebase { "--rebase" } else { "--no-rebase" }, "--no-autostash", "--no-edit"]);
@@ -147,8 +152,8 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
         Op::Push { remote, branch, remote_branch, force, set_upstream } => {
             args.push("push");
             if *force {
-                // 远程在上次 fetch 之后有新提交时拒绝覆盖
-                args.push("--force-with-lease");
+                // 后台 fetch 更新远程引用后，也不能覆盖尚未在本地整合过的提交。
+                args.extend(["--force-with-lease", "--force-if-includes"]);
             }
             if *set_upstream {
                 args.push("--set-upstream");

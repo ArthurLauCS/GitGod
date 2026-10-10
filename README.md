@@ -6,11 +6,13 @@
 
 A Git desktop client built with Svelte, Tauri and Rust. PushRight makes push destinations explicit, recommends a remote branch with the same name, and defaults Pull to **Rebase instead of merge**.
 
-Version **1.1.6** adds Git command names to Chinese actions and repository settings to disable revert in both apps. See the [release notes](docs/RELEASE_1.1.6.md).
+Version **1.1.7** adds automatic desktop refresh and fetch, plus stronger force-push protection in both apps. See the [release notes](docs/RELEASE_1.1.7.md).
 
 This version adds native Git commands to Chinese action labels across toolbars, menus, dialogs and extension commands. **Repository settings**, available in the desktop toolbar and extension Source Control menu, can disable revert for the local repository. Both apps and linked worktrees share `pushright.disableRevert` in the local Git config; other repositories are unaffected. Revert remains allowed by default. When disabled, PushRight blocks starting or continuing revert while allowing abort. Terminal Git and other tools are outside this setting's scope.
 
-**v1.1.6 (MIT licensed)** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
+The desktop app refreshes open repositories every minute and fetches when they open and every ten minutes, including background tabs. Both defaults can be disabled independently in **Automatic refresh and fetch** beside the language selector. Busy repositories defer work; failures appear in the command log and retry on schedule. Background fetch preserves `FETCH_HEAD`, the index and working files. Force push also uses `--force-if-includes` to protect remote commits fetched in the background. These timers run while the desktop app is open, not after it exits; the extension does not enable them.
+
+**v1.1.7 (MIT licensed)** is available for Windows x64. It starts in English and includes complete English and Simplified Chinese UI packs. Switch languages in the top-right corner; your choice is remembered.
 
 The desktop client and editor extension share the new repository tools. The extension includes its own engine and does not require the desktop installation.
 
@@ -18,19 +20,19 @@ The desktop client and editor extension share the new repository tools. The exte
 
 Screenshots show the actual desktop app with a local demo repository and fictional identities.
 
-Source code for this release is available as [ZIP](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.6.zip) or [tar.gz](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.6.tar.gz).
+Source code for this release is available as [ZIP](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.7.zip) or [tar.gz](https://github.com/ArthurLauCS/PushRight/archive/refs/tags/v1.1.7.tar.gz).
 
 ## Download and install
 
-**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.6/PushRight_1.1.6_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.6/pushright-win32-x64-1.1.6.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.6/SHA256SUMS.txt)
+**[Download desktop installer](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.7/PushRight_1.1.7_x64-setup.exe)** · **[Download VSIX (VS Code / Cursor)](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.7/pushright-win32-x64-1.1.7.vsix)** · [SHA256 checksums](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.7/SHA256SUMS.txt)
 
-Download `PushRight_1.1.6_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.6).
+Download `PushRight_1.1.7_x64-setup.exe` from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.7).
 
 - Windows 10 / 11 x64; built and checked on Windows x64.
 - Install [Git for Windows](https://git-scm.com/downloads/win) and make `git` available on PATH.
 - Microsoft Edge WebView2 Runtime is required; the installer attempts an online installation if missing.
 - The installer offers English and Simplified Chinese. App language is selected independently.
-- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.1.6_x64-setup.exe -Algorithm SHA256`.
+- The installer is unsigned; Windows may show an unknown-publisher prompt. Verify against the release's `SHA256SUMS.txt` using `Get-FileHash .\PushRight_1.1.7_x64-setup.exe -Algorithm SHA256`.
 
 Previously named GitGod. PushRight retains the application data identifier for settings compatibility. The old GitGod installation may remain separately installed; it is not removed automatically.
 
@@ -57,7 +59,7 @@ Open a local repository, or pass its path when launching:
 
 1. Review changes, stage files, hunks or selected lines, and enter a commit message.
 2. Check the remote and branch before pushing. When a branch name differs from its upstream, the app requires an explicit choice and recommends the same-name remote branch.
-3. Push uses an explicit remote and branch refspec. Force push uses `--force-with-lease`; check the destination and expected effect first.
+3. Push uses an explicit remote and branch refspec. Force push uses `--force-with-lease --force-if-includes`; check the destination and expected effect first.
 
 For example, if local `feature/login` accidentally tracks `origin/main`, the dialog recommends `origin/feature/login` and makes the mismatch visible.
 
@@ -112,23 +114,23 @@ App text, tooltips, explanations and app-generated errors are translated. Reposi
 
 ## VS Code / Cursor extension
 
-Extension **1.1.6** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, a fixed-order branch list with the checked-out branch ticked, and batch local ignore / tracking controls.
+Extension **1.1.7** includes inline commit file lists and native diffs, Auto / All / branch filters, same-name push from the graph, submodule discovery, a fixed-order branch list with the checked-out branch ticked, and batch local ignore / tracking controls.
 
-The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.6). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
+The same engine and interface run inside VS Code. Install the Windows x64 extension from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AthurLau.pushright) or download the VSIX from [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.7). See the [extension guide](extension/README.md) for requirements and limits. To build from source:
 
 ```sh
 npm ci
 npm run ext:package
-code --install-extension extension/pushright-win32-x64-1.1.6.vsix
+code --install-extension extension/pushright-win32-x64-1.1.7.vsix
 ```
 
 - **Source Control panel**: staged, unstaged and conflicted files; stage, unstage or discard files or selected lines; commit and amend; gutter change markers and Explorer badges. On first use PushRight explains what turning off VS Code's built-in Git means and lets you decide.
-- **Push and pull checks**: Pull asks every time with **Rebase instead of merge** checked. Push recommends the same-name remote branch when the upstream has a different name, and the status bar warns about the mismatch. Force push uses `--force-with-lease` and asks twice.
+- **Push and pull checks**: Pull asks every time with **Rebase instead of merge** checked. Push recommends the same-name remote branch when the upstream has a different name, and the status bar warns about the mismatch. Force push uses `--force-with-lease --force-if-includes` and asks twice.
 - **Authors in the editor**: author, date and subject at the end of the current line, with a hover card; whole-file blame (`Alt+B`) colored by author or by age; CodeLens above files, classes and functions; a status bar item. Author styles set in the commit graph also apply here, and "Highlight Only This Line's Author" marks that author's lines in the file and scrollbar.
 - **History**: file history that follows the active editor, line history for a selection, previous / next revision (`Alt+,` / `Alt+.`), compare with any branch, tag or commit, and commit search by message, author, file, changed text or ID.
 - **Commit graph**: "PushRight: Open Commit Graph" opens the desktop interface in an editor tab.
 
-Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration, and automatic fetch. Submodules must already be initialized.
+Not included yet: macOS, Linux and remote (WSL / SSH) builds, PR / Issue integration. Submodules must already be initialized.
 
 ## Current limits
 

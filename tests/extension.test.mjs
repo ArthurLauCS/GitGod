@@ -129,6 +129,7 @@ test('sidecar answers the same commands as the desktop backend, plus history', {
     assert.deepEqual(rows.map((r) => r.subject), ['rename', 'shout three', 'add file'])
     assert.equal(refs.head, 'refs/heads/main')
     assert.equal(refs.revert_disabled, false)
+    assert.equal((await engine.call('op', { tab, op: { op: 'fetch' } })).ok, true, 'existing fetch callers remain compatible without the background flag')
     const [secondTab] = await engine.call('open_repo', { path: dir })
     assert.equal((await engine.call('op', { tab, op: { op: 'set_revert_disabled', disabled: true } })).ok, true)
     assert.equal((await engine.call('refs', { tab: secondTab })).revert_disabled, true)

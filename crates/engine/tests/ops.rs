@@ -151,6 +151,56 @@ fn conflict_state_and_abort() {
 }
 
 #[test]
+fn background_fetch_preserves_local_work_and_force_push_rejects_unintegrated_updates() {
+    let origin = init("background-origin");
+    commit_file(&origin, 1, "a.txt", "base\n");
+    git(&origin, 0, &["config", "receive.denyCurrentBranch", "ignore"]);
+    let dir = init("background-clone");
+    git(&dir, 0, &["remote", "add", "origin", origin.to_str().unwrap()]);
+    let repo = Repo::open(&dir).unwrap();
+    ok(&repo, Op::Fetch { background: false });
+    git(&dir, 0, &["checkout", "-q", "-B", "main", "origin/main"]);
+    let head = refs::list(&repo).unwrap().head_id;
+    std::fs::write(dir.join("a.txt"), "staged\n").unwrap();
+    status::stage(&repo, &["a.txt".into()]).unwrap();
+    std::fs::write(dir.join("a.txt"), "unstaged\n").unwrap();
+    std::fs::write(dir.join("untracked.txt"), "untracked\n").unwrap();
+    let index = std::fs::read(dir.join(".git/index")).unwrap();
+    std::fs::write(dir.join(".git/FETCH_HEAD"), "manual-fetch-sentinel\n").unwrap();
+    commit_file(&origin, 2, "remote.txt", "colleague\n");
+    let remote = Repo::open(&origin).unwrap();
+    let remote_head = refs::list(&remote).unwrap().head_id;
+
+    let log = ops::run(&repo, Op::Fetch { background: true }).unwrap();
+    assert!(log.ok, "{}", log.output);
+    assert!(log.command.contains("credential.interactive=never"));
+    assert!(log.command.contains("--no-write-fetch-head"));
+    assert_eq!(id_of(&repo, "refs/remotes/origin/main"), remote_head);
+    assert_eq!(refs::list(&repo).unwrap().head_id, head);
+    assert_eq!(std::fs::read(dir.join(".git/index")).unwrap(), index);
+    assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "unstaged\n");
+    assert_eq!(std::fs::read_to_string(dir.join("untracked.txt")).unwrap(), "untracked\n");
+    assert_eq!(std::fs::read_to_string(dir.join(".git/FETCH_HEAD")).unwrap(), "manual-fetch-sentinel\n");
+
+    let push = || Op::Push { remote: "origin".into(), branch: "main".into(), remote_branch: "main".into(), force: true, set_upstream: false };
+    let log = ops::run(&repo, push()).unwrap();
+    assert!(!log.ok, "auto-fetch must not make an unseen remote commit safe to overwrite");
+    assert_eq!(refs::list(&remote).unwrap().head_id, remote_head);
+    // includes 检查比较 reflog 时间；与实际 push 使用同一时钟。
+    let now = || (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() - 1_700_000_000) as u32;
+    git(&dir, now(), &["add", "."]);
+    git(&dir, now(), &["commit", "-q", "-m", "local work"]);
+    git(&dir, now(), &["rebase", "origin/main"]);
+    ok(&repo, Op::Push { remote: "origin".into(), branch: "main".into(), remote_branch: "main".into(), force: false, set_upstream: false });
+    git(&dir, now(), &["commit", "-q", "--amend", "-m", "rewritten local work"]);
+    ok(&repo, push());
+    assert_eq!(refs::list(&remote).unwrap().head_id, refs::list(&repo).unwrap().head_id);
+
+    std::fs::remove_dir_all(&dir).unwrap();
+    std::fs::remove_dir_all(&origin).unwrap();
+}
+
+#[test]
 fn remote_fetch_push_pull_and_upstream() {
     let origin = init("ops-origin");
     commit_file(&origin, 1, "a.txt", "a\n");
@@ -190,14 +240,14 @@ fn remote_fetch_push_pull_and_upstream() {
     // 远程前进后：fetch 看到落后，pull 跟上
     ok(&repo, Op::Checkout { target: "main".into() });
     commit_file(&origin, 4, "d.txt", "d\n");
-    ok(&repo, Op::Fetch);
+    ok(&repo, Op::Fetch { background: false });
     assert_eq!(refs::list(&repo).unwrap().ahead_behind, Some((0, 1)));
     ok(&repo, Op::Pull { rebase: true });
     assert_eq!(refs::list(&repo).unwrap().ahead_behind, Some((0, 0)));
 
     // 检出远程分支：建立跟踪它的本地分支
     git(&origin, 0, &["branch", "remote-only"]);
-    ok(&repo, Op::Fetch);
+    ok(&repo, Op::Fetch { background: false });
     ok(&repo, Op::Track { remote_branch: "origin/remote-only".into() });
     assert_eq!(upstream_of("refs/heads/remote-only").as_deref(), Some("refs/remotes/origin/remote-only"));
 

@@ -49,7 +49,7 @@ export type Op =
   | { op: 'stash_drop'; name: string }
   | { op: 'worktree_add'; path: string; start: string; new_branch: string | null }
   | { op: 'worktree_remove'; path: string; force: boolean }
-  | { op: 'fetch' }
+  | { op: 'fetch'; background?: boolean }
   | { op: 'pull'; rebase: boolean }
   | { op: 'push'; remote: string; branch: string; remote_branch: string; force: boolean; set_upstream: boolean }
   | { op: 'create_tag'; name: string; target: string; message: string }

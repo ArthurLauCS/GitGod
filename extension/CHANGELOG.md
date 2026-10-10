@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.7
+
+- Strengthen force-push protection with `--force-with-lease --force-if-includes` so background fetch cannot silently weaken the lease check.
+- Desktop automatic refresh/fetch timers are not enabled in the extension.
+
+强制推送增加远端提交已在本地整合的检查，避免后台 fetch 削弱保护。扩展版不启用桌面版定时器。
+
 ## 1.1.6
 
 - Append native Git command names to Chinese action labels across menus, buttons, dialogs and the command palette.

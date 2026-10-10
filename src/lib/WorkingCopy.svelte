@@ -18,6 +18,7 @@
     oncommitted,
     discard,
     discardLines,
+    busy = $bindable(false),
   }: {
     tab: number
     entries: api.Entry[]
@@ -30,6 +31,7 @@
     /** 丢弃这些路径的改动；确认对话框和执行都由上层负责 */
     discard: (paths: string[]) => void
     discardLines: (path: string, hunk: number, header: string, lines: number[]) => void
+    busy?: boolean
   } = $props()
 
   let sel = $state<{ path: string; staged: boolean } | null>(null)
@@ -40,7 +42,7 @@
   let message = $state('')
   let amend = $state(false)
   let error = $state('')
-  let busy = $state(false)
+  const disabled = $derived(busy || identityBusy)
 
   const unstaged = $derived(entries.filter((e) => e.unstaged))
   const staged = $derived(entries.filter((e) => e.staged))
@@ -65,11 +67,12 @@
     return () => (stale = true)
   })
 
-  async function run(op: Promise<unknown>) {
+  async function run(op: () => Promise<unknown>) {
+    if (disabled) return
     busy = true
     error = ''
     try {
-      await op
+      await op()
     } catch (e) {
       error = String(e)
     }
@@ -77,12 +80,12 @@
     busy = false
   }
 
-  const stage = (list: api.Entry[]) => run(api.stage(tab, list.map((e) => e.path)))
-  const unstage = (list: api.Entry[]) => run(api.unstage(tab, list.map((e) => e.path)))
+  const stage = (list: api.Entry[]) => run(() => api.stage(tab, list.map((e) => e.path)))
+  const unstage = (list: api.Entry[]) => run(() => api.unstage(tab, list.map((e) => e.path)))
 
   async function commit() {
     if (!canCommit) return
-    await run(api.commit(tab, message, amend))
+    await run(() => api.commit(tab, message, amend))
     if (error) return
     message = ''
     amend = false
@@ -102,9 +105,9 @@
     <div class="title">
       <span>{title}<span class="count">{items.length}</span><span class="hint">{hint}</span></span>
       {#if !isStaged}
-        <button class="btn small quiet danger" disabled={busy || !items.length} onclick={() => discard([])}>{t.discardAll}</button>
+        <button class="btn small quiet danger" disabled={disabled || !items.length} onclick={() => discard([])}>{t.discardAll}</button>
       {/if}
-      <button class="btn small" disabled={busy || !items.length} onclick={() => (isStaged ? unstage(items) : stage(items))}>
+      <button class="btn small" disabled={disabled || !items.length} onclick={() => (isStaged ? unstage(items) : stage(items))}>
         {isStaged ? t.unstageAll : t.stageAll}
       </button>
     </div>
@@ -122,13 +125,13 @@
           <span class="status s{s === '?' ? 'A' : s}" title={t.status[s] ?? s}>{s}</span>
           <span class="path">{base(e.path) || e.path}<span class="dir">{dir(e.path.replace(/\/$/, ''))}</span></span>
           {#if !isStaged && !e.conflicted}
-            <button class="btn small quiet icon danger" disabled={busy} title={t.discardFile} onclick={(ev) => (ev.stopPropagation(), discard([e.path]))}>
+            <button class="btn small quiet icon danger" disabled={disabled} title={t.discardFile} onclick={(ev) => (ev.stopPropagation(), discard([e.path]))}>
               <Icon name="undo" size={14} />
             </button>
           {/if}
           <button
             class="btn small quiet icon"
-            disabled={busy}
+            disabled={disabled}
             title={isStaged ? t.unstageFile : t.stageFile}
             onclick={(ev) => (ev.stopPropagation(), isStaged ? unstage([e]) : stage([e]))}
           >
@@ -174,15 +177,15 @@
     <ConflictView
       {conflict}
       {rebasing}
-      onresolve={(choices) => sel && run(api.conflictResolve(tab, sel.path, choices))}
-      ontake={(theirs) => sel && run(api.conflictTake(tab, sel.path, theirs))}
+      onresolve={(choices) => sel && run(() => api.conflictResolve(tab, sel!.path, choices))}
+      ontake={(theirs) => sel && run(() => api.conflictTake(tab, sel!.path, theirs))}
     />
   {:else}
     <DiffView
       {diff}
       fetchPage={sel ? (skip) => api.diffPage(tab, sel!.staged ? 'staged' : entries.find((e) => e.path === sel!.path)?.unstaged === '?' ? 'untracked' : 'unstaged', '', '', sel!.path, skip) : undefined}
       mode={sel?.staged ? 'staged' : 'unstaged'}
-      onapply={(hunk, header, lines) => sel && run(api.applyLines(tab, sel.path, sel.staged, hunk, header, lines))}
+      onapply={(hunk, header, lines) => sel && run(() => api.applyLines(tab, sel!.path, sel!.staged, hunk, header, lines))}
       ondiscard={(hunk, header, lines) => sel && discardLines(sel.path, hunk, header, lines)}
     />
   {/if}

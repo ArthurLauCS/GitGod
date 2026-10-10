@@ -4,6 +4,7 @@
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void }
 
 const vscode = acquireVsCodeApi()
+export const isTauri = () => false
 const pending = new Map<number, [(value: any) => void, (error: unknown) => void]>()
 let next = 0
 

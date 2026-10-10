@@ -6,9 +6,11 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
-**1.1.6 正式版**为中文菜单、弹窗选项和命令面板附加对应 Git 命令。源代码管理中的“仓库设置”可禁用当前仓库的 revert，与桌面版及关联工作树共享；禁用后阻止发起和继续 revert，仍允许中止。默认允许 revert，此设置不限制终端或其他 Git 工具。
+**1.1.7 正式版**加强强制推送保护，使用 `--force-with-lease --force-if-includes` 防止覆盖已获取但未在本地整合的远端提交。扩展版不启用桌面版的自动刷新与 fetch 定时器。
 
-**[下载 VSIX · Windows x64 · 1.1.6](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.6/pushright-win32-x64-1.1.6.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.6)
+中文菜单、弹窗选项和命令面板附加对应 Git 命令。源代码管理中的“仓库设置”可禁用当前仓库的 revert，与桌面版及关联工作树共享；禁用后阻止发起和继续 revert，仍允许中止。默认允许 revert，此设置不限制终端或其他 Git 工具。
+
+**[下载 VSIX · Windows x64 · 1.1.7](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.7/pushright-win32-x64-1.1.7.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.7)
 
 ## 使用条件
 
@@ -18,7 +20,7 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## 推送与拉取
 
-例如本地 `feature/login` 错误跟踪 `origin/main`，PushRight 会提示名称不一致，推荐 `origin/feature/login`，由你明确选择目标。推送使用指定的远程和分支 refspec；强制推送使用 `--force-with-lease` 并再次确认。
+例如本地 `feature/login` 错误跟踪 `origin/main`，PushRight 会提示名称不一致，推荐 `origin/feature/login`，由你明确选择目标。推送使用指定的远程和分支 refspec；强制推送使用 `--force-with-lease --force-if-includes` 并再次确认。
 
 每次 Pull 都会显示选择框，默认勾选 **Rebase instead of merge**。团队要求线性拉取历史时保持勾选。不会自动贮藏本地改动，请先提交或贮藏；遇到冲突后可解决并继续，或中止。
 
@@ -71,11 +73,11 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.6) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.7) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.6.vsix
-cursor --install-extension pushright-win32-x64-1.1.6.vsix
+code --install-extension pushright-win32-x64-1.1.7.vsix
+cursor --install-extension pushright-win32-x64-1.1.7.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。

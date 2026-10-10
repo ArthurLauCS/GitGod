@@ -1,5 +1,10 @@
 // 全部界面文案集中在此
 export const messages = {
+  autoSyncSettings: '自动刷新与获取',
+  autoRefresh: '每分钟刷新仓库数据',
+  autoFetch: '打开仓库时及每 10 分钟自动获取（git fetch --all --prune）',
+  autoSyncHint: '应用于此桌面版中所有已打开的仓库，包括后台页签。fetch 更新远程引用，不自动 pull、合并或修改工作区文件。仓库忙碌时延后到下一次检查；失败写入命令日志，按下一周期重试。',
+  autoFetchFailed: '自动获取失败，请查看命令日志；可点击“获取”手动重试。',
   repositorySettings: '仓库设置（git config --local）',
   disableRevert: '禁用 revert（git config --local pushright.disableRevert true）',
   allowRevert: '允许 revert（git config --local pushright.disableRevert false）',
@@ -298,7 +303,7 @@ export const messages = {
   pushToUpstream: (up: string) => `推送到上游 ${up}（git push）`,
   pushToSameName: (r: string) => `推送到同名分支 ${r}，并改为上游（推荐）（git push --set-upstream）`,
   remote: '远程',
-  forcePush: '强制推送（git push --force-with-lease）',
+  forcePush: '强制推送（git push --force-with-lease --force-if-includes）',
   noRemote: '这个仓库没有配置远程',
   noBranch: '当前不在任何分支上',
   noCommits: '这个仓库还没有提交',

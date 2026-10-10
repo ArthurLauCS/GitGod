@@ -1,5 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { isTauri } from '@tauri-apps/api/core'
+  import { loadAutoSync } from './lib/auto-sync'
   import { open } from '@tauri-apps/plugin-dialog'
   import * as api from './lib/api'
   import Icon from './lib/Icon.svelte'
@@ -23,6 +25,18 @@
   let error = $state('')
   let dialog = $state<Dialog>()
   let creating = $state(false)
+  const desktop = isTauri()
+  let autoSync = $state(loadAutoSync(localStorage))
+
+  async function autoSyncSettings() {
+    const values = await dialog!.ask({ title: t.autoSyncSettings, message: t.autoSyncHint, fields: [
+      { key: 'refresh', label: t.autoRefresh, type: 'checkbox', value: autoSync.refresh },
+      { key: 'fetch', label: t.autoFetch, type: 'checkbox', value: autoSync.fetch },
+    ] })
+    if (!values) return
+    autoSync = { refresh: !!values.refresh, fetch: !!values.fetch }
+    localStorage.setItem('autoSync', JSON.stringify(autoSync))
+  }
 
   async function create(clone: boolean) {
     const dir = await open({ directory: true, title: clone ? t.tools.cloneParent : t.tools.initRepo })
@@ -131,6 +145,7 @@
     {/each}
     <button class="btn quiet icon" class:on={active === null} title={t.newTab} onclick={() => (active = null)}><Icon name="plus" /></button>
     <span class="spacer"></span>
+    {#if desktop}<button class="btn quiet icon" title={t.autoSyncSettings} onclick={autoSyncSettings}><Icon name="settings" /></button>{/if}
     <select class="field language" aria-label={t.language} title={t.language} value={locale.current} onchange={(e) => setLocale(e.currentTarget.value as Locale)}>
       <option value="en">English</option>
       <option value="zh-CN">简体中文</option>
@@ -142,7 +157,7 @@
 
 <div class="body">
   {#each tabs as tab (tab.id)}
-    <RepoView tab={tab.id} path={tab.path} initialCount={tab.count} active={tab.id === active} onopen={openRepo} />
+    <RepoView tab={tab.id} path={tab.path} initialCount={tab.count} active={tab.id === active} onopen={openRepo} autoSync={desktop ? autoSync : undefined} />
   {/each}
 
   {#if active === null}

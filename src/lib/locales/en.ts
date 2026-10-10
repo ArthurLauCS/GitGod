@@ -1,6 +1,11 @@
 import type { messages as zh, explanations as zhHelp } from './zh'
 
 export const messages = {
+  autoSyncSettings: 'Automatic refresh and fetch',
+  autoRefresh: 'Refresh repository data every minute',
+  autoFetch: 'Fetch on opening a repository and every 10 minutes (git fetch --all --prune)',
+  autoSyncHint: 'Applies to all open repositories in this desktop app, including background tabs. Fetch updates remote references without pulling, merging or changing your working files. Busy repositories wait until the next check. Failures are recorded in the command log and retried at the next interval.',
+  autoFetchFailed: 'Automatic fetch failed. See the command log; use Fetch to retry manually.',
   repositorySettings: 'Repository settings',
   disableRevert: 'Disable revert',
   allowRevert: 'Allow revert',
@@ -286,7 +291,7 @@ export const messages = {
   pushToUpstream: (up: string) => `Push to upstream ${up}`,
   pushToSameName: (r: string) => `Push to same-name branch ${r} and set upstream (recommended)`,
   remote: 'Remote',
-  forcePush: 'Force push (--force-with-lease)',
+  forcePush: 'Force push (--force-with-lease --force-if-includes)',
   noRemote: 'This repository has no remote',
   noBranch: 'HEAD is not on a branch',
   noCommits: 'This repository has no commits yet',
