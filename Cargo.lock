@@ -3751,7 +3751,7 @@ dependencies = [
 
 [[package]]
 name = "pushright"
-version = "1.1.7"
+version = "1.1.8"
 dependencies = [
  "engine",
  "tauri",

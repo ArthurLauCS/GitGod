@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.8
+
+- Replace comparison and interactive rebase revision dropdowns with editable, searchable pickers in the shared full graph UI.
+- Group the current branch and upstream first, then common branches (main, master, season, dev, develop), other local branches, remote branches and tags.
+- Support mouse selection, arrow keys, Enter and Escape while retaining direct commit IDs and revision expressions.
+
+版本比较与交互式变基的选择框支持输入筛选，当前分支及上游置顶，season、dev 等常用分支优先，并保留直接输入提交号及版本表达式的能力。
+
 ## 1.1.7
 
 - Strengthen force-push protection with `--force-with-lease --force-if-includes` so background fetch cannot silently weaken the lease check.
