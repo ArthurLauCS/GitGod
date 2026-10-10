@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.6
+
+- Append native Git command names to Chinese action labels across menus, buttons, dialogs and the command palette.
+- Add repository settings shared by the desktop app and extension. Disabling revert blocks starting and continuing revert at execution time; abort remains available. Linked worktrees share the setting, other repositories are unaffected.
+
+中文操作名称增加对应 Git 命令；新增两端共用的仓库级“禁用 revert”设置，执行入口拦截新建和继续 revert，仍允许中止。
+
 ## 1.1.5
 
 - Show current-line blame on both sides of diffs, including added, deleted and unchanged lines. Use each side's revision or index snapshot; uncommitted additions are labeled as uncommitted.

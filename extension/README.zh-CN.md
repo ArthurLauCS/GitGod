@@ -6,9 +6,9 @@
 
 PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图。推送前明确目标，每次 Pull 默认勾选 **Rebase instead of merge**。包含中英文界面，扩展语言跟随 VS Code。
 
-**1.1.5 正式版**修复 diff 两侧的行末提交信息：新增、删除和未修改行均按各自版本显示归属，暂存和未保存的新增行显示“尚未提交”。
+**1.1.6 正式版**为中文菜单、弹窗选项和命令面板附加对应 Git 命令。源代码管理中的“仓库设置”可禁用当前仓库的 revert，与桌面版及关联工作树共享；禁用后阻止发起和继续 revert，仍允许中止。默认允许 revert，此设置不限制终端或其他 Git 工具。
 
-**[下载 VSIX · Windows x64 · 1.1.5](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.5/pushright-win32-x64-1.1.5.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.5)
+**[下载 VSIX · Windows x64 · 1.1.6](https://github.com/ArthurLauCS/PushRight/releases/download/v1.1.6/pushright-win32-x64-1.1.6.vsix)** · [版本说明与校验值](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.6)
 
 ## 使用条件
 
@@ -71,11 +71,11 @@ PushRight 在 VS Code 中提供 Git 源代码管理、Blame、历史和提交图
 
 ## VSIX 安装
 
-在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.5) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
+在 [GitHub Releases](https://github.com/ArthurLauCS/PushRight/releases/tag/v1.1.6) 下载 Windows x64 VSIX，然后执行 VS Code 或 Cursor 的“扩展：从 VSIX 安装”，或：
 
 ```sh
-code --install-extension pushright-win32-x64-1.1.5.vsix
-cursor --install-extension pushright-win32-x64-1.1.5.vsix
+code --install-extension pushright-win32-x64-1.1.6.vsix
+cursor --install-extension pushright-win32-x64-1.1.6.vsix
 ```
 
 反馈问题请提交到 [GitHub Issues](https://github.com/ArthurLauCS/PushRight/issues)，附版本和复现步骤；分享日志前移除凭据和私有仓库信息。

@@ -40,7 +40,7 @@
   let loadingAll = $state(false)
   let busy = $state(false)
   let error = $state('')
-  let refs = $state.raw<api.Refs>({ head: null, head_id: null, ahead_behind: null, in_progress: null, refs: [] })
+  let refs = $state.raw<api.Refs>({ head: null, head_id: null, ahead_behind: null, in_progress: null, revert_disabled: false, refs: [] })
   let stashes = $state.raw<api.Stash[]>([])
   let worktrees = $state.raw<api.Worktree[]>([])
   let entries = $state.raw<api.Entry[]>([])
@@ -247,12 +247,24 @@
   }
 
   async function discardLines(file: string, hunk: number, header: string, lines: number[]) {
-    if (!(await ask({ title: t.discardLinesTitle, explain: explain.discard, danger: true, confirm: t.discardConfirm }))) return
+    if (!(await ask({ title: t.discardLinesTitle, explain: explain.discard, danger: true, confirm: t.discardLinesConfirm }))) return
     await guard(api.discardLines(tab, file, hunk, header, lines))
     await refresh()
   }
 
   const ask = (spec: Parameters<Dialog['ask']>[0]) => dialog!.ask(spec)
+
+  async function repositorySettings() {
+    const current = await guard(api.refs(tab))
+    if (!current) return
+    refs = current
+    const values = await ask({
+      title: `${t.repositorySettings} · ${path}`,
+      message: t.revertScope,
+      fields: [{ key: 'disabled', label: t.disableRevert, type: 'checkbox', value: refs.revert_disabled }],
+    })
+    if (values) await exec({ op: 'set_revert_disabled', disabled: !!values.disabled })
+  }
 
   async function editIdentity() {
     identity = (await guard(api.commitIdentity(tab))) ?? identity
@@ -579,7 +591,7 @@
       },
       null,
       { label: t.cherryPick, hint: explain.cherry_pick.short, action: () => explained('cherry_pick', t.cherryPick, { op: 'cherry_pick', id }) },
-      { label: t.revertCommit, hint: explain.revert.short, action: () => explained('revert', t.revertCommit, { op: 'revert', id }) },
+      { label: t.revertCommit, disabled: refs.revert_disabled, hint: refs.revert_disabled ? t.errors.PR_REVERT_DISABLED : explain.revert.short, action: () => explained('revert', t.revertCommit, { op: 'revert', id }) },
       { label: t.resetTo(onto), hint: explain.reset.short, danger: true, action: () => reset(id) },
       null,
       { label: t.copyId, action: () => navigator.clipboard.writeText(id) },
@@ -612,13 +624,13 @@
         <Icon name="undo" /><span>{t.undo}</span>
       </button>
       <span class="sep"></span>
-      <button class="btn quiet" disabled={busy} title={explain.fetch.short} onclick={() => exec({ op: 'fetch' })}>
+      <button class="btn quiet" disabled={busy} title={`${t.fetch} · ${explain.fetch.short}`} onclick={() => exec({ op: 'fetch' })}>
         <Icon name="fetch" /><span>{t.fetch}</span>
       </button>
-      <button class="btn quiet" disabled={busy || !!refs.in_progress} title={explain.pull.short} onclick={pull}>
+      <button class="btn quiet" disabled={busy || !!refs.in_progress} title={`${t.pull} · ${explain.pull.short}`} onclick={pull}>
         <Icon name="pull" /><span>{t.pull}</span>
       </button>
-      <button class="btn quiet" disabled={busy} title={explain.push.short} onclick={() => push(head)}>
+      <button class="btn quiet" disabled={busy} title={`${t.push} · ${explain.push.short}`} onclick={() => push(head)}>
         <Icon name="push" /><span>{t.push}</span>
       </button>
     </div>
@@ -635,12 +647,13 @@
       </span>
     </div>
     <div class="tools end">
-      <button class="btn quiet" disabled={busy} title={explain.stash.short} onclick={stash}><Icon name="stash" /><span>{t.stash}</span></button>
-      <button class="btn quiet" disabled={busy} title={explain.create_branch.short} onclick={() => newBranch('HEAD')}>
+      <button class="btn quiet" disabled={busy} title={`${t.stash} · ${explain.stash.short}`} onclick={stash}><Icon name="stash" /><span>{t.stash}</span></button>
+      <button class="btn quiet" disabled={busy} title={`${t.newBranch} · ${explain.create_branch.short}`} onclick={() => newBranch('HEAD')}>
         <Icon name="branch" /><span>{t.newBranch}</span>
       </button>
       <span class="sep"></span>
       <button class="btn quiet" class:on={showLog} title={t.logHint} onclick={() => (showLog = !showLog)}><Icon name="log" /><span>{t.log}</span></button>
+      <button class="btn quiet" disabled={busy} title={t.repositorySettings} onclick={repositorySettings}><Icon name="settings" /><span>{t.repositorySettings}</span></button>
       <button class="btn quiet" title={t.help} onclick={() => help!.open()}><Icon name="help" /><span>{t.help}</span></button>
     </div>
   </header>
@@ -650,8 +663,8 @@
     <p class="progress">
       <strong>{t.inProgress[what]}</strong>
       <span>{t.inProgressHint}</span>
-      <button class="btn small primary" disabled={busy} onclick={() => exec({ op: 'continue', what })}>{t.continue}</button>
-      <button class="btn small" disabled={busy} onclick={() => exec({ op: 'abort', what })}>{t.abort}</button>
+      <button class="btn small primary" disabled={busy || (what === 'revert' && refs.revert_disabled)} onclick={() => exec({ op: 'continue', what })}>{t.continueOperation(what)}</button>
+      <button class="btn small" disabled={busy} onclick={() => exec({ op: 'abort', what })}>{t.abortOperation(what)}</button>
     </p>
   {/if}
   <main>
@@ -743,14 +756,15 @@
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: 16px;
-    height: 56px;
-    padding: 0 8px;
+    min-height: 56px;
+    padding: 8px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     container-type: inline-size;
   }
   .tools {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
     min-width: 0;

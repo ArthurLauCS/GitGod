@@ -51,8 +51,8 @@ test('language defaults to English, switches without resetting state, and surviv
   const ref = first.t
   first.setLocale('zh-CN')
   assert.equal(first.t, ref)
-  assert.equal(first.t.push, '推送')
-  assert.equal(first.explain.push.name, '推送')
+  assert.equal(first.t.push, '推送（git push）')
+  assert.equal(first.explain.push.name, '推送（git push）')
   assert.equal(document.documentElement.lang, 'zh-CN')
   assert.equal(first.errorText('PR_INVALID_NAME: "--flag"'), '名称不合法: "--flag"')
   assert.equal(first.errorText('fatal: 原始 Git 输出'), 'fatal: 原始 Git 输出')
@@ -63,4 +63,28 @@ test('language defaults to English, switches without resetting state, and surviv
   assert.equal((await load()).t.push, 'Push')
   storage.set('locale', 'unsupported')
   assert.equal((await load()).locale.current, 'en')
+})
+
+test('Chinese Git labels cover actions outside menus and distinguish commands with different effects', () => {
+  const cases = [
+    [zh.fetch, 'git fetch'], [zh.stageAll, 'git add -A'], [zh.unstageAll, 'git reset'],
+    [zh.stageLines(2), 'git apply --cached'], [zh.unstageLines(2), 'git apply --cached --reverse'],
+    [zh.discardAll, 'git stash push --include-untracked'], [zh.discardLinesConfirm, 'git apply --reverse'],
+    [zh.resetSoft, 'git reset --soft'], [zh.resetHard, 'git reset --hard'], [zh.amend, 'git commit --amend'],
+    [zh.rename, 'git branch -m'], [zh.tools.renameRemote, 'git remote rename'],
+    [zh.delete, 'git branch -d'], [zh.tools.deleteRemote, 'git remote remove'],
+    [zh.tools.editPush, 'git remote set-url --push'], [zh.tools.applyPlan, 'git rebase -i'],
+    [zh.forcePush, 'git push --force-with-lease'], [zh.newWorktree, 'git worktree add'],
+    [zh.continueOperation('revert'), 'git revert --continue'], [zh.abortOperation('revert'), 'git revert --abort'],
+    [zh.vscode.searchKinds.content, 'git log -S'], [zh.vscode.untrackFile, 'git rm --cached'],
+  ]
+  for (const [label, command] of cases) assert.ok(label.includes(command), `${label}: ${command}`)
+  const english = JSON.parse(readFileSync(new URL('../extension/package.nls.json', import.meta.url), 'utf8'))
+  const chinese = JSON.parse(readFileSync(new URL('../extension/package.nls.zh-cn.json', import.meta.url), 'utf8'))
+  assert.deepEqual(Object.keys(english).sort(), Object.keys(chinese).sort())
+  for (const key of ['commit', 'checkout', 'stageAll', 'fileHistory', 'compareWith', 'repositorySettings']) {
+    assert.match(chinese[`command.${key}`], /（git .+）$/)
+    assert.doesNotMatch(english[`command.${key}`], /（git /)
+  }
+  assert.doesNotMatch(zh.copyId, /git /, 'pure UI actions must not invent a Git command')
 })

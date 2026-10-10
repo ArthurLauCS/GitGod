@@ -21,6 +21,51 @@ fn id_of(repo: &Repo, name: &str) -> Option<String> {
 }
 
 #[test]
+fn repository_revert_policy_is_shared_persistent_and_checked_at_execution() {
+    let dir = init("revert-policy");
+    commit_file(&dir, 1, "a.txt", "base\n");
+    commit_file(&dir, 2, "a.txt", "second\n");
+    let repo = Repo::open(&dir).unwrap();
+    let second = refs::list(&repo).unwrap().head_id.unwrap();
+    commit_file(&dir, 3, "a.txt", "third\n");
+    let head = refs::list(&repo).unwrap().head_id;
+    assert!(!refs::list(&repo).unwrap().revert_disabled);
+    let linked_path = dir.join("linked");
+    git(&dir, 0, &["worktree", "add", "-q", "-b", "linked", linked_path.to_str().unwrap()]);
+    let linked = Repo::open(&linked_path).unwrap();
+    let other = Repo::open(&init("revert-policy-other")).unwrap();
+
+    ok(&repo, Op::SetRevertDisabled { disabled: true });
+    assert!(refs::list(&Repo::open(&dir).unwrap()).unwrap().revert_disabled);
+    assert!(refs::list(&linked).unwrap().revert_disabled);
+    assert!(!refs::list(&other).unwrap().revert_disabled);
+    for r in [&repo, &linked] {
+        assert_eq!(ops::run(r, Op::Revert { id: "HEAD".into() }).unwrap_err(), "PR_REVERT_DISABLED");
+        assert_eq!(ops::run(r, Op::Continue { what: InProgress::Revert }).unwrap_err(), "PR_REVERT_DISABLED");
+    }
+    assert_eq!(refs::list(&repo).unwrap().head_id, head);
+    assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "third\n");
+
+    // 在另一工作树恢复设置后，原会话立即生效；中途禁用不能阻止安全中止。
+    ok(&linked, Op::SetRevertDisabled { disabled: false });
+    assert!(!refs::list(&repo).unwrap().revert_disabled);
+    assert!(!ops::run(&repo, Op::Revert { id: second }).unwrap().ok);
+    assert_eq!(refs::list(&repo).unwrap().in_progress, Some("revert"));
+    ok(&repo, Op::SetRevertDisabled { disabled: true });
+    assert_eq!(ops::run(&repo, Op::Continue { what: InProgress::Revert }).unwrap_err(), "PR_REVERT_DISABLED");
+    ok(&repo, Op::Abort { what: InProgress::Revert });
+    assert_eq!(refs::list(&repo).unwrap().head_id, head);
+    assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "third\n");
+    assert!(refs::list(&repo).unwrap().in_progress.is_none());
+
+    git(&dir, 0, &["config", "--local", "pushright.disableRevert", "invalid"]);
+    assert!(ops::run(&repo, Op::Revert { id: "HEAD".into() }).is_err());
+    ok(&repo, Op::SetRevertDisabled { disabled: false });
+    ok(&repo, Op::Revert { id: "HEAD".into() });
+    assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "second\n");
+}
+
+#[test]
 fn branches_tags_stash_reset() {
     let dir = init("ops-local");
     commit_file(&dir, 1, "a.txt", "a\n");

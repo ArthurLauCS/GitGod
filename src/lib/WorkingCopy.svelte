@@ -221,9 +221,10 @@
   .title {
     flex: none;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-    height: 36px;
+    min-height: 36px;
     padding: 0 8px 0 12px;
     font-size: var(--fs-sm);
     color: var(--muted);
@@ -323,6 +324,7 @@
   }
   .identity {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
   }
@@ -351,6 +353,8 @@
   }
   .actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     align-items: center;
     justify-content: space-between;
   }

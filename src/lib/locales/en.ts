@@ -1,7 +1,17 @@
 import type { messages as zh, explanations as zhHelp } from './zh'
 
 export const messages = {
+  repositorySettings: 'Repository settings',
+  disableRevert: 'Disable revert',
+  allowRevert: 'Allow revert',
+  revertScope: 'Applies to this local repository and its linked worktrees in both PushRight apps. Blocks starting or continuing revert; abort remains available. Does not restrict Git in the terminal or other tools. Reverting merged changes can affect what later merges bring back.',
+  continueOperation: (_what: string) => 'Continue',
+  abortOperation: (_what: string) => 'Abort',
+  discardLinesConfirm: 'Discard',
   tools: {
+    renameRemote: 'Rename remote…',
+    deleteRemote: 'Remove remote…',
+    rebaseActions: { pick: 'pick', reword: 'reword', edit: 'edit', squash: 'squash', fixup: 'fixup', drop: 'drop' } as Record<string, string>,
     refresh: 'Refresh',
     nav: 'Repository tools',
     compare: 'Compare revisions',
@@ -52,6 +62,7 @@ export const messages = {
   stashPopHint: 'Restore these changes and remove the stash if successful',
   renameHint: 'Rename the local branch only',
   errors: {
+    PR_REVERT_DISABLED: 'Revert is disabled for this repository. You can change this in Repository settings; abort remains available.',
     PR_REBASE_BASE: 'Choose an ancestor of the current HEAD as the base.',
     PR_REBASE_MERGES: 'This range contains merge commits. Choose a linear range; merge commits will not be silently flattened.',
     PR_REBASE_PLAN: 'Invalid rebase plan. Include each commit exactly once; squash/fixup need an earlier retained commit and reword needs a message.',
@@ -181,6 +192,7 @@ export const messages = {
   undoNothing: 'Nothing to undo',
   undoTitle: (what: string) => `Undo “${what}”`,
   opNames: {
+    set_revert_disabled: 'Repository settings',
     checkout: 'Switch branch', track: 'Check out remote branch', create_branch: 'Create branch',
     delete_branch: 'Delete branch', create_tag: 'Create tag', delete_tag: 'Delete tag',
     merge: 'Merge', rebase: 'Rebase', cherry_pick: 'Cherry-pick', revert: 'Revert', reset: 'Reset',

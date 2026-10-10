@@ -22,6 +22,7 @@ export interface Refs {
   /** 当前分支相对上游的 [领先, 落后] */
   ahead_behind: [number, number] | null
   in_progress: InProgress | null
+  revert_disabled: boolean
   refs: Ref[]
 }
 export type InProgress = 'merge' | 'rebase' | 'cherry-pick' | 'revert'
@@ -40,6 +41,7 @@ export type Op =
   | { op: 'rebase'; onto: string }
   | { op: 'cherry_pick'; id: string }
   | { op: 'revert'; id: string }
+  | { op: 'set_revert_disabled'; disabled: boolean }
   | { op: 'reset'; target: string; mode: 'soft' | 'mixed' | 'hard' | 'keep' }
   | { op: 'discard'; paths: string[] }
   | { op: 'stash_push'; message: string; include_untracked: boolean }

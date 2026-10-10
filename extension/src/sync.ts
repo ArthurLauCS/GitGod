@@ -122,8 +122,9 @@ export async function inProgress(repo = activeRepo()) {
   const what = repo?.refs.in_progress
   if (!repo || !what) return
   const hint = `${t.inProgressHint}${what === 'rebase' ? '\n\n' + t.rebaseConflictHint : ''}`
-  const choice = await vscode.window.showWarningMessage(t.inProgress[what], { modal: true, detail: hint }, t.continue, t.abort)
-  if (choice) await run(repo, { op: choice === t.continue ? 'continue' : 'abort', what })
+  const choices = what === 'revert' && repo.refs.revert_disabled ? [t.abortOperation(what)] : [t.continueOperation(what), t.abortOperation(what)]
+  const choice = await vscode.window.showWarningMessage(t.inProgress[what], { modal: true, detail: hint }, ...choices)
+  if (choice) await run(repo, { op: choice === t.continueOperation(what) ? 'continue' : 'abort', what })
 }
 
 /** 状态栏里的分支、拉取、推送入口；上游不同名和操作进行中时多出警告项。 */

@@ -76,7 +76,7 @@ async function discover(extra: string[]) {
           const parent = repos.filter((r) => fold(root).startsWith(fold(r.root) + sep)).sort((a, b) => b.root.length - a.root.length)[0]
           repo = {
             tab, root, name: parent ? `${parent.name}/${relative(parent.root, root).split(sep).join('/')}` : basename(root), status: [], identity: null, remotes: [],
-            refs: { head: null, head_id: null, ahead_behind: null, in_progress: null, refs: [] },
+            refs: { head: null, head_id: null, ahead_behind: null, in_progress: null, revert_disabled: false, refs: [] },
           }
           repos.push(repo)
           loading = refresh(repo)

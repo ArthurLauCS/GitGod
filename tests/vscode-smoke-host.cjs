@@ -21,7 +21,7 @@ exports.run = async () => {
     const root = vscode.workspace.workspaceFolders[0].uri.fsPath
     const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim()
     const file = vscode.Uri.file(join(root, 'src.ts'))
-    const step = (name) => passed.push(name)
+    const step = (name) => { passed.push(name); console.log(`[smoke ${new Date().toISOString()}] ${name}`) }
 
     const extension = vscode.extensions.getExtension(process.env.PUSHRIGHT_SMOKE_ID)
     const api = await extension.activate()
@@ -42,6 +42,20 @@ exports.run = async () => {
     const missing = extension.packageJSON.contributes.commands.map((c) => c.command).filter((c) => !registered.has(c))
     assert.deepEqual(missing, [])
     step(`registers all ${extension.packageJSON.contributes.commands.length} contributed commands`)
+
+    const settings = vscode.commands.executeCommand('pushright.repositorySettings', api.repos[0])
+    await sleep(750)
+    await vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem')
+    await settings
+    assert.equal(git('config', '--local', '--get', 'pushright.disableRevert'), 'true')
+    assert.equal((await api.engine.call('refs', { tab: initialTab })).revert_disabled, true)
+    const protectedHead = git('rev-parse', 'HEAD')
+    await assert.rejects(api.engine.call('op', { tab: initialTab, op: { op: 'revert', id: 'HEAD' } }), /PR_REVERT_DISABLED/)
+    assert.equal(git('rev-parse', 'HEAD'), protectedHead)
+    await api.engine.call('op', { tab: initialTab, op: { op: 'set_revert_disabled', disabled: false } })
+    await vscode.commands.executeCommand('pushright.refresh')
+    assert.equal(api.repos[0].refs.revert_disabled, false)
+    step('repository settings persist locally and the shared engine blocks revert without changing HEAD')
 
     // Pull：选择框里「Rebase instead of merge」默认勾选，直接确认应当是变基
     const pulling = vscode.commands.executeCommand('pushright.pull')

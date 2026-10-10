@@ -1,6 +1,6 @@
 <script lang="ts" module>
   /** null 表示分隔线 */
-  export type Item = { label: string; hint?: string; action: () => void; danger?: boolean } | null
+  export type Item = { label: string; hint?: string; action: () => void; danger?: boolean; disabled?: boolean } | null
 </script>
 
 <script lang="ts">
@@ -33,7 +33,7 @@
   <div class="menu" bind:this={menu} style:left="{x}px" style:top="{y}px" role="menu">
     {#each items as item, i (i)}
       {#if item}
-        <button role="menuitem" class:danger={item.danger} onclick={() => (close(), item.action())}>
+        <button role="menuitem" disabled={item.disabled} class:danger={item.danger} onclick={() => (close(), item.action())}>
           {item.label}
           {#if item.hint}<small>{item.hint}</small>{/if}
         </button>
@@ -49,6 +49,9 @@
     position: fixed;
     z-index: 10;
     min-width: 264px;
+    max-width: calc(100vw - 8px);
+    max-height: calc(100vh - 8px);
+    overflow: auto;
     padding: 4px;
     border: 1px solid var(--border-strong);
     border-radius: var(--r-md);
@@ -64,9 +67,10 @@
     border-radius: var(--r-sm);
     background: none;
     text-align: left;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
-  button:hover {
+  button:hover:enabled {
     background: var(--accent);
     color: var(--on-accent);
   }
@@ -81,7 +85,7 @@
   .danger {
     color: var(--red);
   }
-  .danger:hover {
+  .danger:hover:enabled {
     background: var(--red);
     color: var(--on-danger);
   }

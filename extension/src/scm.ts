@@ -87,7 +87,7 @@ async function applySelection(mode: 'stage' | 'unstage' | 'discard') {
   if (!editor || !repo) return
   const staged = mode === 'unstage'
   if (staged ? revOf(editor.document.uri) !== '' : editor.document.uri.scheme !== 'file') return void vscode.window.showWarningMessage(v.selectionSide)
-  if (mode === 'discard' && !(await vscode.window.showWarningMessage(t.discardLinesTitle, { modal: true, detail: help.discard.undo }, t.discardConfirm))) return
+  if (mode === 'discard' && !(await vscode.window.showWarningMessage(t.discardLinesTitle, { modal: true, detail: help.discard.undo }, t.discardLinesConfirm))) return
   // 保存可能失败，也可能经格式化改变选区；以保存成功后的行号为准。
   if (editor.document.isDirty && !(await editor.document.save())) return
   // 选区在行首结束时，最后那一行其实没被选中
@@ -291,6 +291,18 @@ export function registerScm(context: vscode.ExtensionContext) {
     command('commit', (arg) => ((repo) => repo && commit(repo, false))(target(arg))),
     command('commitAmend', (arg) => ((repo) => repo && commit(repo, true))(target(arg))),
     command('editIdentity', (arg) => ((repo) => repo && editIdentity(repo))(target(arg))),
+    command('repositorySettings', async (arg) => {
+      const repo = target(arg)
+      if (!repo) return
+      await refresh(repo)
+      const picked = await vscode.window.showQuickPick([
+        { label: t.disableRevert, disabled: true },
+        { label: t.allowRevert, disabled: false },
+      ].map((item) => ({ ...item, description: item.disabled === repo.refs.revert_disabled ? t.wtCurrent : undefined })), {
+        title: `${repo.name} · ${t.repositorySettings}`, placeHolder: t.revertScope,
+      })
+      if (picked) await run(repo, { op: 'set_revert_disabled', disabled: picked.disabled })
+    }),
     command('refresh', async () => { await discoverRepositories(); await Promise.all(repos.map((repo) => refresh(repo))) }),
     command('closeRepository', async (arg) => {
       const repo = repoArg(arg) ?? (await vscode.window.showQuickPick(repos.map((repo) => ({ label: repo.name, description: repo.root, repo })), { title: v.closeRepository }))?.repo

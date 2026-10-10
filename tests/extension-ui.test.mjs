@@ -523,11 +523,40 @@ test('SCM separates repositories, stops on failed saves and uses selections afte
   assert.ok((await provider.stat(original)).mtime > oldTime)
   assert.deepEqual(events, [{ type: 1, uri: original }])
   for (const action of ['createDirectory', 'writeFile', 'delete', 'rename']) assert.throws(() => provider[action](original), /readonly/)
+  Object.assign(core.t, { repositorySettings: 'Repository settings', disableRevert: 'Disable revert', allowRevert: 'Allow revert', wtCurrent: 'Current' })
+  core.refresh = async (repo) => { repo.refs = { revert_disabled: true } }
+  core.run = async (repo, op) => { writes.push([repo.tab, 'op', op]); return true }
+  vscode.window.showQuickPick = async (items, options) => {
+    assert.match(options.title, /^two · Repository settings/)
+    assert.equal(items[0].description, 'Current', 'settings are refreshed before showing the choice')
+    return items[1]
+  }
+  await commands.get('pushright.repositorySettings')(controls[1])
+  assert.deepEqual(writes.at(-1), [1, 'op', { op: 'set_revert_disabled', disabled: false }], 'settings target the selected repository, not the active editor')
+  const writeCount = writes.length
+  vscode.window.showQuickPick = async () => undefined
+  await commands.get('pushright.repositorySettings')(controls[1])
+  assert.equal(writes.length, writeCount, 'cancel leaves the policy unchanged')
   core.closeRepo = async (repo) => { repos.splice(repos.indexOf(repo), 1); core.onRepoChange.fire(repo) }
   await commands.get('pushright.closeRepository')(controls[1])
   assert.equal(controls[1].disposed, true, 'repository context menu closes its target, not the active editor repository')
   assert.equal(controls[0].disposed, undefined)
   assert.equal(repos.length, 1)
+})
+
+test('disabled revert offers abort only, while other operations retain continue', async () => {
+  const calls = [], shown = []
+  const repo = { refs: { in_progress: 'revert', revert_disabled: true } }
+  const t = { inProgress: {}, inProgressHint: '', continueOperation: (what) => `git ${what} --continue`, abortOperation: (what) => `git ${what} --abort` }
+  const vscode = { window: { showWarningMessage: async (_, options, ...choices) => { shown.push(choices); return choices[0] } } }
+  const sync = load('sync', { vscode, './core': { t, run: async (_, op) => calls.push(op) }, '../../src/lib/branch-name': {}, '../../src/lib/push-target': {} })
+  await sync.inProgress(repo)
+  assert.deepEqual(shown[0], ['git revert --abort'])
+  assert.deepEqual(calls[0], { op: 'abort', what: 'revert' })
+  repo.refs.in_progress = 'rebase'
+  await sync.inProgress(repo)
+  assert.deepEqual(shown[1], ['git rebase --continue', 'git rebase --abort'])
+  assert.deepEqual(calls[1], { op: 'continue', what: 'rebase' })
 })
 
 test('local files expand lazily and tracking commands distinguish local rules, shared rules and deletion', async () => {

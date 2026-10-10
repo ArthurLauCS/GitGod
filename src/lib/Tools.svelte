@@ -46,7 +46,7 @@
     })
   }
   async function remote(action: 'add' | 'fetch' | 'push' | 'rename' | 'remove', item?: api.Remote) {
-    const title = action === 'add' ? t.tools.addRemote : action === 'remove' ? t.delete : action === 'rename' ? t.rename : action === 'push' ? t.tools.editPush : t.tools.editFetch
+    const title = action === 'add' ? t.tools.addRemote : action === 'remove' ? t.tools.deleteRemote : action === 'rename' ? t.tools.renameRemote : action === 'push' ? t.tools.editPush : t.tools.editFetch
     const values = await ask({ title, message: item?.name, warning: action === 'remove' ? t.tools.removeRemote : undefined, danger: action === 'remove', fields:
       action === 'remove' ? [] : action === 'rename' ? [{ key: 'name', label: t.tools.remoteName, type: 'text', value: item!.name }]
       : [...(action === 'add' ? [{ key: 'name', label: t.tools.remoteName, type: 'text' as const, value: 'origin' }] : []), { key: 'url', label: t.tools.url, type: 'text', value: item?.[action === 'push' ? 'push' : 'fetch'] ?? '' }],
@@ -104,7 +104,7 @@
     {#each remotes as item (item.name)}
       <article><h3>{item.name}</h3><p>Fetch: {item.fetch}</p><p>Push: {item.push}</p>
         <div class="actions">{#each ['fetch', 'push', 'rename', 'remove'] as action}
-          <button class="btn small" disabled={disabled} onclick={() => remote(action as 'fetch' | 'push' | 'rename' | 'remove', item)}>{action === 'fetch' ? t.tools.editFetch : action === 'push' ? t.tools.editPush : action === 'rename' ? t.rename : t.delete}</button>
+          <button class="btn small" disabled={disabled} onclick={() => remote(action as 'fetch' | 'push' | 'rename' | 'remove', item)}>{action === 'fetch' ? t.tools.editFetch : action === 'push' ? t.tools.editPush : action === 'rename' ? t.tools.renameRemote : t.tools.deleteRemote}</button>
         {/each}</div>
       </article>
     {/each}
@@ -127,7 +127,7 @@
           <div class="actions">
             <button class="btn small" title={t.tools.up} aria-label={t.tools.up} disabled={disabled || index === 0} onclick={() => move(index, -1)}>↑</button>
             <button class="btn small" title={t.tools.down} aria-label={t.tools.down} disabled={disabled || index === plan!.steps.length - 1} onclick={() => move(index, 1)}>↓</button>
-            <select class="field" aria-label={t.tools.action} bind:value={step.action} disabled={disabled}>{#each ['pick', 'reword', 'edit', 'squash', 'fixup', 'drop'] as action}<option>{action}</option>{/each}</select>
+            <select class="field" aria-label={t.tools.action} bind:value={step.action} disabled={disabled}>{#each ['pick', 'reword', 'edit', 'squash', 'fixup', 'drop'] as action}<option value={action}>{t.tools.rebaseActions[action]}</option>{/each}</select>
             <code>{step.id.slice(0, 8)}</code><span>{step.subject}</span>
           </div>
           {#if step.action === 'reword' || step.action === 'squash'}<label>{t.tools.rebaseMessage}<textarea class="field" bind:value={step.message} disabled={disabled}></textarea></label>{/if}

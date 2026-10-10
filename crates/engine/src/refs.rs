@@ -23,6 +23,7 @@ pub struct Refs {
     pub ahead_behind: Option<(u32, u32)>,
     /// 进行到一半的操作：merge / rebase / cherry-pick / revert
     pub in_progress: Option<&'static str>,
+    pub revert_disabled: bool,
     pub refs: Vec<Ref>,
 }
 
@@ -156,14 +157,15 @@ fn list_with(repo: &Repo, count: bool) -> Result<Refs> {
     let gix = repo.gix();
     let head = gix.head_name().map_err(err)?.map(|n| n.as_bstr().to_string());
     // 上游信息走 CLI：gix 的配置是打开仓库时的快照，push -u 之后不会更新。计数与它并行跑，没有上游时计数命令自己会失败
-    let (out, ahead_behind) = std::thread::scope(|s| {
+    let (out, ahead_behind, revert_disabled) = std::thread::scope(|s| {
+        let revert_disabled = s.spawn(|| crate::ops::revert_disabled(repo));
         let ahead_behind = (count && head.is_some()).then(|| s.spawn(|| {
             let out = repo.git(&["rev-list", "--left-right", "--count", "HEAD...@{upstream}"]).ok()?;
             let out = String::from_utf8_lossy(&out);
             let mut n = out.split_whitespace().map(|n| n.parse().ok());
             Some((n.next()??, n.next()??))
         }));
-        (repo.git(&["for-each-ref", "--format=%(refname)%00%(upstream)", "refs/heads"]), ahead_behind.and_then(|t| t.join().unwrap()))
+        (repo.git(&["for-each-ref", "--format=%(refname)%00%(upstream)", "refs/heads"]), ahead_behind.and_then(|t| t.join().unwrap()), revert_disabled.join().unwrap())
     });
     let out = out?;
     let out = String::from_utf8_lossy(&out);
@@ -183,6 +185,7 @@ fn list_with(repo: &Repo, count: bool) -> Result<Refs> {
         head_id: gix.head_id().ok().map(|id| id.to_string()),
         ahead_behind,
         in_progress,
+        revert_disabled: revert_disabled?,
         refs: commits(&gix)?
             .into_iter()
             .map(|(name, id)| Ref { upstream: upstreams.get(name.as_str()).map(|u| u.to_string()), name, id: id.to_string() })

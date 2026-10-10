@@ -43,6 +43,7 @@ pub enum Op {
     Rebase { onto: String },
     CherryPick { id: String },
     Revert { id: String },
+    SetRevertDisabled { disabled: bool },
     Reset { target: String, mode: ResetMode },
     StashPush { message: String, include_untracked: bool },
     /// 丢弃这些路径的改动（空列表表示全部）。改动进贮藏列表而不是直接删除，后悔了可以取回
@@ -73,7 +74,16 @@ pub(crate) fn safe(s: &str) -> Result<&str> {
     Ok(s)
 }
 
+pub fn revert_disabled(repo: &Repo) -> Result<bool> {
+    let out = repo.git(&["config", "--local", "--type=bool", "--default=false", "--get", "pushright.disableRevert"])?;
+    Ok(out == b"true\n")
+}
+
 pub fn run(repo: &Repo, op: Op) -> Result<Log> {
+    // 每次执行都重读，不能依赖窗口中可能过期的设置；中止仍可用于退出冲突。
+    if matches!(op, Op::Revert { .. } | Op::Continue { what: InProgress::Revert }) && revert_disabled(repo)? {
+        return Err("PR_REVERT_DISABLED".into());
+    }
     let mut args: Vec<&str> = Vec::new();
     let refspec;
     match &op {
@@ -89,6 +99,7 @@ pub fn run(repo: &Repo, op: Op) -> Result<Log> {
         Op::Rebase { onto } => args.extend(["rebase", safe(onto)?]),
         Op::CherryPick { id } => args.extend(["cherry-pick", safe(id)?]),
         Op::Revert { id } => args.extend(["revert", "--no-edit", safe(id)?]),
+        Op::SetRevertDisabled { disabled } => args.extend(["config", "--local", "--type=bool", "--replace-all", "pushright.disableRevert", if *disabled { "true" } else { "false" }]),
         Op::Reset { target, mode } => {
             let mode = match mode {
                 ResetMode::Soft => "--soft",
